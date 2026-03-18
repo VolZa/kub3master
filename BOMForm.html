@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h3>Створити BOM</h3>
+
+<label>Parent Code:</label><br>
+<input type="text" id="parent"><br><br>
+
+<label>Specification:</label><br>
+<textarea id="spec" rows="10" cols="40"
+placeholder="12А3 1015
+4Вр1 340
+12А3 560"></textarea>
+
+<br><br>
+
+<button onclick="buildBOM()">Створити BOM</button>
+
+<p id="result"></p>
+
+<script>
+
+function buildBOM(){
+
+  const parent = document.getElementById("parent").value;
+  const spec = document.getElementById("spec").value;
+
+  google.script.run
+    .withSuccessHandler(function(res){
+
+      document.getElementById("result").innerText = res;
+
+      google.script.host.close();   // закрити форму
+
+    })
+    .withFailureHandler(function(err){
+
+      document.getElementById("result").innerText = err.message;
+
+    })
+    .buildBOMFromText(parent, spec);
+
+}
+
+</script>
+
+</body>
+</html>
