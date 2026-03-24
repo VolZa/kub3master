@@ -15,6 +15,18 @@ export function buildElementRow(
   };
 }
 
+export function buildAssemblyRow(id: string, code: string): ElementRow {
+  return {
+    ID: id,
+    Code: code,
+    Name: `Вузол ${code}`,
+    Type: 'assembly',
+    Category: 'assembly',
+    BaseUnit: 'шт',
+    CreatedAt: new Date(),
+  };
+}
+
 // 👉 це:
 // прибере дублювання
 // уніфікує роботу з таблицею

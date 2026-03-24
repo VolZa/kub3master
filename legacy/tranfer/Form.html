@@ -1,63 +1,73 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <body>
-  <h3>Новий елемент</h3>
+    <h3>Новий елемент</h3>
 
-  <label>Type:</label><br>
-  <select id="type" onchange="onTypeChange()">
-    <option value="product">product</option>
-    <option value="assembly">assembly</option>
-    <option value="part">part</option>
-    <option value="material">material</option>
-  </select><br><br>
+    <label>Type:</label><br />
+    <select id="type" onchange="onTypeChange()">
+      <option value="product">product</option>
+      <option value="assembly">assembly</option>
+      <option value="part">part</option>
+      <option value="material">material</option></select
+    ><br /><br />
 
-  <label>Code:</label><br>
-  <input type="text" id="code" onblur="smartParseAll()"><br><br>
+    <label>Code:</label><br />
+    <input type="text" id="code" onblur="smartParseAll()" /><br /><br />
 
-  <label>Name:</label><br>
-  <input type="text" id="name"><br><br>
+    <label>Name:</label><br />
+    <input type="text" id="name" /><br /><br />
 
-  <label>Base Unit:</label><br>
-  <input type="text" id="unit"><br><br>
+    <label>Base Unit:</label><br />
+    <input type="text" id="unit" /><br /><br />
 
+    <label>Category:</label><br />
+    <input type="text" id="category" /><br /><br />
 
-  <label>Category:</label><br>
-  <input type="text" id="category"><br><br>
+    <label>Profile Type:</label><br />
+    <input type="text" id="profileType" /><br /><br />
 
-  <label>Profile Type:</label><br>
-  <input type="text" id="profileType"><br><br>
+    <label>Diameter (мм):</label><br />
+    <input type="number" id="diameter" oninput="recalcWeightForPart()" /><br />
 
-  <label>Diameter (мм):</label><br>
-  <input type="number" id="diameter" oninput="recalcWeightForPart()"><br>
-  
-  <label>Class:</label><br>
-  <input type="text" id="class"><br><br>
+    <label>Class:</label><br />
+    <input type="text" id="class" /><br /><br />
 
-  <label>Length (мм):</label><br>
-  <input type="number" id="length"
-    oninput="recalcWeightForFlatOrAngle(); recalcWeightForPart();"><br>
-  
-  <label>Width (мм):</label><br>
-  <input type="number" id="width" oninput="recalcWeightForFlatOrAngle()"><br><br>
+    <label>Length (мм):</label><br />
+    <input
+      type="number"
+      id="length"
+      oninput="
+        recalcWeightForFlatOrAngle();
+        recalcWeightForPart();
+      "
+    /><br />
 
-  <label>Thickness (мм):</label><br>
-  <input type="number" id="thickness" oninput="recalcWeightForFlatOrAngle()"><br><br>
+    <label>Width (мм):</label><br />
+    <input
+      type="number"
+      id="width"
+      oninput="recalcWeightForFlatOrAngle()"
+    /><br /><br />
 
+    <label>Thickness (мм):</label><br />
+    <input
+      type="number"
+      id="thickness"
+      oninput="recalcWeightForFlatOrAngle()"
+    /><br /><br />
 
-  <label>Weight per unit:</label><br>
-  <input type="number" step="0.001" id="weightPerUnit"><br><br>
+    <label>Weight per unit:</label><br />
+    <input type="number" step="0.001" id="weightPerUnit" /><br /><br />
 
-  <label>Density:</label><br>
-  <input type="number" step="0.001" id="density"><br><br>
+    <label>Density:</label><br />
+    <input type="number" step="0.001" id="density" /><br /><br />
 
-  <label>Comment:</label><br>
-  <input type="text" id="comment"><br><br>
+    <label>Comment:</label><br />
+    <input type="text" id="comment" /><br /><br />
 
-  <button onclick="submitForm()">Зберегти</button>
+    <button onclick="submitForm()">Зберегти</button>
 
-  <p id="result"></p>
-
- 
+    <p id="result"></p>
 
     <script>
       //визначаємо одиниці вимірювання від(type)
@@ -65,56 +75,55 @@
         const type = document.getElementById('type').value;
         const unitField = document.getElementById('unit');
 
-        if (type === 'material') unitField.value = "м";
-        else unitField.value = "шт";
+        if (type === 'material') unitField.value = 'м';
+        else unitField.value = 'шт';
 
         updateFieldState();
       }
 
       function submitForm() {
-
         const data = {
           type: document.getElementById('type').value,
           code: document.getElementById('code').value,
           name: document.getElementById('name').value,
-          category: document.getElementById('category')?.value || "",
-          unit: document.getElementById('unit').value,
-          profileType: document.getElementById('profileType')?.value || "",
-          diameter: document.getElementById('diameter')?.value || "",
-          class: document.getElementById('class')?.value || "",
-          length: document.getElementById('length')?.value || "",
-          width: document.getElementById('width')?.value || "",
-          thickness: document.getElementById('thickness')?.value || "",
+          category: document.getElementById('category')?.value || '',
+          baseUnit: document.getElementById('baseUnit').value,
+          profileType: document.getElementById('profileType')?.value || '',
+          diameter: document.getElementById('diameter')?.value || '',
+          class: document.getElementById('class')?.value || '',
+          length: document.getElementById('length')?.value || '',
+          width: document.getElementById('width')?.value || '',
+          thickness: document.getElementById('thickness')?.value || '',
           weightPerUnit: document.getElementById('weightPerUnit').value,
           density: document.getElementById('density').value,
-          comment: document.getElementById('comment').value
+          comment: document.getElementById('comment').value,
         };
 
         google.script.run
-          .withSuccessHandler(function(res){
+          .withSuccessHandler(function (res) {
             alert(res);
           })
           .addElement(data);
       }
 
       function applyResult(result) {
+        document.getElementById('code').value = result.code || '';
+        document.getElementById('name').value = result.name || '';
+        document.getElementById('type').value = result.type || '';
+        document.getElementById('category').value = result.category || '';
+        document.getElementById('unit').value = result.baseUnit || '';
 
-        document.getElementById('code').value = result.code || "";
-        document.getElementById('name').value = result.name || "";
-        document.getElementById('type').value = result.type || "";
-        document.getElementById('category').value = result.category || "";
-        document.getElementById('unit').value = result.baseUnit || "";
+        document.getElementById('profileType').value = result.profileType || '';
+        document.getElementById('diameter').value = result.diameter || '';
+        document.getElementById('class').value = result.class || '';
+        document.getElementById('length').value = result.length || '';
+        document.getElementById('width').value = result.width || '';
+        document.getElementById('thickness').value = result.thickness || '';
 
-        document.getElementById('profileType').value = result.profileType || "";
-        document.getElementById('diameter').value = result.diameter || "";
-        document.getElementById('class').value = result.class || "";
-        document.getElementById('length').value = result.length || "";
-        document.getElementById('width').value = result.width || "";
-        document.getElementById('thickness').value = result.thickness || "";
+        document.getElementById('weightPerUnit').value =
+          result.weightPerUnit || '';
 
-        document.getElementById('weightPerUnit').value = result.weightPerUnit || "";
-
-        if (result.profileType === "rebar") {
+        if (result.profileType === 'rebar') {
           document.getElementById('weightPerUnit').readOnly = true;
         } else {
           document.getElementById('weightPerUnit').readOnly = false;
@@ -126,25 +135,23 @@
         } else {
           document.getElementById('type').disabled = false;
         }
-        
+
         if (
-          result.profileType === "rebar" ||
-          result.profileType === "flat" ||
-          result.profileType === "angle"
-        ){
+          result.profileType === 'rebar' ||
+          result.profileType === 'flat' ||
+          result.profileType === 'angle'
+        ) {
           document.getElementById('density').value = 7850;
         }
         updateFieldState();
       }
 
       function smartParseAll() {
-
         const value = document.getElementById('code').value;
 
         // 1️⃣ Спочатку перевіряємо префікси
         google.script.run
-          .withSuccessHandler(function(prefixResult){
-
+          .withSuccessHandler(function (prefixResult) {
             if (prefixResult && prefixResult.detected) {
               applyResult(prefixResult);
               return;
@@ -152,25 +159,21 @@
 
             // 2️⃣ Якщо не префікс — тоді інженерний парсер
             google.script.run
-              .withSuccessHandler(function(result){
-
+              .withSuccessHandler(function (result) {
                 if (!result || !result.detected) return;
 
                 applyResult(result);
-
               })
               .smartEngineeringParser(value);
-
-        })
+          })
           .classifyByPrefix(value);
       }
 
       function recalcWeightForPart() {
-
         const type = document.getElementById('type').value;
         const profileType = document.getElementById('profileType').value;
 
-        if (type !== "part" || profileType !== "rebar") return;
+        if (type !== 'part' || profileType !== 'rebar') return;
 
         const diameter = Number(document.getElementById('diameter').value);
         const length = Number(document.getElementById('length').value);
@@ -184,7 +187,6 @@
       }
 
       function updateFieldState() {
-
         const type = document.getElementById('type').value;
         const profileType = document.getElementById('profileType').value;
 
@@ -196,35 +198,36 @@
         const weightPerUnit = document.getElementById('weightPerUnit');
         const density = document.getElementById('density');
 
-        if (profileType === "rebar" || profileType === "flat" || profileType === "angle") {
+        if (
+          profileType === 'rebar' ||
+          profileType === 'flat' ||
+          profileType === 'angle'
+        ) {
           density.readOnly = true;
         } else {
           density.readOnly = false;
         }
 
         // 🔹 скидаємо все
-        [diameter, rebarClass, length, width, thickness, weightPerUnit]
-          .forEach(el => el.readOnly = false);
+        [diameter, rebarClass, length, width, thickness, weightPerUnit].forEach(
+          (el) => (el.readOnly = false),
+        );
 
-        if (profileType === "rebar") {
-
+        if (profileType === 'rebar') {
           width.readOnly = true;
           thickness.readOnly = true;
 
-          if (type === "part") {
+          if (type === 'part') {
             weightPerUnit.readOnly = true;
           }
 
-          if (type === "material") {
+          if (type === 'material') {
             length.readOnly = true;
           }
-
-        } else if (profileType === "flat" || profileType === "angle") {
-
+        } else if (profileType === 'flat' || profileType === 'angle') {
           diameter.readOnly = true;
           rebarClass.readOnly = true;
           weightPerUnit.readOnly = true;
-
         } else {
           // product або assembly
           diameter.readOnly = true;
@@ -234,28 +237,25 @@
           length.readOnly = true;
           weightPerUnit.readOnly = true;
         }
-
       }
 
       function recalcWeightForFlatOrAngle() {
-
         const type = document.getElementById('type').value;
         const profileType = document.getElementById('profileType').value;
 
-        if (type !== "part") return;
-        if (profileType !== "flat" && profileType !== "angle") return;
+        if (type !== 'part') return;
+        if (profileType !== 'flat' && profileType !== 'angle') return;
 
         const width = Number(document.getElementById('width').value);
         const thickness = Number(document.getElementById('thickness').value);
         const length = Number(document.getElementById('length').value);
-        const density = Number(document.getElementById('density').value || 7850);
+        const density = Number(
+          document.getElementById('density').value || 7850,
+        );
 
         if (!width || !thickness || !length) return;
 
-        const volume =
-          (width / 1000) *
-          (thickness / 1000) *
-          (length / 1000);
+        const volume = (width / 1000) * (thickness / 1000) * (length / 1000);
 
         const weight = (volume * density).toFixed(3);
 

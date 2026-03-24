@@ -47,6 +47,6 @@ export function getOrCreateElement(parsed: ParsedSpec) {
   return {
     id,
     code: built.code,
-    unit: built.baseUnit, // 🔥 додали
+    baseUnit: built.baseUnit, // 🔥 додали
   };
 }

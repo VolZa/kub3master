@@ -1,13 +1,5 @@
 import { ElementType } from '../../services/moove.element';
 
-// export interface Element {
-//   id: string;
-//   code: string;
-//   type: string;
-//   category: string;
-//   baseUnit: string;
-// }
-
 // як зберігається в таблиці
 export interface ElementRow {
   ID: string;
@@ -51,4 +43,10 @@ export interface CreateElementDto {
   length?: number;
   width?: number;
   thickness?: number;
+}
+
+export interface ElementCacheItem {
+  id: string;
+  code: string;
+  baseUnit: string; // ❗ було unit
 }

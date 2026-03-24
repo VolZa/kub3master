@@ -2,26 +2,50 @@ import { parseSpec } from './bom.parser';
 import { getOrCreateElement } from '../elements/element.factory';
 import { getOrCreateAssembly } from '../elements/assembly.service';
 import { insertBOMRows } from './bom.repository';
+import { mapElementToBOMItem } from './bom.mapper';
+import { ElementCacheItem } from '../elements/element.model';
 
 /**
  * Будує один рядок BOM
  */
+// function buildBOMRow(parentId: string, line: string, now: Date): any[] {
+//   const { spec, qty } = extractSpecAndQty(line);
+
+//   const parsed = parseSpec(spec);
+
+//   if (!parsed.detected) {
+//     throw new Error('Не розпізнано: ' + line);
+//   }
+
+//   const child = getOrCreateElement(parsed);
+
+//   return [
+//     parentId,
+//     child.id,
+//     qty,
+//     child.unit, // 🔥 головна зміна
+//     now,
+//   ];
+// }
+
 function buildBOMRow(parentId: string, line: string, now: Date): any[] {
   const { spec, qty } = extractSpecAndQty(line);
-
   const parsed = parseSpec(spec);
 
   if (!parsed.detected) {
     throw new Error('Не розпізнано: ' + line);
   }
 
-  const child = getOrCreateElement(parsed);
+  const child: ElementCacheItem = getOrCreateElement(parsed);
+
+  // 🔥 новий крок
+  const bomItem = mapElementToBOMItem(child);
 
   return [
     parentId,
     child.id,
     qty,
-    child.unit, // 🔥 головна зміна
+    bomItem.unit, // ✅ через mapper
     now,
   ];
 }

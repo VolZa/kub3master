@@ -6,7 +6,7 @@ export interface ElementInput {
   type: ElementType;
 
   category?: string;
-  unit?: string;
+  baseUnit?: string;
   profileType?: string;
 
   diameter?: number;
