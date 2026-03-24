@@ -1,56 +1,20 @@
-// function addBOMSmart(parentCode, specString, qty) {
-
-//   const bomSheet = getSheetByNameSafe('01_BOM');
-
-//   // 1️⃣ знайти Parent
-//   const parent = findElementByCode(parentCode);
-//   if (!parent) {
-//     Logger.log("Parent not found: " + parentCode);
-//     return;
-//   }
-
-//   // 2️⃣ розібрати специфікацію
-//   const parsed = smartEngineeringParser(specString);
-//   if (!parsed) {
-//     Logger.log("Parser failed: " + specString);
-//     return;
-//   }
-
-//   // 3️⃣ створити або знайти part
-//   const child = getOrCreatePart(parsed);
-
-//   // 4️⃣ запис у BOM
-//   bomSheet.appendRow([
-//     parent.id,
-//     parent.code,
-//     child.id,
-//     child.code,
-//     Number(qty),
-//     "шт",
-//     new Date()
-//   ]);
-
-// }
-
 function addBOMSmart(parentCode, specString, qty) {
-
   const bomSheet = getSheetByNameSafe('01_BOM');
 
   qty = Number(qty);
   if (!qty || qty <= 0) {
-    return "❌ Qty повинно бути > 0";
+    return '❌ Qty повинно бути > 0';
   }
 
   let parent = findElementByCode(parentCode);
 
-  if (!parent){
-
+  if (!parent) {
     const id = addElementAndReturnId({
-      type: "assembly",
+      type: 'assembly',
       code: parentCode,
-      name: "Вузол " + parentCode,
-      category: "assembly",
-      unit: "шт"
+      name: 'Вузол ' + parentCode,
+      category: 'assembly',
+      unit: 'шт',
     });
 
     parent = { id: id, code: parentCode };
@@ -59,7 +23,7 @@ function addBOMSmart(parentCode, specString, qty) {
   const parsed = smartEngineeringParser(specString);
 
   if (!parsed || !parsed.detected) {
-    return "❌ Не вдалося розпізнати специфікацію: " + specString;
+    return '❌ Не вдалося розпізнати специфікацію: ' + specString;
   }
 
   const child = getOrCreatePart(parsed);
@@ -67,15 +31,9 @@ function addBOMSmart(parentCode, specString, qty) {
   Logger.log(parent);
   Logger.log(child);
 
-  bomSheet.appendRow([
-    parent.id,
-    child.id,
-    qty,
-    "шт",
-    new Date()
-  ]);
+  bomSheet.appendRow([parent.id, child.id, qty, 'шт', new Date()]);
 
-  return "✅ BOM додано";
+  return '✅ BOM додано';
 }
 // function addBOMSmart(parentCode, specString, qty) {
 
@@ -85,7 +43,6 @@ function addBOMSmart(parentCode, specString, qty) {
 //   if (!qty || qty <= 0) {
 //     return "❌ Qty повинно бути > 0";
 //   }
-
 
 //   let parent = findElementByCode(parentCode);
 
@@ -188,63 +145,42 @@ function addBOMSmart(parentCode, specString, qty) {
 //   return "Додано: " + added;
 // }
 
-
-
 function buildBOMFromText(parentCode, specText) {
-
   const lines = specText
-    .split("\n")
-    .map(l => l.trim())
-    .filter(l => l !== "");
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l !== '');
 
   let added = 0;
   let errors = [];
 
   for (let line of lines) {
-    
     // - Нормалізація рядка
     line = line.trim();
     line = normalizeCode(line);
-     line = line
-      .replace(/Арматура/gi,"")
-      .replace(/Ø/g,"")
-      .replace(/\(.*?\)/g,"")   // прибираємо (А-240)
-      .replace(/,/g,"")
-      .replace(/L\s*=\s*/i," ")
-      .replace(/А-І\b/g,"А1")
-      .replace(/А-ІІ\b/g,"А2")
-      .replace(/А-ІІІ\b/g,"А3")
-      .replace(/Вр-?1/gi,"Вр1") 
-      .replace(/\s+/g," ")
+    line = line
+      .replace(/Арматура/gi, '')
+      .replace(/Ø/g, '')
+      .replace(/\(.*?\)/g, '') // прибираємо (А-240)
+      .replace(/,/g, '')
+      .replace(/L\s*=\s*/i, ' ')
+      .replace(/А-І\b/g, 'А1')
+      .replace(/А-ІІ\b/g, 'А2')
+      .replace(/А-ІІІ\b/g, 'А3')
+      .replace(/Вр-?1/gi, 'Вр1')
+      .replace(/\s+/g, ' ')
       .trim();
-    // line = line
-    //   .replace(/Арматура/gi,"")
-    //   .replace(/Ø/g,"")
-    //   .replace(/\(.*?\)/g,"")   // прибираємо (А-240)
-    //   .replace(/,/g,"")
-    //   .replace(/L\s*=\s*/i," ")
-    //   .replace(/A-I\b/g,"А1")
-    //   .replace(/A-II\b/g,"А2")
-    //   .replace(/A-III\b/g,"А3")
-    //   .replace(/A-І\b/g,"А1")
-    //   .replace(/A-ІІ\b/g,"А2")
-    //   .replace(/A-ІІІ\b/g,"А3")
-    //   .replace(/Вр-?1/gi,"Вр1") 
-    //   .replace(/\s+/g," ")
-    //   .trim();
-  //      .replace(/-/g," ")
     Logger.log(line);
     // --- 1️⃣ інженерний формат ---
     const parts = line.split(/\s+/);
 
     if (parts.length >= 2 && /^\d/.test(parts[0])) {
-
-      const spec = parts[0] + " " + parts[1];
+      const spec = parts[0] + ' ' + parts[1];
       const qty = parts[2] || 1;
 
       const res = addBOMSmart(parentCode, spec, qty);
 
-      if (res.startsWith("✅")) added++;
+      if (res.startsWith('✅')) added++;
       else errors.push(line);
 
       continue;
@@ -254,12 +190,11 @@ function buildBOMFromText(parentCode, specText) {
     const parsed = parseEngineeringLine(line);
 
     if (parsed && parsed.detected) {
-
-      const spec = parsed.diameter + parsed.class + " " + parsed.length;
+      const spec = parsed.diameter + parsed.class + ' ' + parsed.length;
 
       const res = addBOMSmart(parentCode, spec, 1);
 
-      if (res.startsWith("✅")) added++;
+      if (res.startsWith('✅')) added++;
       else errors.push(line);
 
       continue;
@@ -269,5 +204,5 @@ function buildBOMFromText(parentCode, specText) {
     errors.push(line);
   }
 
-  return "Додано: " + added + " | Помилки: " + errors.length;
+  return 'Додано: ' + added + ' | Помилки: ' + errors.length;
 }

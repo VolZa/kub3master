@@ -1,4 +1,4 @@
-function getSheetByNameSafe(
+export function getSheet(
   sheetName: string,
 ): GoogleAppsScript.Spreadsheet.Sheet {
   const sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
@@ -11,7 +11,7 @@ function getSheetByNameSafe(
 }
 
 //Створення карти заголовків
-function getHeaderMap(
+export function getHeaderMap(
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
 ): Record<string, number> {
   const headers = sheet
@@ -25,7 +25,7 @@ function getHeaderMap(
   return map;
 }
 
-function appendRowSafe(
+export function appendRowSafe(
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
   row: unknown[],
 ) {
@@ -36,7 +36,7 @@ function appendRowSafe(
 //Форматування певних колонок таблиці 00_Elements
 //запустити вручну в разі збою форматування
 function setupElementSheetFormats(): void {
-  const sheet = getSheetByNameSafe('00_Elements');
+  const sheet = getSheet('00_Elements');
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
   const map: Record<string, number> = {};

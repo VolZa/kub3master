@@ -17,3 +17,20 @@ function normalizeCode(input: string): string {
   Logger.log('upper= ' + upper);
   return upper;
 }
+
+export function normalizeLine(line: string): string {
+  return line
+    .trim()
+    .toUpperCase()
+    .replace(/Ø/g, '')
+    .replace(/АРМАТУРА/g, '')
+    .replace(/\(.*?\)/g, '')
+    .replace(/,/g, '')
+    .replace(/L\s*=\s*/g, ' ')
+    .replace(/А-І\b/g, 'А1')
+    .replace(/А-ІІ\b/g, 'А2')
+    .replace(/А-ІІІ\b/g, 'А3')
+    .replace(/ВР-?1/g, 'ВР1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}

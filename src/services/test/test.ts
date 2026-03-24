@@ -1,4 +1,4 @@
-import { addElement } from '../element.service';
+import { addElement } from '../../modules/elements/element.service';
 export function test_addElement() {
   const data = {
     name: 'Test',
