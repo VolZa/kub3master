@@ -1,36 +1,32 @@
 <!doctype html>
 <html>
   <body>
-    <h3>Новий елемент</h3>
-
-    <label>Name:</label><br />
-    <input id="name" /><br /><br />
-
-    <label>Type:</label><br />
-    <select id="type">
-      <option value="product">product</option>
-      <option value="assembly">assembly</option></select
-    ><br /><br />
-
-    <button onclick="submitForm()">Submit</button>
-
+    <h3>Створити BOM</h3>
+    <label>Parent Code:</label><br />
+    <input type="text" id="parent" /><br /><br />
+    <label>Specification:</label><br />
+    <textarea
+      id="spec"
+      rows="10"
+      cols="40"
+      placeholder="12А3 1015 4Вр1 340 12А3 560"
+    ></textarea>
+    <br /><br />
+    <button onclick="buildBOM()">Створити BOM</button>
+    <p id="result"></p>
     <script>
-      function submitForm() {
-        const data = {
-          name: document.getElementById('name').value,
-          type: document.getElementById('type').value,
-        };
-
+      function buildBOM() {
+        const parent = document.getElementById('parent').value;
+        const spec = document.getElementById('spec').value;
         google.script.run
-          .withSuccessHandler((res) => {
-            console.log('SUCCESS:', res);
-            alert('OK: ' + res);
+          .withSuccessHandler(function (res) {
+            document.getElementById('result').innerText = res;
+            google.script.host.close(); // закрити форму
           })
-          .withFailureHandler((err) => {
-            console.error('ERROR:', err);
-            alert('ERROR');
+          .withFailureHandler(function (err) {
+            document.getElementById('result').innerText = err.message;
           })
-          .addElement(data);
+          .buildBOMFromText(parent, spec);
       }
     </script>
   </body>

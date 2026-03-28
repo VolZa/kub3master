@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+  <body>
+    <h3>Новий елемент</h3>
+
+    <label>Name:</label><br />
+    <input id="name" /><br /><br />
+
+    <label>Type:</label><br />
+    <select id="type">
+      <option value="product">product</option>
+      <option value="assembly">assembly</option></select
+    ><br /><br />
+
+    <button onclick="submitForm()">Submit</button>
+
+    <script>
+      function submitForm() {
+        const data = {
+          name: document.getElementById('name').value,
+          type: document.getElementById('type').value,
+        };
+
+        google.script.run
+          .withSuccessHandler((res) => {
+            console.log('SUCCESS:', res);
+            alert('OK: ' + res);
+          })
+          .withFailureHandler((err) => {
+            console.error('ERROR:', err);
+            alert('ERROR');
+          })
+          .addElement(data);
+      }
+    </script>
+  </body>
+</html>

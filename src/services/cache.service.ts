@@ -1,3 +1,4 @@
+import { mapRowToElement } from '../modules/elements/element.mapper';
 import { ElementShort } from '../modules/elements/element.model';
 import { createColumnMap, getValue } from '../utils/column-mapper';
 
@@ -40,15 +41,30 @@ export function getElementCache(): ElementMap {
 
   const result: ElementMap = {};
 
+  // for (let i = 1; i < data.length; i++) {
+  //   const row = data[i];
+
+  //   const id = getValue(row, map, 'ID');
+  //   const code = getValue(row, map, 'Code');
+  //   const baseUnit = getValue(row, map, 'BaseUnit');
+
+  //   if (code) {
+  //     result[code] = { id, code, baseUnit };
+  //   }
+  // }
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
 
-    const id = getValue(row, map, 'ID');
-    const code = getValue(row, map, 'Code');
-    const baseUnit = getValue(row, map, 'baseUnit');
+    const elementRow = mapRowToElement(row, map);
 
-    if (code) {
-      result[code] = { id, code, baseUnit };
+    const element: ElementCacheItem = {
+      id: elementRow.ID,
+      code: elementRow.Code,
+      baseUnit: elementRow.BaseUnit,
+    };
+
+    if (element.code) {
+      result[element.code] = element;
     }
   }
 
