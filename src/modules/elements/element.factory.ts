@@ -1,18 +1,19 @@
-import { ParsedSpec } from '../bom/bom.parser';
+import { ParsedSpec } from '../bom/model/parsed-spec.model';
 import { buildRebar } from './builders/rebar.builder';
 import { buildAngle } from './builders/angle.builder';
 import { buildPlate } from './builders/plate.builder';
-
-import { findElementByCode, insertElementRow } from './element.repository';
+import { ElementRepository } from './element.repository';
 import { generateId } from '../../services/id.service';
 import { buildElementRow } from './element.mapper';
 
-export function getOrCreateElement(parsed: ParsedSpec) {
-  if (!parsed.detected) {
-    throw new Error('Spec not detected');
+export function getOrCreateElement(
+  parsed: ParsedSpec,
+  repo: ElementRepository,
+) {
+  if (parsed.kind === 'unknown') {
+    throw new Error('Spec not recognized');
   }
 
-  // 🔥 1. Визначаємо builder
   let built;
 
   switch (parsed.kind) {
@@ -29,24 +30,78 @@ export function getOrCreateElement(parsed: ParsedSpec) {
       break;
 
     default:
-      throw new Error('Unknown element kind');
+      throw new Error(`Builder not implemented for kind: ${parsed.kind}`);
   }
 
-  // 🔥 2. Шукаємо
-  const existing = findElementByCode(built.code);
+  // 🔍 тепер через repo
+  const existing = repo.findByCode(built.code);
 
   if (existing) return existing;
 
-  // 🔥 3. Створюємо
+  // 🆕 створення
   const id = generateId(built.type);
 
   const row = buildElementRow(built, id);
 
-  insertElementRow(row);
+  repo.insert(row);
 
   return {
     id,
     code: built.code,
-    baseUnit: built.baseUnit, // 🔥 додали
+    baseUnit: built.baseUnit,
   };
 }
+
+// import { ParsedSpec } from '../bom/model/parsed-spec.model';
+// import { buildRebar } from './builders/rebar.builder';
+// import { buildAngle } from './builders/angle.builder';
+// import { buildPlate } from './builders/plate.builder';
+
+// import { findElementByCode, insertElementRow } from './element.repository';
+// import { generateId } from '../../services/id.service';
+// import { buildElementRow } from './element.mapper';
+
+// export function getOrCreateElement(parsed: ParsedSpec) {
+//   // ❌ detected більше не потрібен
+//   if (parsed.kind === 'unknown') {
+//     throw new Error('Spec not recognized');
+//   }
+
+//   let built;
+
+//   // 🔥 типобезпечний switch
+//   switch (parsed.kind) {
+//     case 'rebar':
+//       built = buildRebar(parsed);
+//       break;
+
+//     case 'angle':
+//       built = buildAngle(parsed);
+//       break;
+
+//     case 'plate':
+//       built = buildPlate(parsed);
+//       break;
+
+//     default:
+//       throw new Error(`Builder not implemented for kind: ${parsed.kind}`);
+//   }
+
+//   // 🔍 пошук
+//   const existing = findElementByCode(built.code);
+
+//   if (existing) return existing;
+
+//   // 🆕 створення
+//   const id = generateId(built.type);
+
+//   const row = buildElementRow(built, id);
+
+//   insertElementRow(row);
+
+//   return {
+//     id,
+//     code: built.code,
+//     baseUnit: built.baseUnit,
+//   };
+// }

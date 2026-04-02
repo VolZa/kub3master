@@ -2,6 +2,45 @@
 <html>
   <body>
     <h3>Створити BOM</h3>
+
+    <label>Parent Code:</label><br />
+    <input id="parentCode" value="КП-1" /><br /><br />
+
+    <label>Specification:</label><br />
+    <textarea id="spec" rows="6">
+Арматура ø12 А500С, L=1015 1
+Арматура ø4 Вр-І, L=340 2
+    </textarea
+    ><br /><br />
+
+    <button onclick="submitForm()">Створити BOM</button>
+
+    <script>
+      function submitForm() {
+        const data = {
+          parentCode: document.getElementById('parentCode').value,
+          specification: document.getElementById('spec').value,
+        };
+
+        console.log('SEND:', data); // 🔥 debug HTML
+
+        google.script.run
+          .withSuccessHandler((res) => {
+            console.log('SUCCESS:', res);
+          })
+          .withFailureHandler((err) => {
+            console.error('ERROR:', err);
+          })
+          .buildBOMFromText(data); // ✅
+      }
+    </script>
+  </body>
+</html>
+
+<!-- <!doctype html>
+<html>
+  <body>
+    <h3>Створити дя BOM</h3>
     <label>Parent Code:</label><br />
     <input type="text" id="parent" /><br /><br />
     <label>Specification:</label><br />
@@ -30,4 +69,4 @@
       }
     </script>
   </body>
-</html>
+</html> -->

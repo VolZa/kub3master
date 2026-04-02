@@ -1,38 +1,58 @@
-import { getElementCache } from '../../services/cache.service';
-import { getSheet } from '../../services/sheets.service';
-import { ElementRow } from './element.model';
-import { ELEMENT_HEADERS } from './element.schema';
+import { ParsedSpec } from '../bom/model/parsed-spec.model';
+import { buildRebar } from './builders/rebar.builder';
+import { buildAngle } from './builders/angle.builder';
+import { buildPlate } from './builders/plate.builder';
+// import { ElementRepository } from './element.repository';
+import { generateId } from '../../services/id.service';
+import { buildElementRow } from './element.mapper';
 
-export function findElementByCode(code: string) {
-  const cache = getElementCache();
-
-  return cache[code] || null;
+export interface ElementRepository {
+  findByCode(code: string): any | null;
+  insert(row: any): void;
 }
 
-// export function findElementByCode(code: string) {
-//   const sheet = getSheet('00_Elements');
-//   const data = sheet.getDataRange().getValues();
+export function getOrCreateElement(
+  parsed: ParsedSpec,
+  repo: ElementRepository,
+) {
+  if (parsed.kind === 'unknown') {
+    throw new Error('Spec not recognized');
+  }
 
-//   for (let i = 1; i < data.length; i++) {
-//     if (data[i][1] === code) {
-//       return {
-//         id: data[i][0],
-//         code: data[i][1],
-//       };
-//     }
-//   }
+  let built;
 
-//   return null;
-// }
+  switch (parsed.kind) {
+    case 'rebar':
+      built = buildRebar(parsed);
+      break;
 
-export function insertElementRow(row: ElementRow): void {
-  const sheet = getSheet('00_Elements');
-  const headers = ELEMENT_HEADERS;
+    case 'angle':
+      built = buildAngle(parsed);
+      break;
 
-  const mappedRow = headers.map((h) => {
-    const key = h as keyof ElementRow;
-    return row[key] ?? '';
-  });
+    case 'plate':
+      built = buildPlate(parsed);
+      break;
 
-  sheet.appendRow(mappedRow);
+    default:
+      throw new Error(`Builder not implemented for kind: ${parsed.kind}`);
+  }
+
+  // 🔍 шукаємо
+  const existing = repo.findByCode(built.code);
+
+  if (existing) return existing;
+
+  // 🆕 створюємо
+  const id = generateId(built.type);
+
+  const row = buildElementRow(built, id);
+
+  repo.insert(row);
+
+  return {
+    id,
+    code: built.code,
+    baseUnit: built.baseUnit,
+  };
 }

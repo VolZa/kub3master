@@ -6,8 +6,10 @@
     "moduleResolution": "node",
     "strict": true,
     "rootDir": "src",
-    "types": ["google-apps-script"],
+    "types": ["node", "google-apps-script"],
     "esModuleInterop": true,
     "sourceMap": true
   }
 }
+
+//"module": "CommonJS"

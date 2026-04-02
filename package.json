@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "build": "rollup -c && cpy appsscript.json html/**/*.html dist",
-    "push": "npm run build && clasp push"
+    "push": "npm run build && clasp push",
+    "debug": "ts-node src/debug/debug.ts"
   },
   "keywords": [],
   "author": "",
