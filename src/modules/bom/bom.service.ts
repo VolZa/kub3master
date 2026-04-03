@@ -153,15 +153,19 @@ export function buildBOMFromText(data: Input) {
     console.log('PROCESS ITEM:', item);
 
     // 🔹 тут тимчасово mock
-    const parentId = 1000; // поки заглушка
-    const childId = Math.floor(Math.random() * 10000); // fake ID
-
+    // const parentId = 1000; // поки заглушка
+    // const childId = Math.floor(Math.random() * 10000); // fake ID
+    const child: ElementCacheItem = getOrCreateElement(parsed);
     rawRows.push([parentId, childId, item.qty]);
   }
 
   console.log('RAW ROWS:', JSON.stringify(rawRows, null, 2));
 
-  return 'STOP 3';
+  const aggregated = aggregateBOMRows(rawRows);
+
+  console.log('AGGREGATED:', JSON.stringify(aggregated, null, 2));
+
+  return 'STOP 4';
 }
 
 // export function buildBOMFromText(data: any): string {
