@@ -1,29 +1,43 @@
 import { ElementRepository } from './element.repository';
-import { addElementToCache } from '../../services/cache.service';
-import { generateId } from '../../services/id.service';
-import { ElementCacheItem } from './element.model';
+import { ElementShort } from './element.model';
 import { buildAssemblyRow } from './element.mapper';
+import { generateIdByType } from '../../utils/id';
+import { addElementToCache } from '../../services/cache.service';
 
-/**
- * Отримати або створити вузол (assembly)
- */
 export function getOrCreateAssembly(
   code: string,
   repo: ElementRepository,
-): ElementCacheItem {
-  let element = repo.findByCode(code);
+): ElementShort {
+  // 🔍 1. шукаємо
+  const existing = repo.findByCode(code);
 
-  if (element) return element;
+  if (existing) {
+    const short: ElementShort = {
+      id: existing.id,
+      code: existing.code,
+      baseUnit: existing.baseUnit,
+    };
 
-  const id = generateId('assembly');
+    addElementToCache(short);
+
+    return short;
+  }
+
+  // 🆕 2. створюємо
+  const id = generateIdByType('assembly');
 
   const row = buildAssemblyRow(id, code);
 
   repo.insert(row);
 
-  element = { id, code, baseUnit: 'шт' };
+  // 🔁 3. формуємо domain → short
+  const short: ElementShort = {
+    id,
+    code,
+    baseUnit: row.BaseUnit,
+  };
 
-  addElementToCache(element);
+  addElementToCache(short);
 
-  return element;
+  return short;
 }

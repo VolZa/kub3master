@@ -1,10 +1,10 @@
 // modules/bom/bom.repository.ts
-import { getSheet } from '../../services/sheets.service';
+import { getSheetByNameSafe } from '../../utils/sheets';
 
 export function insertBOMRows(rows: any[][]) {
   if (!rows.length) return;
 
-  const sheet = getSheet('01_BOM');
+  const sheet = getSheetByNameSafe('01_BOM');
 
   const startRow = sheet.getLastRow() + 1;
 

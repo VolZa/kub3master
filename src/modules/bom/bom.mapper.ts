@@ -1,6 +1,6 @@
-import { ElementCacheItem } from '../elements/element.model';
+import { ElementShort } from '../elements/element.model';
 
-export function mapElementToBOMItem(child: ElementCacheItem) {
+export function mapElementToBOMItem(child: ElementShort) {
   return {
     unit: child.baseUnit,
   };

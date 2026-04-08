@@ -1,3 +1,4 @@
+import { ELEMENT_TYPES } from '../../../config/config';
 import { ParsedSpec } from '../../bom/model/parsed-spec.model';
 
 export function buildAngle(parsed: ParsedSpec) {
@@ -16,7 +17,7 @@ export function buildAngle(parsed: ParsedSpec) {
   return {
     code,
     name,
-    type: 'part',
+    type: ELEMENT_TYPES.PART,
     category: 'angle',
     baseUnit: 'шт',
 

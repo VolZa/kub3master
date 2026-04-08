@@ -1,46 +1,71 @@
-// modules/bom/bom.parser.ts
-
-import { normalizeLine } from '../../../utils/normalize';
-import { parseRebar } from './parseRebar';
-// import { parseAngle } from './parsers/angle.parser';
-import { parsePlate } from './parsePlate';
-// import { ParsedSpec } from './model/parsed-spec.model';
-
 import { ParsedSpec } from '../model/parsed-spec.model';
+
+import { parseRebar } from './parseRebar';
 import { parseAngle } from './parseAngle';
-// import { parseRebar } ...
-// import { parsePipe } ...
+import { parsePlate } from './parsePlate';
+import { parsePipe } from './parsePipe';
+import { parseBeam } from './parseBeam';
+import { parseChannel } from './parseChannel';
+import { normalize } from '../../../utils/normalize';
 
 export function parseSpec(input: string): ParsedSpec {
-  const normalized = input.toLowerCase();
-
-  // 1. арматура
-  if (normalized.includes('a500') || normalized.includes('ø')) {
-    return parseRebar(input);
-  }
-
-  // 2. кутник
-  if (normalized.includes('кутник') || normalized.includes('l')) {
-    return parseAngle(input);
-  }
-
-  // 3. полоса / пластина
-  if (
-    normalized.includes('пластина') ||
-    normalized.includes('полоса') ||
-    normalized.includes('лист')
-  ) {
-    return parsePlate(input);
-  }
-
-  // 4. труба
-  if (normalized.includes('труба')) {
-    // return parsePipe(input);
-  }
-
-  return { kind: 'unknown' };
+  const normalized = normalize(input);
+  console.log('🧩 parseSpec input:', JSON.stringify(input));
+  console.log('🧩 parseSpec normalized:', JSON.stringify(normalized));
+  return (
+    parseRebar(normalized) ||
+    parseAngle(normalized) ||
+    parsePlate(normalized) ||
+    parsePipe(normalized) ||
+    parseBeam(normalized) ||
+    parseChannel(normalized) || {
+      kind: 'unknown',
+    }
+  );
 }
+// // modules/bom/bom.parser.ts
 
+// import { normalizeLine } from '../../../utils/normalize';
+// import { parseRebar } from './parseRebar';
+// // import { parseAngle } from './parsers/angle.parser';
+// import { parsePlate } from './parsePlate';
+// // import { ParsedSpec } from './model/parsed-spec.model';
+
+// import { ParsedSpec } from '../model/parsed-spec.model';
+// import { parseAngle } from './parseAngle';
+// // import { parseRebar } ...
+// // import { parsePipe } ...
+
+// export function parseSpec(input: string): ParsedSpec {
+//   const normalized = input.toLowerCase();
+
+//   // 1. арматура
+//   if (normalized.includes('a500') || normalized.includes('ø')) {
+//     return parseRebar(input);
+//   }
+
+//   // 2. кутник
+//   if (normalized.includes('кутник') || normalized.includes('l')) {
+//     return parseAngle(input);
+//   }
+
+//   // 3. полоса / пластина
+//   if (
+//     normalized.includes('пластина') ||
+//     normalized.includes('полоса') ||
+//     normalized.includes('лист')
+//   ) {
+//     return parsePlate(input);
+//   }
+
+//   // 4. труба
+//   if (normalized.includes('труба')) {
+//     // return parsePipe(input);
+//   }
+
+//   return { kind: 'unknown' };
+// }
+//=================
 // export function parseSpec(raw: string): ParsedSpec {
 //   const line = normalizeLine(raw);
 

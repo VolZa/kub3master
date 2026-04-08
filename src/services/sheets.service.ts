@@ -1,29 +1,6 @@
-export function getSheet(
-  sheetName: string,
-): GoogleAppsScript.Spreadsheet.Sheet {
-  const sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
+// Сервіс для роботи з Google Sheets, специфічний для цього проєкту
 
-  if (!sheet) {
-    throw new Error(`Лист ${sheetName} не знайдено`);
-  }
-
-  return sheet;
-}
-
-//Створення карти заголовків
-export function getHeaderMap(
-  sheet: GoogleAppsScript.Spreadsheet.Sheet,
-): Record<string, number> {
-  const headers = sheet
-    .getRange(1, 1, 1, sheet.getLastColumn())
-    .getValues()[0] as string[];
-
-  const map: Record<string, number> = {};
-
-  headers.forEach((h, i) => (map[h] = i));
-
-  return map;
-}
+import { getSheetByNameSafe } from '../utils/sheets';
 
 export function appendRowSafe(
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
@@ -36,7 +13,7 @@ export function appendRowSafe(
 //Форматування певних колонок таблиці 00_Elements
 //запустити вручну в разі збою форматування
 function setupElementSheetFormats(): void {
-  const sheet = getSheet('00_Elements');
+  const sheet = getSheetByNameSafe('00_Elements');
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
   const map: Record<string, number> = {};
@@ -64,7 +41,7 @@ function setupElementSheetFormats(): void {
 }
 
 // //Створення ID для елемента
-// function generateIdByType(type) {
+// function generateIdByType(type: ElementType) {
 //   const ss = SpreadsheetApp.getActive();
 //   const configSheet = ss.getSheetByName('_Config_ID_Counters');
 //   if (!configSheet) throw new Error('Лист _Config_ID_Counters не знайдено');
@@ -74,12 +51,6 @@ function setupElementSheetFormats(): void {
 //     .getValues();
 
 //   const ranges = ID_RANGES;
-//   // const ranges = {
-//   //   product:   [1000,1999],
-//   //   assembly:  [2000,2999],
-//   //   material:  [3000,3999],
-//   //   part:      [4000,9999]
-//   // };
 
 //   if (!ranges[type]) {
 //     throw new Error('Невідомий тип: ' + type);

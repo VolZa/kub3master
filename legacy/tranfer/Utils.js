@@ -1,32 +1,14 @@
-function getSheetByNameSafe(sheetName) {
-  const sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
-
-  if (!sheet) {
-    throw new Error(`Лист ${sheetName} не знайдено`);
-  }
-
-  return sheet;
-}
+import { ID_RANGES } from '../config/config';
+import { getSheetByNameSafe } from '../services/sheets.service';
 
 //Створення карти заголовків
+//експортовано в src/utils/sheets.ts
 function getHeaderMap(sheet) {
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const map = {};
   headers.forEach((h, i) => (map[h] = i));
   return map;
 }
-
-// function getHeaderMap(sheet: GoogleAppsScript.Spreadsheet.Sheet): Record<string, number> {
-//   const headers = sheet
-//     .getRange(1, 1, 1, sheet.getLastColumn())
-//     .getValues()[0] as string[];
-
-//   const map: Record<string, number> = {};
-
-//   headers.forEach((h, i) => (map[h] = i));
-
-//   return map;
-// }
 
 function normalizeCode(input) {
   Logger.log('input= ' + input);
@@ -77,8 +59,7 @@ function setupElementSheetFormats() {
 
 //Створення ID для елемента
 function generateIdByType(type) {
-  const ss = SpreadsheetApp.getActive();
-  const configSheet = ss.getSheetByName('_Config_ID_Counters');
+  const configSheet = getSheetByNameSafe('_Config_ID_Counters');
   if (!configSheet) throw new Error('Лист _Config_ID_Counters не знайдено');
 
   const data = configSheet
@@ -86,12 +67,6 @@ function generateIdByType(type) {
     .getValues();
 
   const ranges = ID_RANGES;
-  // const ranges = {
-  //   product:   [1000,1999],
-  //   assembly:  [2000,2999],
-  //   material:  [3000,3999],
-  //   part:      [4000,9999]
-  // };
 
   if (!ranges[type]) {
     throw new Error('Невідомий тип: ' + type);

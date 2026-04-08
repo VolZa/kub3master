@@ -1,3 +1,4 @@
+import { ELEMENT_TYPES } from '../../../config/config';
 import { ParsedSpec } from '../../bom/model/parsed-spec.model';
 
 export function buildPlate(parsed: ParsedSpec) {
@@ -8,7 +9,7 @@ export function buildPlate(parsed: ParsedSpec) {
   return {
     code: `P_${parsed.width}_${parsed.thickness}_${parsed.length}`,
     name: `Полоса ${parsed.width}x${parsed.thickness} L=${parsed.length}`,
-    type: 'part',
+    type: ELEMENT_TYPES.PART,
     category: 'plate',
     baseUnit: 'шт',
 

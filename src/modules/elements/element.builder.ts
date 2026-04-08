@@ -1,4 +1,4 @@
-import { ElementType } from '../../services/moove.element';
+import { ElementType } from '../../config/config';
 import { ParsedSpec } from '../bom/model/parsed-spec.model';
 
 export interface BuiltElement {
@@ -12,6 +12,7 @@ export interface BuiltElement {
   diameter?: number;
   length?: number;
   width?: number;
+  height?: number;
   thickness?: number;
 }
 

@@ -1,3 +1,4 @@
+import { ELEMENT_TYPES } from '../../../config/config';
 import { ParsedSpec } from '../../bom/model/parsed-spec.model';
 
 export function buildRebar(parsed: ParsedSpec) {
@@ -10,7 +11,7 @@ export function buildRebar(parsed: ParsedSpec) {
   return {
     code,
     name: `Арматура Ø${parsed.diameter} ${parsed.className ?? ''} L=${parsed.length ?? ''}`,
-    type: 'REBAR',
+    type: ELEMENT_TYPES.PART,
     category: 'metal',
     baseUnit: 'kg',
 

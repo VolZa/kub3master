@@ -1,3 +1,13 @@
+export function normalize(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/,/g, '')
+    .replace(/×/g, 'x') // unicode ×
+    .replace(/\*/g, 'x') // *
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function normalizeCode(input: string): string {
   Logger.log('input= ' + input);
   if (!input) return '';
@@ -27,6 +37,7 @@ export function normalizeLine(line: string): string {
     .replace(/\(.*?\)/g, '')
     .replace(/,/g, '')
     .replace(/L\s*=\s*/g, ' ')
+    .replace(/І/g, '1') // 🔥 ДОДАТИ
     .replace(/А-І\b/g, 'А1')
     .replace(/А-ІІ\b/g, 'А2')
     .replace(/А-ІІІ\b/g, 'А3')

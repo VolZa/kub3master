@@ -1,6 +1,4 @@
-import { createColumnMap, getValue } from '../utils/column-mapper';
-
-const SHEET_NAME = '_Config_ID_Counters';
+//
 
 /**
  * Генерує наступний ID для заданого типу
@@ -40,22 +38,22 @@ const SHEET_NAME = '_Config_ID_Counters';
 // }
 
 //mock-версія для тестування без Google Sheets замість^^^^^
-let counter = 0;
+// let counter = 0;
 
-export function generateId(type: string): string {
-  counter++;
-  return `${type}_${counter}`;
-}
+// export function generateId(type: string): string {
+//   counter++;
+//   return `${type}_${counter}`;
+// }
 
-function formatId(type: string, id: number): string {
-  const prefixMap: Record<string, string> = {
-    product: 'PRD',
-    assembly: 'ASM',
-    material: 'MAT',
-    part: 'PRT',
-  };
+// function formatId(type: string, id: number): string {
+//   const prefixMap: Record<string, string> = {
+//     product: 'PRD',
+//     assembly: 'ASM',
+//     material: 'MAT',
+//     part: 'PRT',
+//   };
 
-  const prefix = prefixMap[type] || 'UNK';
+//   const prefix = prefixMap[type] || 'UNK';
 
-  return `${prefix}-${id.toString().padStart(4, '0')}`;
-}
+//   return `${prefix}-${id.toString().padStart(4, '0')}`;
+// }

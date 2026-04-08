@@ -1,11 +1,11 @@
-import { ElementType } from '../../services/moove.element';
+import { ElementType } from '../../config/config';
 
 // як зберігається в таблиці
 export interface ElementRow {
   ID: string;
   Code: string;
   Name: string;
-  Type: string;
+  Type: ElementType;
   Category: string;
   BaseUnit: string;
   ProfileType?: string;
@@ -30,6 +30,16 @@ export interface ElementShort {
   baseUnit: string;
 }
 
+// повна модель (для repository)
+export type ElementFull = {
+  id: string;
+  code: string;
+  name: string;
+  type: ElementType;
+  category?: string;
+  baseUnit: string;
+};
+
 //  що потрібно для створення CreateElementDto
 export interface CreateElementDto {
   code: string;
@@ -45,8 +55,14 @@ export interface CreateElementDto {
   thickness?: number;
 }
 
-export interface ElementCacheItem {
-  id: string;
+export interface ParsedPart {
   code: string;
-  baseUnit: string; // ❗ було unit
+  name: string;
+  category?: string;
+  baseUnit?: string;
+  profileType?: string;
+  diameter: number;
+  class: string;
+  length: number;
+  weightPerUnit?: number;
 }

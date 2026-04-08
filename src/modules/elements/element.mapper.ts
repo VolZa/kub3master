@@ -1,34 +1,12 @@
-import { ElementRow } from './element.model';
 import { getValue } from '../../utils/getValue';
+import { BuiltElement } from './element.builder';
+import { ElementRow, ElementFull, ElementShort } from './element.model';
+// import { ElementFull, ElementShort } from './element.model';
 
-export function buildElementRow(
-  built: any, // поки можна any, потім уточнимо
-  id: string,
-): ElementRow {
-  return {
-    ID: id,
-    Code: built.code,
-    Name: built.name,
-    Type: built.type,
-    Category: built.category,
-    BaseUnit: built.baseUnit,
-    CreatedAt: new Date(),
-  };
-}
-
-export function buildAssemblyRow(id: string, code: string): ElementRow {
-  return {
-    ID: id,
-    Code: code,
-    Name: `Вузол ${code}`,
-    Type: 'assembly',
-    Category: 'assembly',
-    BaseUnit: 'шт',
-    CreatedAt: new Date(),
-  };
-}
-
-export function mapRowToElement(
+//
+// 🔹 1. Sheet → ElementRow
+//
+export function mapSheetRowToElementRow(
   row: any[],
   map: Record<string, number>,
 ): ElementRow {
@@ -52,6 +30,73 @@ export function mapRowToElement(
     Density: getValue(row, map, 'Density'),
     Comment: getValue(row, map, 'Comment'),
     CreatedAt: getValue(row, map, 'CreatedAt')!,
+  };
+}
+
+//
+// 🔹 2. ElementRow → Domain
+//
+export function mapElementRowToDomain(row: ElementRow): ElementFull {
+  return {
+    id: row.ID,
+    code: row.Code,
+    name: row.Name,
+    type: row.Type as any,
+    category: row.Category,
+    baseUnit: row.BaseUnit,
+  };
+}
+
+//
+// 🔹 3. Domain → Row
+//
+export function mapElementToRow(el: ElementFull): ElementRow {
+  return {
+    ID: el.id,
+    Code: el.code,
+    Name: el.name,
+    Type: el.type,
+    Category: el.category || '',
+    BaseUnit: el.baseUnit,
+    CreatedAt: new Date(),
+  };
+}
+
+//
+// 🔹 4. Builder → Row
+//
+export function buildElementRow(built: BuiltElement, id: string): ElementRow {
+  return {
+    ID: id,
+    Code: built.code,
+    Name: built.name,
+    Type: built.type,
+    Category: built.category,
+    BaseUnit: built.baseUnit,
+    CreatedAt: new Date(),
+  };
+}
+
+//
+// 🔹 5. Assembly helper
+//
+export function buildAssemblyRow(id: string, code: string): ElementRow {
+  return {
+    ID: id,
+    Code: code,
+    Name: `Вузол ${code}`,
+    Type: 'assembly',
+    Category: 'assembly',
+    BaseUnit: 'шт',
+    CreatedAt: new Date(),
+  };
+}
+
+export function toShort(el: ElementFull): ElementShort {
+  return {
+    id: el.id,
+    code: el.code,
+    baseUnit: el.baseUnit,
   };
 }
 // 👉 це:

@@ -35,6 +35,70 @@ function addBOMSmart(parentCode, specString, qty) {
 
   return '✅ BOM додано';
 }
+
+//перенесено в bom.service.ts
+function buildBOMFromText(parentCode, specText) {
+  const lines = specText
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l !== '');
+
+  let added = 0;
+  let errors = [];
+
+  for (let line of lines) {
+    // - Нормалізація рядка
+    line = line.trim();
+    line = normalizeCode(line);
+    line = line
+      .replace(/Арматура/gi, '')
+      .replace(/Ø/g, '')
+      .replace(/\(.*?\)/g, '') // прибираємо (А-240)
+      .replace(/,/g, '')
+      .replace(/L\s*=\s*/i, ' ')
+      .replace(/А-І\b/g, 'А1')
+      .replace(/А-ІІ\b/g, 'А2')
+      .replace(/А-ІІІ\b/g, 'А3')
+      .replace(/Вр-?1/gi, 'Вр1')
+      .replace(/\s+/g, ' ')
+      .trim();
+    Logger.log(line);
+    // --- 1️⃣ інженерний формат ---
+    const parts = line.split(/\s+/);
+
+    if (parts.length >= 2 && /^\d/.test(parts[0])) {
+      const spec = parts[0] + ' ' + parts[1];
+      const qty = parts[2] || 1;
+
+      const res = addBOMSmart(parentCode, spec, qty);
+
+      if (res.startsWith('✅')) added++;
+      else errors.push(line);
+
+      continue;
+    }
+
+    // --- 2️⃣ текст креслення ---
+    const parsed = parseEngineeringLine(line);
+
+    if (parsed && parsed.detected) {
+      const spec = parsed.diameter + parsed.class + ' ' + parsed.length;
+
+      const res = addBOMSmart(parentCode, spec, 1);
+
+      if (res.startsWith('✅')) added++;
+      else errors.push(line);
+
+      continue;
+    }
+
+    // --- якщо нічого не розпізнано ---
+    errors.push(line);
+  }
+
+  return 'Додано: ' + added + ' | Помилки: ' + errors.length;
+}
+
 // function addBOMSmart(parentCode, specString, qty) {
 
 //   const bomSheet = getSheetByNameSafe('01_BOM');
@@ -144,65 +208,3 @@ function addBOMSmart(parentCode, specString, qty) {
 
 //   return "Додано: " + added;
 // }
-
-function buildBOMFromText(parentCode, specText) {
-  const lines = specText
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l !== '');
-
-  let added = 0;
-  let errors = [];
-
-  for (let line of lines) {
-    // - Нормалізація рядка
-    line = line.trim();
-    line = normalizeCode(line);
-    line = line
-      .replace(/Арматура/gi, '')
-      .replace(/Ø/g, '')
-      .replace(/\(.*?\)/g, '') // прибираємо (А-240)
-      .replace(/,/g, '')
-      .replace(/L\s*=\s*/i, ' ')
-      .replace(/А-І\b/g, 'А1')
-      .replace(/А-ІІ\b/g, 'А2')
-      .replace(/А-ІІІ\b/g, 'А3')
-      .replace(/Вр-?1/gi, 'Вр1')
-      .replace(/\s+/g, ' ')
-      .trim();
-    Logger.log(line);
-    // --- 1️⃣ інженерний формат ---
-    const parts = line.split(/\s+/);
-
-    if (parts.length >= 2 && /^\d/.test(parts[0])) {
-      const spec = parts[0] + ' ' + parts[1];
-      const qty = parts[2] || 1;
-
-      const res = addBOMSmart(parentCode, spec, qty);
-
-      if (res.startsWith('✅')) added++;
-      else errors.push(line);
-
-      continue;
-    }
-
-    // --- 2️⃣ текст креслення ---
-    const parsed = parseEngineeringLine(line);
-
-    if (parsed && parsed.detected) {
-      const spec = parsed.diameter + parsed.class + ' ' + parsed.length;
-
-      const res = addBOMSmart(parentCode, spec, 1);
-
-      if (res.startsWith('✅')) added++;
-      else errors.push(line);
-
-      continue;
-    }
-
-    // --- якщо нічого не розпізнано ---
-    errors.push(line);
-  }
-
-  return 'Додано: ' + added + ' | Помилки: ' + errors.length;
-}
