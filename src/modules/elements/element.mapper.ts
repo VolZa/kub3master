@@ -1,4 +1,5 @@
 import { getValue } from '../../utils/getValue';
+import { calcRebarWeight } from '../../utils/rebar';
 import { BuiltElement } from './element.builder';
 import { ElementRow, ElementFull, ElementShort } from './element.model';
 // import { ElementFull, ElementShort } from './element.model';
@@ -65,6 +66,17 @@ export function mapElementToRow(el: ElementFull): ElementRow {
 //
 // 🔹 4. Builder → Row
 //
+// export function buildElementRow(built: BuiltElement, id: string): ElementRow {
+//   return {
+//     ID: id,
+//     Code: built.code,
+//     Name: built.name,
+//     Type: built.type,
+//     Category: built.category,
+//     BaseUnit: built.baseUnit,
+//     CreatedAt: new Date(),
+//   };
+// }
 export function buildElementRow(built: BuiltElement, id: string): ElementRow {
   return {
     ID: id,
@@ -73,6 +85,17 @@ export function buildElementRow(built: BuiltElement, id: string): ElementRow {
     Type: built.type,
     Category: built.category,
     BaseUnit: built.baseUnit,
+
+    // 🔥 ДОДАТИ
+    Diameter: built.diameter,
+    Class: built.className,
+    Length: built.length,
+    Width: built.width,
+    Thickness: built.thickness,
+    WeightPerUnit:
+      built.category === 'rebar' && built.length && built.diameter
+        ? calcRebarWeight(built.length, built.diameter, 1)
+        : undefined,
     CreatedAt: new Date(),
   };
 }
@@ -99,6 +122,56 @@ export function toShort(el: ElementFull): ElementShort {
     baseUnit: el.baseUnit,
   };
 }
+
+export function mapRowToFull(row: any[], headers: string[]) {
+  const get = (name: string) => {
+    const idx = headers.indexOf(name);
+    return idx !== -1 ? row[idx] : undefined;
+  };
+
+  return {
+    id: String(get('ID')),
+    code: get('Code'),
+    name: get('Name'),
+    type: get('Type'),
+    category: get('Category'),
+    baseUnit: get('BaseUnit'),
+
+    diameter: Number(get('Diameter')) || undefined,
+    className: get('Class'),
+    length: Number(get('Length')) || undefined,
+    width: Number(get('Width')) || undefined,
+    thickness: Number(get('Thickness')) || undefined,
+
+    weightPerUnit: Number(get('WeightPerUnit')) || 0,
+    density: Number(get('Density')) || undefined,
+  };
+}
+
+// export function mapRowToFull(
+//   row: any[],
+//   headers: string[],
+// ): ElementFull & {
+//   weightPerUnit?: number;
+// } {
+//   const get = (name: string) => {
+//     const idx = headers.indexOf(name);
+//     return idx !== -1 ? row[idx] : undefined;
+//   };
+
+//   return {
+//     id: String(get('ID')),
+//     code: get('Code'),
+//     name: get('Name'),
+//     type: get('Type'),
+//     category: get('Category'),
+//     baseUnit: get('BaseUnit'),
+
+//     // 🔥 додаткові (важливі для розрахунків)
+//     weightPerUnit: Number(get('WeightPerUnit')) || 0,
+//   };
+// }
+
 // 👉 це:
 // прибере дублювання
 // уніфікує роботу з таблицею

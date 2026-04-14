@@ -9,6 +9,8 @@ export interface BuiltElement {
   baseUnit: string;
 
   // optional
+  className?: string;
+  // geometry
   diameter?: number;
   length?: number;
   width?: number;

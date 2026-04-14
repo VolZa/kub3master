@@ -38,6 +38,7 @@ export type ElementFull = {
   type: ElementType;
   category?: string;
   baseUnit: string;
+  weightPerUnit?: number;
 };
 
 //  що потрібно для створення CreateElementDto
