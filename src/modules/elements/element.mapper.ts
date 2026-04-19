@@ -120,6 +120,7 @@ export function toShort(el: ElementFull): ElementShort {
     id: el.id,
     code: el.code,
     baseUnit: el.baseUnit,
+    type: el.type, // 🔥
   };
 }
 

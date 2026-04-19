@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+  <head>
+    <base target="_top" />
+    <title>BOM Table Parser</title>
+    <!-- 🔥 ОБОВ'ЯЗКОВО -->
+    <style>
+      textarea {
+        width: 100%;
+        height: 200px;
+      }
+      input {
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Створити BOM (Table Parser V1)</h3>
+
+    <label>Parent Code:</label>
+    <input id="parentCode" value="КР1-1-39" />
+
+    <label>Table Input:</label>
+    <textarea id="tableInput">
+КР1-1-39
+Арматура Ø6 A500C L=145 | 1
+ГСк-2-5 | Стержень гнутий | 1
+Арматура Ø14 A500C L=380 | 1
+    </textarea>
+
+    <button onclick="submit()">Створити BOM</button>
+
+    <script>
+      function submit() {
+        const parentCode = document.getElementById('parentCode').value;
+        const text = document.getElementById('tableInput').value;
+
+        google.script.run
+          .withSuccessHandler((res) => alert('OK: ' + res))
+          .runTableParser(parentCode, text);
+      }
+    </script>
+  </body>
+</html>

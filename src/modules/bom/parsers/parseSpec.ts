@@ -10,19 +10,48 @@ import { normalize } from '../../../utils/normalize';
 
 export function parseSpec(input: string): ParsedSpec {
   const normalized = normalize(input);
+
   console.log('🧩 parseSpec input:', JSON.stringify(input));
   console.log('🧩 parseSpec normalized:', JSON.stringify(normalized));
-  return (
+
+  const parsed =
     parseRebar(normalized) ||
     parseAngle(normalized) ||
     parsePlate(normalized) ||
     parsePipe(normalized) ||
     parseBeam(normalized) ||
-    parseChannel(normalized) || {
-      kind: 'unknown',
-    }
-  );
+    parseChannel(normalized);
+
+  if (!parsed) {
+    return {
+      kind: 'assembly',
+      name: input.trim(),
+    };
+  }
+
+  return parsed;
 }
+// export function parseSpec(input: string): ParsedSpec {
+//   const normalized = normalize(input);
+//   console.log('🧩 parseSpec input:', JSON.stringify(input));
+//   console.log('🧩 parseSpec normalized:', JSON.stringify(normalized));
+//   if (!parsedSuccessfully) {
+//     return {
+//       kind: 'assembly',
+//       name: input.trim(),
+//     };
+//   }
+//   return (
+//     parseRebar(normalized) ||
+//     parseAngle(normalized) ||
+//     parsePlate(normalized) ||
+//     parsePipe(normalized) ||
+//     parseBeam(normalized) ||
+//     parseChannel(normalized) || {
+//       kind: 'unknown',
+//     }
+//   );
+// }
 // // modules/bom/bom.parser.ts
 
 // import { normalizeLine } from '../../../utils/normalize';

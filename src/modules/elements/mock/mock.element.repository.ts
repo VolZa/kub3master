@@ -20,22 +20,77 @@
 //   }
 // }
 
+// import { ElementRepository } from '../element.repository';
+// import { ElementFull } from '../element.model';
+
+// export class MockElementRepository implements ElementRepository {
+//   private storage = new Map<string, any>();
+
+//   findById(id: string): ElementFull | null {
+//     return this.storage.get(id) || null;
+//   }
+//   findByCode(code: string) {
+//     return this.storage.get(code) || null;
+//   }
+
+//   insert(row: any) {
+//     console.log('MOCK INSERT:', row);
+
+//     this.storage.set(row.code, row);
+//   }
+// }
+
 import { ElementRepository } from '../element.repository';
-import { ElementFull } from '../element.model';
+import { ElementFull, ElementRow } from '../element.model';
+import { mapElementRowToDomain } from '../element.mapper';
 
 export class MockElementRepository implements ElementRepository {
-  private storage = new Map<string, any>();
+  private rows: ElementRow[] = [];
 
+  constructor(initialRows: ElementRow[] = []) {
+    this.rows = initialRows;
+  }
+
+  // ------------------------
+  // FIND BY ID
+  // ------------------------
   findById(id: string): ElementFull | null {
-    return this.storage.get(id) || null;
-  }
-  findByCode(code: string) {
-    return this.storage.get(code) || null;
+    const row = this.rows.find((r) => String(r.ID) === String(id));
+    return row ? mapElementRowToDomain(row) : null;
   }
 
-  insert(row: any) {
-    console.log('MOCK INSERT:', row);
+  // ------------------------
+  // FIND BY CODE
+  // ------------------------
+  findByCode(code: string): ElementFull | null {
+    const row = this.rows.find((r) => r.Code === code);
+    return row ? mapElementRowToDomain(row) : null;
+  }
 
-    this.storage.set(row.code, row);
+  // ------------------------
+  // 🔥 NORMALIZED SEARCH
+  // ------------------------
+  findByCodeNormalized(code: string): ElementFull | null {
+    const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+
+    const target = norm(code);
+
+    const row = this.rows.find((r) => norm(r.Code) === target);
+
+    return row ? mapElementRowToDomain(row) : null;
+  }
+
+  // ------------------------
+  // INSERT
+  // ------------------------
+  insert(row: ElementRow): void {
+    this.rows.push(row);
+  }
+
+  // ------------------------
+  // (опціонально) для дебагу
+  // ------------------------
+  getAll(): ElementFull[] {
+    return this.rows.map((r) => mapElementRowToDomain(r));
   }
 }

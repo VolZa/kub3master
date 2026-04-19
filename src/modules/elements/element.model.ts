@@ -28,6 +28,7 @@ export interface ElementShort {
   id: string;
   code: string;
   baseUnit: string;
+  type: ElementType; // 🔥 додав
 }
 
 // повна модель (для repository)

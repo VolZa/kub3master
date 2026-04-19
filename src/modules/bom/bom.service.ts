@@ -1,7 +1,7 @@
 import { parseSpec } from './parsers/parseSpec';
 import { getOrCreateElement } from '../elements/element.factory';
 import { getOrCreateAssembly } from '../elements/assembly.service';
-import { insertBOMRows } from './bom.repository';
+import { deleteBOMTree, insertBOMRows } from './bom.repository';
 import { mapElementToBOMItem } from './bom.mapper';
 import { ElementShort } from '../elements/element.model';
 import {
@@ -11,7 +11,7 @@ import {
 import { MockElementRepository } from '../elements/mock/mock.element.repository';
 import { getOrCreateMaterialFromPart } from '../../domain/materials/material.service';
 import { buildByKind } from '../../modules/elements/builders/builder.dispatcher';
-
+import { deleteBOMByParentId } from './bom.repository';
 /* Будує один рядок BOM
  */
 
@@ -30,8 +30,37 @@ function buildBOMRow(
     throw new Error('Не розпізнано: ' + line);
   }
 
+  // 🔥 спроба знайти як assembly
+  // const existingAssembly = repo.findByCode(spec);
+  const existingAssembly = repo.findByCodeNormalized(spec);
+
+  if (existingAssembly && existingAssembly.type === 'assembly') {
+    return [[parentId, existingAssembly.id, safeQty, 'шт', now]];
+  }
+
   // 🔥 1. build
   const built = buildByKind(parsed);
+
+  // 🔥 визначаємо тип
+  if (built.type === 'assembly') {
+    // 🔥 але створюємо через assembly factory
+    const assembly = getOrCreateAssembly(spec, repo);
+
+    return [[parentId, assembly.id, safeQty, 'шт', now]];
+  }
+
+  // 🔥 assembly
+  // if (built.type === 'assembly') {
+  //   // const assembly = getOrCreateAssembly(built.code, repo);
+  //   const assembly = getOrCreateAssembly(parsed.code , repo);
+  //   return [[parentId, assembly.id, safeQty, 'шт', now]];
+  // }
+
+  // const element = getOrCreateElement(parsed, repo);
+
+  // if (element.type === 'assembly') {
+  //   return [[parentId, element.id, safeQty, 'шт', now]];
+  // }
 
   // 🔥 2. qty для material
   let materialQty = safeQty;
@@ -88,6 +117,7 @@ export function buildBOMFromText(data: Input) {
 
   const parent = getOrCreateAssembly(data.parentCode, repo);
   const parentId = parent.id;
+  deleteBOMTree(parentId);
   const now = new Date();
 
   const rawRows: any[][] = [];

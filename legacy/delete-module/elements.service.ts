@@ -1,8 +1,12 @@
-import { generateIdByType } from '../../utils/id';
-import { ElementType, ELEMENT_TYPES, STEEL_DENSITY } from '../../config/config';
-import { calcRebarWeightPerMeter } from '../../utils/rebar';
-import { getHeaderMap } from '../../utils/sheets';
-import { ParsedPart } from './element.model';
+import { generateIdByType } from '../../src/utils/id';
+import {
+  ElementType,
+  ELEMENT_TYPES,
+  STEEL_DENSITY,
+} from '../../src/config/config';
+import { calcRebarWeightPerMeter } from '../../src/utils/rebar';
+import { getHeaderMap } from '../../src/utils/sheets';
+import { ParsedPart } from '../../src/modules/elements/element.model';
 
 // ================= TYPES =================
 

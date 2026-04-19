@@ -1,6 +1,6 @@
 import { ParsedSpec } from '../model/parsed-spec.model';
 
-export function parsePlate(input: string): ParsedSpec {
+export function parsePlate(input: string): ParsedSpec | null {
   const normalized = input
     .toLowerCase()
     .replace('х', 'x') // кирилична

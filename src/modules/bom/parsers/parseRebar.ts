@@ -1,7 +1,7 @@
 import { ParsedSpec } from '../model/parsed-spec.model';
 import { normalizeRebarClass } from '../../../domain/materials/rebar.utils';
 
-export function parseRebar(input: string): ParsedSpec {
+export function parseRebar(input: string): ParsedSpec | null {
   normalizeRebarClass(input);
   console.log('🧩 parseАрматура input:', JSON.stringify(input));
   const normalized = input
@@ -43,10 +43,12 @@ export function parseRebar(input: string): ParsedSpec {
   const length = lengthMatch ? Number(lengthMatch[1]) : undefined;
 
   // ===== Валідація =====
-  if (!diameter) {
-    return { kind: 'unknown' };
+  // if (!diameter) {
+  //   return { kind: 'unknown' };
+  // }
+  if (!diameter || !className) {
+    return null;
   }
-
   return {
     kind: 'rebar',
     diameter,

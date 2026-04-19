@@ -35,6 +35,15 @@ export function buildByKind(parsed: ParsedSpec): BuiltElement {
 
     case 'channel':
       return buildChannel(parsed);
+    // 🔥 ДОДАТИ ОЦЕ
+    case 'assembly':
+      return {
+        type: 'assembly',
+        code: parsed.name,
+        name: parsed.name,
+        baseUnit: 'шт',
+        category: 'assembly',
+      };
 
     case 'unknown':
       throw new Error('Spec not recognized');

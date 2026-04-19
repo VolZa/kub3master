@@ -45,6 +45,7 @@ export type ParsedSpec =
       thickness?: number;
       length?: number;
     }
+  | { kind: 'assembly'; name: string } // 🔥 ДОДАТИ
   | {
       kind: 'unknown';
     };

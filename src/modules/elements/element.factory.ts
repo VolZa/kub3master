@@ -9,6 +9,8 @@ import {
   getElementFromCache,
 } from '../../services/cache.service';
 import { toShort } from './element.mapper';
+import { getOrCreateRebarMaterial } from '../../../legacy/delete-module/elements.service';
+import { BuiltElementExtended } from './element.builder';
 
 export function getOrCreateElement(
   parsed: ParsedSpec,
@@ -37,7 +39,18 @@ export function getOrCreateElement(
 
   // 🆕 4. create
   const id = generateIdByType(built.type);
+  const extended: BuiltElementExtended = { ...built };
+  if (built.category === 'rebar' && built.type === 'part') {
+    const materialId = getOrCreateRebarMaterial(
+      Number(built.diameter),
+      built.className || '',
+    );
 
+    // 🔥 додаємо в built
+    extended.parentMaterialId = materialId;
+
+    console.log('🔗 LINK MATERIAL:', materialId);
+  }
   const row = buildElementRow(built, id);
   console.log('💾 INSERT ELEMENT:', built.code);
 
@@ -48,6 +61,7 @@ export function getOrCreateElement(
     id,
     code: built.code,
     baseUnit: built.baseUnit ?? 'шт', // safeguard
+    type: built.type, // 🔥
   };
 
   addElementToCache(short);

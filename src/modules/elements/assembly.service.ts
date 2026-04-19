@@ -18,6 +18,7 @@ export function getOrCreateAssembly(
       id: existing.id,
       code: existing.code,
       baseUnit: existing.baseUnit,
+      type: existing.type, // 🔥
     };
 
     addElementToCache(short);
@@ -37,6 +38,7 @@ export function getOrCreateAssembly(
     id,
     code,
     baseUnit: row.BaseUnit,
+    type: 'assembly', // 🔥
   };
 
   addElementToCache(short);

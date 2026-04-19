@@ -18,6 +18,10 @@ export interface BuiltElement {
   thickness?: number;
 }
 
+export type BuiltElementExtended = BuiltElement & {
+  parentMaterialId?: string;
+};
+
 // ===== Code =====
 
 export function buildElementCode(parsed: ParsedSpec): string {

@@ -29,6 +29,7 @@ export function getOrCreateMaterialFromPart(
       id: existing.id,
       code: existing.code,
       baseUnit: existing.baseUnit,
+      type: existing.type, // 🔥
     };
 
     addElementToCache(short);
@@ -68,6 +69,7 @@ export function getOrCreateMaterialFromPart(
     id,
     code,
     baseUnit: 'кг',
+    type: ELEMENT_TYPES.MATERIAL, // 🔥 ВАЖЛИВО
   };
 
   addElementToCache(short);

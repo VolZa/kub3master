@@ -5,3 +5,11 @@ export function openForm() {
 
   SpreadsheetApp.getUi().showSidebar(html);
 }
+
+export function openFormTable() {
+  const html = HtmlService.createHtmlOutputFromFile('FormTable')
+    .setWidth(450)
+    .setHeight(350);
+
+  SpreadsheetApp.getUi().showSidebar(html);
+}
