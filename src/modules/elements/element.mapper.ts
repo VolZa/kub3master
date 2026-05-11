@@ -66,18 +66,11 @@ export function mapElementToRow(el: ElementFull): ElementRow {
 //
 // 🔹 4. Builder → Row
 //
-// export function buildElementRow(built: BuiltElement, id: string): ElementRow {
-//   return {
-//     ID: id,
-//     Code: built.code,
-//     Name: built.name,
-//     Type: built.type,
-//     Category: built.category,
-//     BaseUnit: built.baseUnit,
-//     CreatedAt: new Date(),
-//   };
-// }
-export function buildElementRow(built: BuiltElement, id: string): ElementRow {
+
+export function buildElementRow(
+  built: BuiltElement & { parentMaterialId?: string },
+  id: string,
+): ElementRow {
   return {
     ID: id,
     Code: built.code,
@@ -86,16 +79,20 @@ export function buildElementRow(built: BuiltElement, id: string): ElementRow {
     Category: built.category,
     BaseUnit: built.baseUnit,
 
-    // 🔥 ДОДАТИ
+    // 🔥 НОВЕ
+    ParentMaterialID: built.parentMaterialId,
+
     Diameter: built.diameter,
     Class: built.className,
     Length: built.length,
     Width: built.width,
     Thickness: built.thickness,
+
     WeightPerUnit:
       built.category === 'rebar' && built.length && built.diameter
         ? calcRebarWeight(built.length, built.diameter, 1)
         : undefined,
+
     CreatedAt: new Date(),
   };
 }
@@ -148,33 +145,3 @@ export function mapRowToFull(row: any[], headers: string[]) {
     density: Number(get('Density')) || undefined,
   };
 }
-
-// export function mapRowToFull(
-//   row: any[],
-//   headers: string[],
-// ): ElementFull & {
-//   weightPerUnit?: number;
-// } {
-//   const get = (name: string) => {
-//     const idx = headers.indexOf(name);
-//     return idx !== -1 ? row[idx] : undefined;
-//   };
-
-//   return {
-//     id: String(get('ID')),
-//     code: get('Code'),
-//     name: get('Name'),
-//     type: get('Type'),
-//     category: get('Category'),
-//     baseUnit: get('BaseUnit'),
-
-//     // 🔥 додаткові (важливі для розрахунків)
-//     weightPerUnit: Number(get('WeightPerUnit')) || 0,
-//   };
-// }
-
-// 👉 це:
-// прибере дублювання
-// уніфікує роботу з таблицею
-// export function mapElementToRow(...)
-// export function mapRowToElement(...)

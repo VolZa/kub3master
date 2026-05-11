@@ -5,6 +5,7 @@ import { generateIdByType } from '../../utils/id';
 import { addElementToCache } from '../../services/cache.service';
 
 import { getSheetByNameSafe } from '../../utils/sheets';
+import { ELEMENT_TYPES } from '../../config/config';
 
 export function getOrCreateAssembly(
   code: string,
@@ -44,6 +45,35 @@ export function getOrCreateAssembly(
   addElementToCache(short);
 
   return short;
+}
+
+export function getOrCreateAssemblyWithName(
+  code: string,
+  name: string,
+  repo: ElementRepository,
+) {
+  let existing = repo.findByCode(code);
+
+  if (existing) return existing;
+
+  const id = generateIdByType(ELEMENT_TYPES.ASSEMBLY);
+
+  repo.insert({
+    ID: id,
+    Code: code,
+    Name: name || code,
+    Type: ELEMENT_TYPES.ASSEMBLY,
+    Category: 'assembly',
+    BaseUnit: 'шт',
+    CreatedAt: new Date(),
+  });
+
+  const el = repo.findById(id);
+  if (!el) {
+    throw new Error('Failed to create assembly: ' + code);
+  }
+
+  return el;
 }
 
 export function calcAssemblyWeight(

@@ -1,37 +1,77 @@
 import { parseSpec } from '../modules/bom/parsers/parseSpec';
 import { getOrCreateElement } from '../modules/elements/element.factory';
 import { MockElementRepository } from '../modules/elements/mock/mock.element.repository';
+import { CatalogInMemoryRepository } from '../modules/catalog/catalog.repository';
 
-export function testBOM() {
-  const repo = new MockElementRepository();
+// export function testBOM() {
+//   const elementRepo = new MockElementRepository();
 
-  const inputs = [
-    'Арматура ø6 А500С, L=145',
-    'Кутник L 100x63x8, L=440',
-    'Пластина 200x100x10',
-  ];
+//   // 🔽 додаємо каталог (мінімально правильно)
+//   const catalogRows = getCatalogSheetValues(); // ← скажеш якщо нема
+//   const catalogRepo = new CatalogInMemoryRepository(catalogRows);
 
-  for (const input of inputs) {
-    console.log('INPUT:', input);
+//   const inputs = [
+//     'Арматура ø6 А500С, L=145',
+//     'Кутник L 100x63x8, L=440',
+//     'Пластина 200x100x10',
+//   ];
 
-    const spec = parseSpec(input);
+//   for (const input of inputs) {
+//     console.log('INPUT:', input);
 
-    console.log('SPEC:', spec);
+//     const spec = parseSpec(input);
+//     console.log('SPEC:', spec);
 
-    try {
-      const element = getOrCreateElement(spec, repo);
-      console.log('ELEMENT:', element);
-    } catch (e) {
-      if (e instanceof Error) {
-        console.error('ERROR:', e.message);
-      } else {
-        console.error('ERROR:', e);
-      }
-    }
+//     try {
+//       const element = getOrCreateElement(
+//         spec,
+//         elementRepo,
+//         catalogRepo, // ✅ новий параметр
+//       );
 
-    console.log('--------------');
-  }
-}
+//       console.log('ELEMENT:', element);
+//     } catch (e) {
+//       if (e instanceof Error) {
+//         console.error('ERROR:', e.message);
+//       } else {
+//         console.error('ERROR:', e);
+//       }
+//     }
+
+//     console.log('--------------');
+//   }
+// }
+
+// export function testBOM() {
+//   const repo = new MockElementRepository();
+
+//   const inputs = [
+//     'Арматура ø6 А500С, L=145',
+//     'Кутник L 100x63x8, L=440',
+//     'Пластина 200x100x10',
+//   ];
+
+//   for (const input of inputs) {
+//     console.log('INPUT:', input);
+
+//     const spec = parseSpec(input);
+
+//     console.log('SPEC:', spec);
+
+//     try {
+//       const element = getOrCreateElement(spec, repo);
+//       console.log('ELEMENT:', element);
+//     } catch (e) {
+//       if (e instanceof Error) {
+//         console.error('ERROR:', e.message);
+//       } else {
+//         console.error('ERROR:', e);
+//       }
+//     }
+
+//     console.log('--------------');
+//   }
+// }
 
 // main();
 

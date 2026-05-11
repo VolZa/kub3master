@@ -9,6 +9,7 @@ export interface BuiltElement {
   baseUnit: string;
 
   // optional
+  profileType?: string;
   className?: string;
   // geometry
   diameter?: number;
@@ -16,6 +17,9 @@ export interface BuiltElement {
   width?: number;
   height?: number;
   thickness?: number;
+
+  weightPerUnit?: number;
+  density?: number;
 }
 
 export type BuiltElementExtended = BuiltElement & {

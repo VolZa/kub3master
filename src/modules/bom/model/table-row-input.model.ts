@@ -1,5 +1,6 @@
 export interface TableRowInput {
-  name: string;
-  designation?: string;
+  codeEl: string;
+  prefix?: string;
+  sufix?: string;
   qty?: number;
 }

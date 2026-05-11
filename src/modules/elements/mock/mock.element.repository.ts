@@ -1,48 +1,7 @@
-// import { ElementRepository } from '../element.repository';
-// import { ElementCacheItem } from '../element.model';
-
-// export class MockElementRepository implements ElementRepository {
-//   private items: Map<string, ElementCacheItem> = new Map();
-//   private idCounter = 1000;
-
-//   findByCode(code: string): ElementShort | null {
-//     return this.items.get(code) || null;
-//   }
-
-//   save(element: ElementShort): ElementShort {
-//     if (!element.id) {
-//       element.id = String(this.idCounter++);
-//     }
-
-//     this.items.set(element.code, element);
-
-//     return element;
-//   }
-// }
-
-// import { ElementRepository } from '../element.repository';
-// import { ElementFull } from '../element.model';
-
-// export class MockElementRepository implements ElementRepository {
-//   private storage = new Map<string, any>();
-
-//   findById(id: string): ElementFull | null {
-//     return this.storage.get(id) || null;
-//   }
-//   findByCode(code: string) {
-//     return this.storage.get(code) || null;
-//   }
-
-//   insert(row: any) {
-//     console.log('MOCK INSERT:', row);
-
-//     this.storage.set(row.code, row);
-//   }
-// }
-
 import { ElementRepository } from '../element.repository';
 import { ElementFull, ElementRow } from '../element.model';
 import { mapElementRowToDomain } from '../element.mapper';
+import { ElementType } from '../../../config/config';
 
 export class MockElementRepository implements ElementRepository {
   private rows: ElementRow[] = [];
@@ -86,7 +45,12 @@ export class MockElementRepository implements ElementRepository {
   insert(row: ElementRow): void {
     this.rows.push(row);
   }
+  updateType(id: string, type: ElementType): void {
+    const row = this.rows.find((r) => r.ID === id);
+    if (!row) return;
 
+    row.Type = type;
+  }
   // ------------------------
   // (опціонально) для дебагу
   // ------------------------

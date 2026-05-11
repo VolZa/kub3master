@@ -99,31 +99,31 @@ export function createElement(data: ElementInput): string {
 
 // ================= MATERIAL =================
 
-export function getOrCreateRebarMaterial(
-  diameter: number,
-  rebarClass: string,
-): string {
-  const code = `Ø${diameter}${rebarClass}`;
+// export function getOrCreateRebarMaterial(
+//   diameter: number,
+//   rebarClass: string,
+// ): string {
+//   const code = `Ø${diameter}${rebarClass}`;
 
-  const existing = findElementByCode(code);
-  if (existing) return existing.id;
+//   const existing = findElementByCode(code);
+//   if (existing) return existing.id;
 
-  //   const weight = Number(((diameter * diameter) / 162).toFixed(3));
-  const weight = calcRebarWeightPerMeter(diameter);
+//   //   const weight = Number(((diameter * diameter) / 162).toFixed(3));
+//   const weight = calcRebarWeightPerMeter(diameter);
 
-  return createElement({
-    type: ELEMENT_TYPES.MATERIAL,
-    code,
-    name: `Арматура ${rebarClass} Ø${diameter}`,
-    category: 'Арматура',
-    baseUnit: 'м',
-    profileType: 'rebar',
-    diameter,
-    class: rebarClass,
-    weightPerUnit: weight,
-    density: STEEL_DENSITY,
-  });
-}
+//   return createElement({
+//     type: ELEMENT_TYPES.MATERIAL,
+//     code,
+//     name: `Арматура ${rebarClass} Ø${diameter}`,
+//     category: 'Арматура',
+//     baseUnit: 'м',
+//     profileType: 'rebar',
+//     diameter,
+//     class: rebarClass,
+//     weightPerUnit: weight,
+//     density: STEEL_DENSITY,
+//   });
+// }
 
 function normalizeNumber(value: any): number | null {
   if (value === '' || value === null || value === undefined) return null;

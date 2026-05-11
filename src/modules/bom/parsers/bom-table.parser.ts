@@ -1,67 +1,83 @@
 import { ElementRepository } from '../../elements/element.repository';
-import { getOrCreateElement } from '../../elements/element.factory';
-import { getOrCreateAssembly } from '../../elements/assembly.service';
-import { parseSpec } from './parseSpec';
+import {
+  getOrCreateAssembly,
+  getOrCreateAssemblyWithName,
+} from '../../elements/assembly.service';
 import { insertBOMRows } from '../bom.repository';
 import { TableRowInput } from '../model/table-row-input.model';
+import { aggregateBOMRows, buildBOMRow } from '../bom.service';
+import { ICatalogRepository } from '../../catalog/catalog.repository.interface';
+import { deleteBOMTree } from '../bom.repository';
+import { mapTableRowToStructured } from './mappers/table-row.mapper';
+
+import { parseParent } from './parseParent';
+// import { getOrCreateElementWithType } from '../../elements/element.factory';
+import { buildName } from '../../../utils/buildName';
+
+import { parseStructuredLine } from './parseStucturedLine';
+import { parseSpec } from './parseSpec';
+import { normalizeSpec } from './utils/spec.utils';
+import { normalizeLine } from '../../../utils/normalize';
+import { CatalogService } from '../../catalog/catalog.service';
+import { getOrCreateElement } from '../../elements/element.factory';
 
 export function buildBOMFromTable(
+  parent: { code: string; name: string },
   rows: TableRowInput[],
-  rootCode: string,
   repo: ElementRepository,
+  // catalogRepo: ICatalogRepository,
+  catalogService: CatalogService,
 ) {
-  console.log('TABLE ROWS:', JSON.stringify(rows, null, 2));
-  const root = getOrCreateAssembly(rootCode, repo);
+  console.log('👉 START buildBOMFromTable');
 
-  let currentParent = root;
+  const root = getOrCreateAssemblyWithName(parent.code, parent.name, repo);
+
+  const parentId = root.id;
+
+  deleteBOMTree(parentId);
 
   const now = new Date();
+
   const rawRows: any[][] = [];
+  const errors: any[] = [];
 
   for (const row of rows) {
     try {
-      // 🔥 1. новий верхній assembly (заголовок типу КР1-1-39)
-      if (!row.qty && !row.designation) {
-        currentParent = getOrCreateAssembly(row.name, repo);
-        continue;
-      }
+      const structured = mapTableRowToStructured(row);
 
-      // 🔥 2. вкладений assembly (ГСк-2-5)
-      if (row.designation) {
-        const childAssembly = getOrCreateAssembly(row.designation, repo);
-
-        rawRows.push([
-          currentParent.id,
-          childAssembly.id,
-          row.qty ?? 1,
-          'шт',
-          now,
-        ]);
-
-        // 🔥 змінюємо контекст
-        currentParent = childAssembly;
-
-        continue;
-      }
-
-      // 🔥 3. звичайна деталь
-      const parsed = parseSpec(row.name);
-
-      const element = getOrCreateElement(parsed, repo);
-
-      rawRows.push([
-        currentParent.id,
-        element.id,
-        row.qty ?? 1,
-        element.baseUnit,
+      const bomRows = buildBOMRow(
+        parentId,
+        structured,
         now,
-      ]);
+        repo,
+        catalogService,
+      );
+
+      rawRows.push(...bomRows);
     } catch (e) {
       console.error('❌ ROW ERROR:', row, e);
+      errors.push(row);
     }
   }
 
-  insertBOMRows(rawRows);
+  const aggregated = aggregateBOMRows(rawRows);
 
-  return rawRows.length;
+  insertBOMRows(aggregated);
+
+  //👉 тимчасово прибери
+  // const detector = new ProductDetector(repo);
+  // detector.detectAndUpdate(parentId, aggregated);
+
+  return {
+    added: aggregated.length,
+    errors,
+    errorCount: errors.length,
+  };
+}
+
+// 🔥 допоміжна функція для визначення типу батьківського елемента
+function detectParentTypeFromInput(lines: string[]): 'product' | 'assembly' {
+  return lines.some((line) => line.toLowerCase().includes('бетон'))
+    ? 'product'
+    : 'assembly';
 }

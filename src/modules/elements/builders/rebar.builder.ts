@@ -28,6 +28,7 @@ export function buildRebar(parsed: ParsedSpec): BuiltElement {
     type: ELEMENT_TYPES.PART, // ✔ строго типізовано
     category: 'rebar',
     baseUnit: 'шт', // 🔥 ВАЖЛИВО
+    profileType: 'rebar', // 🔥 для матеріалу
     className,
 
     diameter,

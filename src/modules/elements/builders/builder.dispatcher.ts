@@ -8,6 +8,7 @@ import { buildPipeRound } from './pipeRound.builder';
 import { buildPipeSquare } from './pipeSquare.builder';
 import { buildBeam } from './beam.builder';
 import { buildChannel } from './channel.builder';
+import { buildConcrete } from './concrete.builder';
 
 export function assertNever(x: never): never {
   throw new Error(`Unhandled case: ${JSON.stringify(x)}`);
@@ -44,6 +45,8 @@ export function buildByKind(parsed: ParsedSpec): BuiltElement {
         baseUnit: 'шт',
         category: 'assembly',
       };
+    case 'concrete':
+      return buildConcrete(parsed);
 
     case 'unknown':
       throw new Error('Spec not recognized');

@@ -6,46 +6,53 @@ export type ParsedSpec =
       length?: number;
     }
   | {
-      kind: 'angle'; // кутник
-      width: number; // одна полка
-      height: number; // друга полка
+      kind: 'angle';
+      width: number;
+      height: number;
       thickness: number;
       length?: number;
     }
   | {
-      kind: 'plate'; // пластина / полоса
+      kind: 'plate';
       thickness: number;
       width?: number;
       length?: number;
     }
   | {
-      kind: 'pipe_round'; // труба кругла
+      kind: 'pipe_round';
       diameter: number;
       thickness: number;
       length?: number;
     }
   | {
-      kind: 'pipe_square'; // труба профільна
+      kind: 'pipe_square';
       width: number;
       height: number;
       thickness: number;
       length?: number;
     }
   | {
-      kind: 'beam'; // двутавр
+      kind: 'beam';
       height: number;
       width: number;
       thickness?: number;
       length?: number;
     }
   | {
-      kind: 'channel'; // швелер
+      kind: 'channel';
       height: number;
       width: number;
       thickness?: number;
       length?: number;
     }
-  | { kind: 'assembly'; name: string } // 🔥 ДОДАТИ
+  | {
+      kind: 'assembly';
+      name: string;
+    }
+  | {
+      kind: 'concrete'; // 🔥 ДОДАТИ
+      className: string;
+    }
   | {
       kind: 'unknown';
     };

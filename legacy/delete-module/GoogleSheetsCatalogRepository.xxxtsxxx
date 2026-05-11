@@ -1,0 +1,119 @@
+import { CatalogItem } from '../../../modules/catalog/catalog.model';
+import { ICatalogRepository } from '../../../modules/catalog/catalog.repository.interface';
+import { mapRowsToCatalogItems } from '../../../modules/catalog/catalog.mapper';
+import { validateCatalogConsistency } from '../../../modules/catalog/ProductionRules';
+import { getSheetByNameSafe } from '../../../utils/sheets';
+
+export class CatalogInMemoryRepository implements ICatalogRepository {
+  private byCode = new Map<string, CatalogItem>();
+
+  constructor(rows: any[][]) {
+    const items = mapRowsToCatalogItems(rows);
+
+    items.forEach((item) => {
+      validateCatalogConsistency(item);
+      this.byCode.set(item.code, item);
+    });
+  }
+
+  getByCode(code: string): CatalogItem | null {
+    return this.byCode.get(code) || null;
+  }
+
+  requireByCode(code: string): CatalogItem {
+    const item = this.getByCode(code);
+    if (!item) {
+      throw new Error(`❌ Catalog not found: ${code}`);
+    }
+    return item;
+  }
+}
+
+export class GoogleSheetsCatalogRepository implements ICatalogRepository {
+  private repo: CatalogInMemoryRepository;
+
+  constructor() {
+    const sheet = getSheetByNameSafe('04_Catalog');
+    const data = sheet.getDataRange().getValues();
+
+    // 🔥 передаємо rows в існуючий repo
+    this.repo = new CatalogInMemoryRepository(data);
+  }
+
+  getByCode(code: string): CatalogItem | null {
+    return this.repo.getByCode(code);
+  }
+
+  requireByCode(code: string): CatalogItem {
+    return this.repo.requireByCode(code);
+  }
+}
+
+// import { CatalogRepository } from '@/modules/catalog/catalog.repository';
+// import { CatalogItem } from '@/modules/catalog/catalog.model';
+// import { getSheetByNameSafe } from '@/utils/sheets';
+
+// export class GoogleSheetsCatalogRepository implements CatalogRepository {
+//   private readonly SHEET_NAME = '04_Catalog';
+
+//   private sheet: GoogleAppsScript.Spreadsheet.Sheet;
+
+//   constructor() {
+//     this.sheet = getSheetByNameSafe(this.SHEET_NAME);
+//   }
+
+//   getByCode(code: string): CatalogItem | null {
+//     const data = this.sheet.getDataRange().getValues();
+
+//     const [headers, ...rows] = data;
+//     const map = this.buildHeaderMap(headers);
+
+//     for (const row of rows) {
+//       if (row[map['Code']] === code) {
+//         return this.mapRow(row, map);
+//       }
+//     }
+
+//     return null;
+//   }
+
+//   insert(item: CatalogItem): void {
+//     this.sheet.appendRow([
+//       item.id,
+//       item.code,
+//       item.name,
+//       item.type,
+//       item.category ?? '',
+//       item.baseUnit,
+//       item.profileType ?? '',
+//       item.hasBOM,
+//       item.productionType,
+//       item.comment ?? '',
+//       item.createdAt,
+//     ]);
+//   }
+
+//   // --- helpers ---
+
+//   private buildHeaderMap(headers: any[]): Record<string, number> {
+//     const map: Record<string, number> = {};
+//     headers.forEach((h, i) => (map[h] = i));
+//     return map;
+//   }
+
+//   private mapRow(row: any[], map: Record<string, number>): CatalogItem {
+//     return {
+//       id: row[map['ID']],
+//       code: row[map['Code']],
+//       name: row[map['Name']],
+//       type: row[map['Type']],
+//       baseUnit: row[map['BaseUnit']],
+//       hasBOM: row[map['HasBOM']],
+//       productionType: row[map['ProductionType']],
+//       profileType: row[map['ProfileType']] || undefined,
+//       category: row[map['Category']] || undefined,
+//       comment: row[map['Comment']] || undefined,
+//       createdAt: row[map['CreatedAt']],
+//     };
+//   }
+// }

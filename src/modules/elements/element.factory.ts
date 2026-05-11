@@ -9,62 +9,164 @@ import {
   getElementFromCache,
 } from '../../services/cache.service';
 import { toShort } from './element.mapper';
-import { getOrCreateRebarMaterial } from '../../../legacy/delete-module/elements.service';
 import { BuiltElementExtended } from './element.builder';
+import { getOrCreateMaterialFromPart } from '../../domain/materials/material.service';
+import { ElementType, MaterialCategory } from '../../config/config';
+import { CatalogService } from '../catalog/catalog.service';
 
 export function getOrCreateElement(
   parsed: ParsedSpec,
   repo: ElementRepository,
+  catalogService: CatalogService,
 ): ElementShort {
-  console.log('🔥 FACTORY CALLED');
-  console.log('🧩 parsed FULL:', JSON.stringify(parsed));
-  // 🔥 1. build (сам кине помилку якщо unknown)
+  // 🔥 1. build raw
   const built = buildByKind(parsed);
 
-  // 🔥 2. cache FIRST
-  const cached = getElementFromCache(built.code);
+  // 🔥 2. Catalog resolve
+  const catalog = catalogService.getByCode(built.code);
+
+  const type = catalog?.type ?? built.type;
+  const category = catalog?.category ?? built.category;
+  const profileType = catalog?.profileType ?? built.profileType;
+
+  const cacheKey = `${type}:${built.code}`;
+
+  // 🔥 3. cache
+  const cached = getElementFromCache(cacheKey);
   if (cached) return cached;
 
-  // 🔍 3. repository
+  // 🔍 4. repo
   const existing = repo.findByCode(built.code);
-  console.log('🔍 findByCode:', built.code, existing);
-
   if (existing) {
     const short = toShort(existing);
-
     addElementToCache(short);
-
     return short;
   }
 
-  // 🆕 4. create
-  const id = generateIdByType(built.type);
-  const extended: BuiltElementExtended = { ...built };
-  if (built.category === 'rebar' && built.type === 'part') {
-    const materialId = getOrCreateRebarMaterial(
-      Number(built.diameter),
-      built.className || '',
-    );
+  // 🆕 5. create
+  const id = generateIdByType(type);
 
-    // 🔥 додаємо в built
-    extended.parentMaterialId = materialId;
-
-    console.log('🔗 LINK MATERIAL:', materialId);
-  }
-  const row = buildElementRow(built, id);
-  console.log('💾 INSERT ELEMENT:', built.code);
+  const row = buildElementRow(
+    {
+      ...built,
+      type,
+      category,
+      profileType,
+    },
+    id,
+  );
 
   repo.insert(row);
 
-  // 🔥 5. нормалізований short
   const short: ElementShort = {
     id,
     code: built.code,
-    baseUnit: built.baseUnit ?? 'шт', // safeguard
-    type: built.type, // 🔥
+    baseUnit: built.baseUnit ?? 'шт',
+    type,
   };
 
   addElementToCache(short);
 
   return short;
 }
+
+// import { ParsedSpec } from '../bom/model/parsed-spec.model';
+// import { ElementRepository } from './element.repository';
+// import { ElementShort, ElementFull } from './element.model';
+// import { buildByKind } from './builders/builder.dispatcher';
+// import { buildElementRow } from './element.mapper';
+// import { generateIdByType } from '../../utils/id';
+// import {
+//   addElementToCache,
+//   getElementFromCache,
+// } from '../../services/cache.service';
+// import { toShort } from './element.mapper';
+// import { BuiltElementExtended } from './element.builder';
+// import { getOrCreateMaterialFromPart } from '../../domain/materials/material.service';
+// import { ElementType, MaterialCategory } from '../../config/config';
+
+// export function getOrCreateElement(
+//   parsed: ParsedSpec,
+//   repo: ElementRepository,
+// ): ElementShort {
+//   // 🔥 1. build
+//   const built = buildByKind(parsed);
+
+//   // 🔥 2. cache (краще через code + type)
+//   const cacheKey = `${built.type}:${built.code}`;
+
+//   const cached = getElementFromCache(cacheKey);
+//   if (cached) return cached;
+
+//   // 🔍 3. repository
+//   const existing = repo.findByCode(built.code);
+//   if (existing) {
+//     const short = toShort(existing);
+//     addElementToCache(short);
+//     // addElementToCache(cacheKey, short);
+//     return short;
+//   }
+
+//   // 🆕 4. create (БЕЗ domain-логіки)
+//   const id = generateIdByType(built.type);
+
+//   const row = buildElementRow(built, id);
+
+//   repo.insert(row);
+
+//   const short: ElementShort = {
+//     id,
+//     code: built.code,
+//     baseUnit: built.baseUnit ?? 'шт',
+//     type: built.type,
+//   };
+
+//   addElementToCache(short);
+
+//   return short;
+// }
+
+// export function getOrCreateElementWithType(
+//   code: string,
+//   name: string,
+//   type: ElementType,
+//   categoty: MaterialCategory,
+//   baseUnit: string,
+//   repo: ElementRepository,
+// ): ElementFull {
+//   let existing = repo.findByCode(code);
+
+//   if (existing) {
+//     if (existing.type !== type) {
+//       repo.updateType(existing.id, type);
+
+//       // 🔥 перечитати після апдейту
+//       const updated = repo.findById(existing.id);
+//       if (!updated) throw new Error('Failed to reload element');
+
+//       return updated;
+//     }
+
+//     return existing;
+//   }
+
+//   const id = generateIdByType(type);
+
+//   repo.insert({
+//     ID: id,
+//     Code: code,
+//     Name: name,
+//     Type: type,
+//     Category: categoty,
+//     BaseUnit: baseUnit,
+//     CreatedAt: new Date(),
+//   });
+
+//   // 🔥 КЛЮЧОВИЙ МОМЕНТ
+//   const created = repo.findById(id);
+//   if (!created) {
+//     throw new Error('Failed to create element: ' + code);
+//   }
+
+//   return created;
+// }
