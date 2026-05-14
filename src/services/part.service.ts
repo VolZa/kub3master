@@ -10,7 +10,7 @@ export function getOrCreateRebarPart(
   length: number,
   repo: ElementRepository,
 ): ElementShort {
-  const code = `R_${diameter}_${className}_L${length}`;
+  const code = `R_${diameter}_${className}, L=${length}`;
 
   const existing = repo.findByCode(code);
   if (existing) return toShort(existing);

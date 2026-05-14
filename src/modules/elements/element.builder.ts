@@ -28,12 +28,25 @@ export type BuiltElementExtended = BuiltElement & {
 
 // ===== Code =====
 
+// export function buildElementCode(parsed: ParsedSpec): string {
+//   if (parsed.kind === 'rebar') {
+//     return `${parsed.diameter}_${parsed.className}_${parsed.length}`;
+//   }
+
+//   return parsed.kind; // fallback
+// }
 export function buildElementCode(parsed: ParsedSpec): string {
+  throw new Error('❌ DO NOT USE buildElementCode(parsed)');
+}
+
+export function buildElementCodeFromParsed(parsed: ParsedSpec): string {
   if (parsed.kind === 'rebar') {
-    return `${parsed.diameter}_${parsed.className}_${parsed.length}`;
+    const base = `R_${parsed.diameter}_${parsed.className}`;
+
+    return parsed.length ? `${base}, L=${parsed.length}` : base;
   }
 
-  return parsed.kind; // fallback
+  return parsed.kind;
 }
 
 // ===== Name =====

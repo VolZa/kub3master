@@ -95,4 +95,34 @@ export class CatalogService {
   resolveOrThrow(code: string): CatalogItem {
     return this.requireByCode(code);
   }
+  // -------------------------------
+  // 🔥 RESOLVE WITH CONTEXT
+  // -------------------------------
+
+  resolveWithContext(
+    code: string,
+    row: TableRowInput,
+  ): {
+    item: CatalogItem;
+    resolvedType: 'material' | 'part' | 'assembly' | 'product';
+  } {
+    const item = this.requireByCode(code);
+
+    let resolvedType = item.type;
+
+    // 🔥 універсальна логіка
+    if (item.supportsLength) {
+      if (this.hasLength(row)) {
+        resolvedType = 'part';
+      } else {
+        resolvedType = 'material';
+      }
+    }
+
+    return { item, resolvedType };
+  }
+
+  private hasLength(row: TableRowInput): boolean {
+    return row.length !== undefined && row.length > 0;
+  }
 }

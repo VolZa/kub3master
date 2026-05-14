@@ -3,4 +3,5 @@ export interface TableRowInput {
   prefix?: string;
   sufix?: string;
   qty?: number;
+  length?: number; // ✅ обов’язково
 }

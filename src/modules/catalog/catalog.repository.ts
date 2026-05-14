@@ -4,7 +4,7 @@ import { mapRowsToCatalogItems } from './catalog.mapper';
 import { validateCatalogItem } from './catalog.rules';
 
 function normalizeCode(code: string): string {
-  return code.trim().toUpperCase();
+  return code.trim().toLowerCase();
 }
 
 export class CatalogInMemoryRepository implements ICatalogRepository {
@@ -14,15 +14,18 @@ export class CatalogInMemoryRepository implements ICatalogRepository {
     const items = mapRowsToCatalogItems(rows);
 
     items.forEach((item) => {
-      validateCatalogItem(item);
-
-      const code = normalizeCode(item.code);
-
-      if (this.byCode.has(code)) {
-        throw new Error(`❌ Duplicate catalog code: ${code}`);
+      // validateCatalogItem(item); // 🔥 тепер передаємо тип для більш контекстної валідації
+      // 🔥 тільки базова перевірка (без resolvedType)
+      if (!item.typeCode) {
+        throw new Error(`❌ typeCode is required`);
       }
 
-      this.byCode.set(code, item);
+      const typeCode = normalizeCode(item.typeCode);
+      if (this.byCode.has(typeCode)) {
+        throw new Error(`❌ Duplicate catalog code: ${typeCode}`);
+      }
+
+      this.byCode.set(typeCode, item);
     });
   }
 
@@ -30,11 +33,20 @@ export class CatalogInMemoryRepository implements ICatalogRepository {
     return this.byCode.get(normalizeCode(code)) || null;
   }
 
-  requireByCode(code: string): CatalogItem {
-    const item = this.getByCode(code);
+  // requireByCode(code: string): CatalogItem {
+  //   const item = this.getByCode(code);
+  //   if (!item) {
+  //     throw new Error(`❌ Catalog not found: ${code}`);
+  //   }
+  //   return item;
+  // }
+  requireByCode(typeCode: string): CatalogItem {
+    const item = this.byCode.get(normalizeCode(typeCode));
+
     if (!item) {
-      throw new Error(`❌ Catalog not found: ${code}`);
+      throw new Error(`Catalog item not found: ${typeCode}`);
     }
+
     return item;
   }
 

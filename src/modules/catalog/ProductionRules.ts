@@ -43,7 +43,7 @@ export function ensureParentCatalog(
   console.log(`🆕 Auto-create ${type.toUpperCase()}: ${code}`);
 
   catalog = createCatalogItem({
-    code,
+    typeCode: code,
     name,
     type,
     // baseUnit: 'шт',
@@ -61,7 +61,7 @@ export function ensureParentCatalog(
 export function validateConcreteRule(parent: CatalogItem, child: CatalogItem) {
   if (isConcrete(child) && parent.type !== 'product') {
     throw new Error(
-      `❌ Бетон може входити тільки у виріб. Parent: ${parent.code}`,
+      `❌ Бетон може входити тільки у виріб. Parent: ${parent.typeCode}`,
     );
   }
 }
@@ -72,10 +72,10 @@ export function validateConcreteRule(parent: CatalogItem, child: CatalogItem) {
 
 export function validateCatalogConsistency(item: CatalogItem) {
   if (item.type === 'part' && item.hasBOM) {
-    throw new Error(`❌ Part не може мати BOM: ${item.code}`);
+    throw new Error(`❌ Part не може мати BOM: ${item.typeCode}`);
   }
 
   if (item.productionType === 'purchased' && item.hasBOM) {
-    throw new Error(`❌ Purchased не може мати BOM: ${item.code}`);
+    throw new Error(`❌ Purchased не може мати BOM: ${item.typeCode}`);
   }
 }

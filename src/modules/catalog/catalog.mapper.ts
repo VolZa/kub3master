@@ -34,26 +34,27 @@ export function mapRowsToCatalogItems(rows: any[][]): CatalogItem[] {
 
   const idx = {
     id: getCol(headers, 'ID'),
-    code: getCol(headers, 'Code'),
+    typeCode: getCol(headers, 'TypeCode'),
     name: getCol(headers, 'Name'),
     type: getCol(headers, 'Type'),
     category: getCol(headers, 'Category'),
     profileType: getCol(headers, 'ProfileType'),
     hasBOM: getCol(headers, 'HasBOM'),
     productionType: getCol(headers, 'ProductionType'),
+    supportsLength: getCol(headers, 'SupportsLength'),
     comment: getCol(headers, 'Comment'),
   };
 
   return data.map((row, i) => {
-    const code = normalizeString(row[idx.code]);
+    const typeCode = normalizeString(row[idx.typeCode]);
 
-    if (!code) {
+    if (!typeCode) {
       throw new Error(`❌ Empty code at row ${i + 2}`);
     }
 
     return {
       id: Number(row[idx.id]),
-      code,
+      typeCode: String(row[idx.typeCode]).trim().toLowerCase(),
       name: String(row[idx.name] || '').trim(),
 
       type: row[idx.type], // далі можна строго типізувати
@@ -65,6 +66,8 @@ export function mapRowsToCatalogItems(rows: any[][]): CatalogItem[] {
       hasBOM: normalizeBoolean(row[idx.hasBOM]),
 
       productionType: row[idx.productionType],
+
+      supportsLength: normalizeBoolean(row[idx.supportsLength]),
 
       comment: normalizeString(row[idx.comment]),
     };

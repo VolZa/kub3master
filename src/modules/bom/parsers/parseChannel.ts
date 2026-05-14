@@ -5,6 +5,8 @@ export function parseChannel(input: string): ParsedSpec | null {
     return null;
   }
 
+  if (!input.includes('x')) return null;
+
   const sizeMatch = input.match(/(\d+)\s*x\s*(\d+)/);
 
   if (!sizeMatch) return null;

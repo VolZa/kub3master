@@ -6,10 +6,13 @@ export function parseAngle(input: string): ParsedSpec | null {
     .replace('х', 'x') // кирилична х
     .replace(/кутник|l/g, '')
     .trim();
-
+  // 🔥 ОБОВ’ЯЗКОВА УМОВА
+  if (!normalized.includes('x')) {
+    return null;
+  }
   // шукаємо всі числа
   const matches = normalized.match(/\d+/g);
-
+  console.log('parseAngle matches:', matches);
   if (!matches) {
     return { kind: 'unknown' };
   }

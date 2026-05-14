@@ -1,9 +1,16 @@
 import { ParsedSpec } from '../model/parsed-spec.model';
 import { normalizeRebarClass } from '../../../domain/materials/rebar.utils';
+import { normalizeNumberString } from '../../../utils/normalize';
 
 export function parseRebar(input: string): ParsedSpec | null {
+  const lengthMatch = input.match(/L\s*=\s*([\d\s]+)/i);
+
+  const length = lengthMatch
+    ? normalizeNumberString(lengthMatch[1])
+    : undefined;
   normalizeRebarClass(input);
   console.log('🧩 parseАрматура input:', JSON.stringify(input));
+
   const normalized = input
     .replace(/І/g, '1')
     .replace(/ВР-?1/i, 'A240') // або твоя логіка
@@ -16,9 +23,21 @@ export function parseRebar(input: string): ParsedSpec | null {
     .trim();
   console.log('🧩 parseАрматура normalized:', JSON.stringify(normalized));
   // ===== Діаметр =====
-  const diameterMatch = normalized.match(/d\s*(\d+)/);
-  const diameter = diameterMatch ? Number(diameterMatch[1]) : undefined;
+  let diameter: number | undefined;
 
+  // 🔹 формат R_12_A500C
+  const rMatch = normalized.match(/r[_\s]?(\d+)/i);
+
+  // 🔹 формат d12
+  const dMatch = normalized.match(/d\s*(\d+)/i);
+
+  if (rMatch) {
+    diameter = Number(rMatch[1]);
+  } else if (dMatch) {
+    diameter = Number(dMatch[1]);
+  }
+  // const diameter = diameterMatch ? Number(diameterMatch[1]) : undefined;
+  console.log('🧩 parseАрматура diameter:', JSON.stringify(diameter));
   // ===== Клас =====
 
   // const classMatch = normalized.match(/a\d{3,4}c?/);
@@ -39,8 +58,11 @@ export function parseRebar(input: string): ParsedSpec | null {
   // console.log('🧩 parseАрматура classMatch:', JSON.stringify(classMatch));
   console.log('🧩 parseАрматура className:', JSON.stringify(className));
   // ===== Довжина =====
-  const lengthMatch = normalized.match(/l\s*=?\s*(\d+)/);
-  const length = lengthMatch ? Number(lengthMatch[1]) : undefined;
+  // const lengthMatch = normalized.match(/l\s*=?\s*(\d+)/);
+
+  console.log('🧩 parseАрматура lengthMatch:', JSON.stringify(lengthMatch));
+
+  // const length = lengthMatch ? Number(lengthMatch[1]) : undefined;
 
   // ===== Валідація =====
   // if (!diameter) {

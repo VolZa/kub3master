@@ -1,7 +1,7 @@
 import { onOpen } from './main';
 import { openForm, openFormTable } from './ui/openForm';
-import { buildBOMFromText } from './modules/bom/bom.service';
-import { buildBOMFromTable } from './modules/bom/parsers/bom-table.parser';
+import { buildBOMFromText, buildBOMFromTable } from './modules/bom/bom.service';
+// import { buildBOMFromTable } from './modules/bom/bom-table.parser';
 // import { testBOM } from './dev/test-bom';
 import { register } from './core/register';
 

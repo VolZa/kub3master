@@ -8,7 +8,7 @@ import {
 
 export interface CatalogItem {
   id: number;
-  code: string;
+  typeCode: string;
   name: string;
 
   type: ElementType;
@@ -17,6 +17,7 @@ export interface CatalogItem {
 
   hasBOM: boolean;
   productionType: ProductionType;
+  supportsLength: boolean;
 
   comment?: string;
 }

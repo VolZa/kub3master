@@ -4,8 +4,8 @@ import {
   MATERIAL_CATEGORIES,
   PROFILE_TYPES,
   ProfileType,
-} from '../../../config/config';
-import { TableRowInput } from '../model/table-row-input.model';
+} from '../src/config/config';
+import { TableRowInput } from '../src/modules/bom/model/table-row-input.model';
 
 export function classifyRow(row: TableRowInput): {
   type: ElementType;
@@ -29,7 +29,7 @@ export function classifyRow(row: TableRowInput): {
   if (prefix.includes('арматура')) {
     return {
       type: 'part',
-      category: 'rebar_part',
+      category: 'R_part',
       profileType: PROFILE_TYPES.REBAR,
       baseUnit: 'шт',
     };
@@ -39,7 +39,7 @@ export function classifyRow(row: TableRowInput): {
   if (prefix.includes('стержень')) {
     return {
       type: 'part',
-      category: 'rebar_part',
+      category: 'R_part',
       profileType: PROFILE_TYPES.REBAR,
       baseUnit: 'шт',
     };
@@ -49,7 +49,7 @@ export function classifyRow(row: TableRowInput): {
   if (prefix.includes('хомут')) {
     return {
       type: 'part',
-      category: 'rebar_part',
+      category: 'R_part',
       profileType: PROFILE_TYPES.REBAR,
       baseUnit: 'шт',
     };
@@ -59,7 +59,7 @@ export function classifyRow(row: TableRowInput): {
   if (prefix.includes('сітка')) {
     return {
       type: 'assembly',
-      category: 'rebar_assembly',
+      category: 'R_assembly',
       profileType: PROFILE_TYPES.REBAR,
       baseUnit: 'шт',
     };

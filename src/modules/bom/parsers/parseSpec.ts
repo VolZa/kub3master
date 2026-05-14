@@ -8,29 +8,89 @@ import { parseBeam } from './parseBeam';
 import { parseChannel } from './parseChannel';
 import { normalize } from '../../../utils/normalize';
 
+// export function parseSpec(input: string): ParsedSpec {
+//   const normalized = normalize(input);
+
+//   console.log('🧩 parseSpec input:', JSON.stringify(input));
+//   console.log('🧩 parseSpec normalized:', JSON.stringify(normalized));
+
+//   const parsed =
+//     parseRebar(normalized) ||
+//     parseAngle(normalized) ||
+//     parsePlate(normalized) ||
+//     parsePipe(normalized) ||
+//     parseBeam(normalized) ||
+//     parseChannel(normalized);
+
+//   if (!parsed) {
+//     return {
+//       kind: 'assembly',
+//       name: input.trim(),
+//     };
+//   }
+
+//   return parsed;
+// }
+
 export function parseSpec(input: string): ParsedSpec {
   const normalized = normalize(input);
 
   console.log('🧩 parseSpec input:', JSON.stringify(input));
   console.log('🧩 parseSpec normalized:', JSON.stringify(normalized));
 
-  const parsed =
-    parseRebar(normalized) ||
-    parseAngle(normalized) ||
-    parsePlate(normalized) ||
-    parsePipe(normalized) ||
-    parseBeam(normalized) ||
-    parseChannel(normalized);
+  let parsed: ParsedSpec | null = null;
 
-  if (!parsed) {
-    return {
-      kind: 'assembly',
-      name: input.trim(),
-    };
+  // 🔍 пробуємо parseRebar
+  parsed = parseRebar(normalized);
+  if (parsed) {
+    console.log('✅ matched: parseRebar', parsed);
+    return parsed;
   }
 
-  return parsed;
+  // 🔍 parseAngle
+  parsed = parseAngle(normalized);
+  if (parsed) {
+    console.log('⚠️ matched: parseAngle', parsed);
+    return parsed;
+  }
+
+  // 🔍 parsePlate
+  parsed = parsePlate(normalized);
+  if (parsed) {
+    console.log('⚠️ matched: parsePlate', parsed);
+    return parsed;
+  }
+
+  // 🔍 parsePipe
+  parsed = parsePipe(normalized);
+  if (parsed) {
+    console.log('⚠️ matched: parsePipe', parsed);
+    return parsed;
+  }
+
+  // 🔍 parseBeam
+  parsed = parseBeam(normalized);
+  if (parsed) {
+    console.log('⚠️ matched: parseBeam', parsed);
+    return parsed;
+  }
+
+  // 🔍 parseChannel
+  parsed = parseChannel(normalized);
+  if (parsed) {
+    console.log('⚠️ matched: parseChannel', parsed);
+    return parsed;
+  }
+
+  // ❌ нічого не підійшло
+  console.log('❌ no parser matched');
+
+  return {
+    kind: 'assembly',
+    name: input.trim(),
+  };
 }
+
 // export function parseSpec(input: string): ParsedSpec {
 //   const normalized = normalize(input);
 //   console.log('🧩 parseSpec input:', JSON.stringify(input));
