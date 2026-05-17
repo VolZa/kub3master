@@ -11,9 +11,10 @@ export function getOrCreateMaterialFromCode(
   repo: MaterialRepository,
 ): ElementFull {
   const materialCode = code
-    .split('_L')[0] // 🔥 відкидаємо довжину
+    .split('_L')[0]
     .trim()
     .toUpperCase();
+
   console.log('Looking for material with code:', materialCode);
   const existing = repo.findByCode(materialCode);
 
@@ -22,18 +23,15 @@ export function getOrCreateMaterialFromCode(
   }
 
   const match = materialCode.match(/^R_(\d+)_([A-Z0-9]+)/);
-  //   const match = materialCode.match(/^R_(\d+)_([A-Z0-9]+)(?:_L(\d+))?/);
   console.log('Regex match result:', match);
+
   if (!match) {
     throw new Error(`Invalid material code: ${code}`);
   }
 
   const diameter = Number(match[1]);
   const className = match[2];
-  const length = match[3] ? Number(match[3]) : undefined;
-  const name = buildName('Арматура', `Ø${diameter} ${className}`, {
-    length,
-  });
+  const name = buildName('Арматура', `Ø${diameter} ${className}`);
   const id = generateIdByType(ELEMENT_TYPES.MATERIAL);
 
   repo.insert({
@@ -48,7 +46,7 @@ export function getOrCreateMaterialFromCode(
     Diameter: diameter,
     Class: className,
     Width: undefined,
-    Length: length,
+    Length: undefined,
     Thickness: undefined,
     IsActive: true,
     ParentType: '',
