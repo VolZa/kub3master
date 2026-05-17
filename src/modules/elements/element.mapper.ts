@@ -106,7 +106,7 @@ export function buildAssemblyRow(id: string, code: string): ElementRow {
     Code: code,
     Name: `Вузол ${code}`,
     Type: 'assembly',
-    Category: 'assembly',
+    Category: 'steel component',
     BaseUnit: 'шт',
     CreatedAt: new Date(),
   };

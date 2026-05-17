@@ -1,35 +1,20 @@
 export function parseParent(input: string): { code: string; name: string } {
-  const parts = input
-    .split(';')
-    .map((p) => p.trim())
-    .filter(Boolean);
+  const parts = input.split(';').map((p) => p.trim());
 
-  // 🔹 1. тільки code
-  if (parts.length === 1) {
-    const code = parts[0];
-
-    return {
-      code,
-      name: code,
-    };
+  if (parts.length < 2 || parts.length > 3) {
+    throw new Error(`Invalid parent row: ${input}`);
   }
 
-  // 🔹 2. prefix + code
-  if (parts.length === 2) {
-    const [prefix, code] = parts;
+  const prefix = parts[0];
+  const code = parts[1];
+  const suffix = parts[2];
 
-    return {
-      code,
-      name: `${prefix} ${code}`,
-    };
+  if (!prefix || !code) {
+    throw new Error(`Invalid parent row: ${input}`);
   }
-
-  // 🔹 3. prefix + code + suffix
-  const [prefix, code, ...rest] = parts;
-  const suffix = rest.join(' ');
 
   return {
     code,
-    name: `${prefix} ${code} ${suffix}`.trim(),
+    name: [prefix, code, suffix].filter(Boolean).join(' '),
   };
 }

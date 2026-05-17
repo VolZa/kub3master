@@ -1,128 +1,98 @@
 import { TableRowInput } from '../modules/bom/model/table-row-input.model';
-import { normalizeLine, normalizeNumberString } from './normalize';
+import { normalizeNumberString } from './normalize';
 
 export function parseTableText(text: string): TableRowInput[] {
-  console.log('👉 START parseTableText');
-  console.log('TEXT:', text);
   const lines = text
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
-  console.log('const lines:', lines);
-  const result: TableRowInput[] = [];
 
-  for (const line of lines) {
+  return lines.map((line) => {
     const parts = line.split(';').map((p) => p.trim());
 
-    let prefix: string | undefined;
-    let spec: string | undefined;
-    let qty: number | undefined;
-    // 1 колонка
-    if (parts.length === 1) {
-      spec = parts[0];
+    if (parts.length < 3) {
+      throw new Error(`Invalid table row: ${line}`);
     }
 
-    // 2 колонки → code | qty
-    if (parts.length === 2) {
-      // result.push({
-      //   codeEl: parts[0],
-      //   // qty: Number(parts[1]),
-      //   qty: normalizeNumberString(parts[1]),
-      // });
-      // continue;
-      spec = parts[0];
-      qty = Number(parts[1]);
+    const prefix = parts[0];
+    const rawCode = parts[1];
+    const qtyRaw = parts[parts.length - 1];
+    const qty = normalizeNumberString(qtyRaw);
+    console.log('Parsed qty:', qty, 'from raw:', qtyRaw);
+
+    if (!prefix || !rawCode || !qty || qty <= 0) {
+      throw new Error(`Invalid table row: ${line}`);
     }
 
-    // 3 колонки → prefix | code | qty
-    if (parts.length >= 3) {
-      // result.push({
-      //   prefix: parts[0],
-      //   codeEl: parts[1],
-      //   qty: normalizeNumberString(parts[2]),
-      // });
-      // continue;
-      prefix = parts[0];
-      spec = parts[1];
-      qty = Number(parts[2]);
+    let length: number | undefined;
+    const suffixParts: string[] = [];
+
+    for (const value of parts.slice(2, -1)) {
+      const lengthValue = parseLength(value);
+
+      if (lengthValue !== undefined) {
+        length = lengthValue;
+      } else if (value) {
+        suffixParts.push(value);
+      }
     }
 
-    // 4 колонки → prefix | code | sufix | qty
-    // if (parts.length === 4) {
-    //   result.push({
-    //     prefix: parts[0],
-    //     codeEl: parts[1],
-    //     sufix: parts[2],
-    //     qty: normalizeNumberString(parts[3]),
-    //   });
-    //   continue;
-    // }
-    if (!spec) {
-      throw new Error(`Invalid row: ${line}`);
-    }
+    const codeEl = isRebarCode(rawCode)
+      ? buildElementCode(rawCode, length)
+      : rawCode.trim();
 
-    // -------------------------------
-    // 🔥 ТУТ ВИКОРИСТОВУЄМО normalize
-    // -------------------------------
-
-    const { code, length } = buildElementCode(spec);
-
-    // -------------------------------
-    // 🔹 ФОРМУЄМО РЕЗУЛЬТАТ
-    // -------------------------------
-
-    result.push({
+    console.log(
+      'returned = Parsed codeEl:',
+      codeEl,
+      'from rawCode:',
+      rawCode,
+      'with length:',
+      length,
+    );
+    return {
       prefix,
-      codeEl: code, // ✅ уніфікований ключ
-      sufix: undefined,
+      codeEl,
+      rawCode,
+      sufix: suffixParts.length ? suffixParts.join(' ') : undefined,
       qty,
       length,
-    });
-  }
-
-  return result;
+    };
+  });
 }
 
-function buildElementCode(spec: string): {
-  code: string;
-  length?: number;
-} {
-  const lengthMatch = spec.match(/L\s*=\s*([\d\s]+)/i);
+function isRebarCode(rawCode: string): boolean {
+  return /[øØ]/.test(rawCode);
+}
 
-  const length = lengthMatch
-    ? normalizeNumberString(lengthMatch[1])
-    : undefined;
-  console.log('👉 buildElementCode, spec:', spec);
-  // 🔹 1. нормалізуємо
-  const normalized = normalizeLine(spec);
-  // приклад: "12 А500С 2890"
-  console.log('🔹 normalizeLine(spec):', normalized);
-  const parts = normalized.split(' ');
+function parseLength(value: string): number | undefined {
+  const match = value.match(/L\s*=\s*([\d\s,.]+)/i);
 
-  if (parts.length < 2) {
-    throw new Error(`Invalid spec: ${spec}`);
+  return match ? normalizeNumberString(match[1]) : undefined;
+}
+
+function buildElementCode(rawCode: string, length?: number): string {
+  const match = rawCode.match(/[øØ]\s*(\d+)\s*([A-Za-zА-Яа-я0-9]+)/);
+
+  if (!match) {
+    throw new Error(`Invalid rebar code: ${rawCode}`);
   }
 
-  // 🔹 2. діаметр
-  const diameter = parts[0];
+  const diameter = match[1];
+  const className = normalizeRebarClass(match[2]);
+  const parts = ['R', diameter, className];
 
-  // 🔹 3. клас
-  let className = parts[1].replace('А', 'A').replace('С', 'C');
-
-  // // 🔹 4. довжина (якщо є)
-  // let length: number | undefined;
-
-  // if (parts[2]) {
-  //   length = normalizeNumberString(parts[2]);
-  // }
-  console.log('🔹 length:', length);
-  // 🔹 5. формуємо код матеріалу
-  let code = `R_${diameter}_${className}`;
-
-  // 🔹 6. додаємо довжину
   if (length) {
-    code += `, L=${length}`;
+    parts.push(`L${length}`);
   }
 
-  return { code, length };
+  return parts.join('_');
+}
+
+function normalizeRebarClass(value: string): string {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/А/g, 'A')
+    .replace(/В/g, 'B')
+    .replace(/С/g, 'C');
 }

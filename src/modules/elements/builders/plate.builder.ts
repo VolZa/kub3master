@@ -5,7 +5,7 @@ export function buildPlate(parsed: ParsedSpec) {
   if (parsed.kind !== 'plate') {
     throw new Error('Invalid spec for plate builder');
   }
-
+  console.log('🔨 buildPlate with parsed:', parsed);
   return {
     code: `P_${parsed.width}_${parsed.thickness}_${parsed.length}`,
     name: `Полоса ${parsed.width}x${parsed.thickness} L=${parsed.length}`,

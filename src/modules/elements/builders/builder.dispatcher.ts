@@ -43,7 +43,7 @@ export function buildByKind(parsed: ParsedSpec): BuiltElement {
         code: parsed.name,
         name: parsed.name,
         baseUnit: 'шт',
-        category: 'assembly',
+        category: 'steel component',
       };
     case 'concrete':
       return buildConcrete(parsed);

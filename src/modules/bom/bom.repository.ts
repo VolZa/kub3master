@@ -1,69 +1,5 @@
-// modules/bom/bom.repository.ts
-// import { getSheetByNameSafe } from '../../utils/sheets';
-
-// export function insertBOMRows(rows: any[][]) {
-//   const sheet = getSheetByNameSafe('01_BOM');
-
-//   // if (!rows.length) return;
-
-//   // const lastRow = sheet.getLastRow();
-
-//   // // 🔥 беремо тільки A–E
-//   // const data = rows.map((r) => [
-//   //   r[0], // ParentID
-//   //   r[1], // ChildID
-//   //   r[2], // Qty
-//   //   r[3], // Unit
-//   //   r[4], // CreatedAt
-//   // ]);
-
-//   // sheet.getRange(lastRow + 1, 1, data.length, 5).setValues(data);
-
-//   const data = sheet.getDataRange().getValues();
-//   console.log('📊 EXISTING DATA:', JSON.stringify(data, null, 2));
-//   const headers = data[0];
-//   const map: Record<string, number> = {};
-//   headers.forEach((h, i) => (map[h] = i));
-
-//   // 🔥 будуємо map існуючих
-//   const existingMap = new Map<string, number>();
-
-//   for (let i = 1; i < data.length; i++) {
-//     const parentId = data[i][map['ParentID']];
-//     const childId = data[i][map['ChildID']];
-
-//     const key = `${parentId}_${childId}`;
-//     console.log('EXISTING KEY:', key);
-//     existingMap.set(key, i); // рядок в таблиці
-//   }
-
-//   for (const row of rows) {
-//     const parentId = row[0];
-//     const childId = row[1];
-//     const qty = row[2];
-
-//     const key = `${parentId}_${childId}`;
-//     console.log('NEW KEY:', key);
-//     if (existingMap.has(key)) {
-//       console.log('✅ MATCH FOUND:', key);
-//       // 🔥 UPDATE
-//       const rowIndex = existingMap.get(key)! + 1;
-
-//       const currentQty = sheet.getRange(rowIndex, map['Qty'] + 1).getValue();
-
-//       sheet
-//         .getRange(rowIndex, map['Qty'] + 1)
-//         .setValue(Number(currentQty) + Number(qty));
-//     } else {
-//       console.log('❌ NO MATCH:', key);
-//       // 🔥 INSERT
-//       sheet.appendRow(row);
-//     }
-//   }
-// }
-
 import { getSheetByNameSafe } from '../../utils/sheets';
-import { insertRows } from '../../utils/sheets.utils';
+import { forceText, insertRows } from '../../utils/sheets.utils';
 
 export function insertBOMRows(rows: any[][]) {
   console.log('INPUT ROWS:', JSON.stringify(rows, null, 2));
@@ -87,12 +23,19 @@ export function insertBOMRows(rows: any[][]) {
   });
 
   const rowsToInsert: any[][] = [];
-  const updates: { rowIndex: number; newQty: number }[] = [];
+  const updates: {
+    rowIndex: number;
+    newQty: number;
+    parentCode: string;
+    childCode: string;
+  }[] = [];
 
   for (const r of rows) {
     const parentId = r[0];
     const childId = r[1];
     const qty = Number(r[2]);
+    const parentCode = String(r[5] ?? '');
+    const childCode = String(r[6] ?? '');
 
     const key = `${String(parentId)}_${String(childId)}`;
 
@@ -106,16 +49,20 @@ export function insertBOMRows(rows: any[][]) {
 
       updates.push({
         rowIndex,
-        newQty: currentQty + qty,
+        newQty: qty,
+        parentCode,
+        childCode,
       });
     } else {
       // 🔥 INSERT тільки A–E
       rowsToInsert.push([
-        parentId,
-        childId,
+        forceText(parentId),
+        forceText(childId),
         qty,
         r[3], // Unit
         r[4], // CreatedAt
+        parentCode,
+        childCode,
       ]);
     }
   }
@@ -123,17 +70,13 @@ export function insertBOMRows(rows: any[][]) {
   // 🔥 1. UPDATE батчем
   updates.forEach((u) => {
     sheet.getRange(u.rowIndex, 3).setValue(u.newQty);
+    sheet.getRange(u.rowIndex, 6, 1, 2).setValues([[u.parentCode, u.childCode]]);
   });
 
   // 🔥 2. INSERT батчем (дуже важливо)
   console.log('ROWS TO INSERT:', JSON.stringify(rowsToInsert, null, 2));
   console.log('UPDATES:', updates.length);
-  // if (rowsToInsert.length) {
-  // const startRow = sheet.getLastRow() + 1;
 
-  // sheet.getRange(startRow, 1, rowsToInsert.length, 5).setValues(rowsToInsert);
-
-  // }
   if (rowsToInsert.length) {
     insertRows(sheet, rowsToInsert);
   }
@@ -160,72 +103,45 @@ export function deleteBOMByParentId(parentId: string) {
     .setValues(rowsToKeep);
 }
 
-// export function deleteBOMTree(parentId: string) {
-//   const sheet = getSheetByNameSafe('01_BOM');
-//   const data = sheet.getDataRange().getValues();
-
-//   if (data.length <= 1) return;
-
-//   const header = data[0];
-//   const rows = data.slice(1);
-
-//   // 🔥 будуємо граф parent → children
-//   const childrenMap = new Map<string, string[]>();
-
-//   for (const row of rows) {
-//     const parent = String(row[0]);
-//     const child = String(row[1]);
-
-//     if (!childrenMap.has(parent)) {
-//       childrenMap.set(parent, []);
-//     }
-
-//     childrenMap.get(parent)!.push(child);
-//   }
-
-//   // 🔥 збираємо всі вузли для видалення
-//   const toDelete = new Set<string>();
-
-//   function collect(id: string) {
-//     if (toDelete.has(id)) return;
-
-//     toDelete.add(id);
-
-//     const children = childrenMap.get(id) || [];
-
-//     for (const child of children) {
-//       collect(child);
-//     }
-//   }
-
-//   collect(String(parentId));
-
-//   // 🔥 фільтруємо рядки
-//   const result = [header];
-
-//   for (const row of rows) {
-//     const parent = String(row[0]);
-
-//     if (!toDelete.has(parent)) {
-//       result.push(row);
-//     }
-//   }
-
-//   // 🔥 перезапис
-//   sheet.clearContents();
-//   sheet.getRange(1, 1, result.length, result[0].length).setValues(result);
-// }
 export function deleteBOMTree(parentId: string) {
   const sheet = getSheetByNameSafe('01_BOM');
 
   const data = sheet.getDataRange().getValues();
 
+  if (data.length <= 1) return;
+
   const headers = data[0];
   const parentIdx = headers.indexOf('ParentID');
+  const childIdx = headers.indexOf('ChildID');
+
+  const childrenByParent = new Map<string, string[]>();
+
+  for (let i = 1; i < data.length; i++) {
+    const parent = String(data[i][parentIdx]);
+    const child = String(data[i][childIdx]);
+    const children = childrenByParent.get(parent) ?? [];
+
+    children.push(child);
+    childrenByParent.set(parent, children);
+  }
+
+  const parentsToDelete = new Set<string>();
+
+  function collect(id: string) {
+    if (parentsToDelete.has(id)) return;
+
+    parentsToDelete.add(id);
+
+    for (const child of childrenByParent.get(id) ?? []) {
+      collect(child);
+    }
+  }
+
+  collect(String(parentId));
 
   const filtered = data.filter((row, i) => {
     if (i === 0) return true;
-    return String(row[parentIdx]) !== String(parentId);
+    return !parentsToDelete.has(String(row[parentIdx]));
   });
 
   sheet.clearContents();

@@ -63,7 +63,7 @@ export function getOrCreateAssemblyWithName(
     Code: code,
     Name: name || code,
     Type: ELEMENT_TYPES.ASSEMBLY,
-    Category: 'assembly',
+    Category: 'steel component',
     BaseUnit: 'шт',
     CreatedAt: new Date(),
   });

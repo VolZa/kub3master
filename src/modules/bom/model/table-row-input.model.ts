@@ -1,7 +1,8 @@
 export interface TableRowInput {
+  prefix: string;
   codeEl: string;
-  prefix?: string;
+  rawCode: string;
   sufix?: string;
   qty?: number;
-  length?: number; // ✅ обов’язково
+  length?: number;
 }

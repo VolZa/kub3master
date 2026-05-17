@@ -1,50 +1,68 @@
+import { ELEMENT_TYPES } from '../../config/config';
+import { generateIdByType } from '../../utils/id';
 import { ElementRepository } from './element.repository';
-import { Element } from './element.model';
-import { ElementShort } from '../../modules/elements/element.model';
+import { ElementFull } from './element.model';
+import { buildName } from './builders/name.builder';
+
+type MaterialRepository = Pick<ElementRepository, 'findByCode' | 'insert'>;
 
 export function getOrCreateMaterialFromCode(
   code: string,
-  repo: ElementRepository,
-): Element {
-  // 🔹 1. нормалізуємо
-  const normalizedCode = code.trim().toUpperCase();
-
-  // 🔹 2. шукаємо
-  const existing = repo.findByCode(normalizedCode);
+  repo: MaterialRepository,
+): ElementFull {
+  const materialCode = code
+    .split('_L')[0] // 🔥 відкидаємо довжину
+    .trim()
+    .toUpperCase();
+  console.log('Looking for material with code:', materialCode);
+  const existing = repo.findByCode(materialCode);
 
   if (existing) {
     return existing;
   }
 
-  // 🔹 3. парсимо код (R_12_A500C)
-  const match = normalizedCode.match(/^R_(\d+)_([A-Z0-9]+)/);
-
+  const match = materialCode.match(/^R_(\d+)_([A-Z0-9]+)/);
+  //   const match = materialCode.match(/^R_(\d+)_([A-Z0-9]+)(?:_L(\d+))?/);
+  console.log('Regex match result:', match);
   if (!match) {
-    throw new Error(`❌ Invalid material code: ${code}`);
+    throw new Error(`Invalid material code: ${code}`);
   }
 
   const diameter = Number(match[1]);
   const className = match[2];
-
-  // 🔹 4. формуємо назву
-  const name = `Арматура Ø${diameter} ${className}`;
-
-  // 🔹 5. створюємо material
-  const material = repo.create({
-    code: normalizedCode,
-    name,
-
-    type: 'material',
-    category: 'rebar',
-    profileType: 'rebar',
-
-    baseUnit: 'кг',
-
-    diameter,
-    class: className,
-
-    isActive: true,
+  const length = match[3] ? Number(match[3]) : undefined;
+  const name = buildName('Арматура', `Ø${diameter} ${className}`, {
+    length,
   });
+  const id = generateIdByType(ELEMENT_TYPES.MATERIAL);
+
+  repo.insert({
+    ID: id,
+    Code: materialCode,
+    Name: name,
+    Type: ELEMENT_TYPES.MATERIAL,
+    Category: 'rebar',
+    BaseUnit: 'кг',
+    ProfileType: 'round',
+    ParentMaterialID: '',
+    Diameter: diameter,
+    Class: className,
+    Width: undefined,
+    Length: length,
+    Thickness: undefined,
+    IsActive: true,
+    ParentType: '',
+    WeightPerUnit: undefined,
+    Density: 7850,
+    Comment: '',
+    CreatedAt: new Date(),
+  });
+
+  const material = repo.findByCode(materialCode);
+
+  if (!material) {
+    throw new Error(`Failed to create material: ${materialCode}`);
+  }
 
   return material;
 }

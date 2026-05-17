@@ -1,6 +1,7 @@
 import { ParsedSpec } from '../../bom/model/parsed-spec.model';
 import { BuiltElement } from '../element.builder';
 import { ELEMENT_TYPES } from '../../../config/config';
+import { buildName } from './name.builder';
 
 export function buildRebar(parsed: ParsedSpec): BuiltElement {
   if (parsed.kind !== 'rebar') {
@@ -15,12 +16,17 @@ export function buildRebar(parsed: ParsedSpec): BuiltElement {
     .join('_');
 
   // 🔥 name (людський)
-  const nameParts = [`Арматура Ø${diameter}`];
+  // const nameParts = [`Арматура Ø${diameter}`];
 
-  if (className) nameParts.push(className);
-  if (length) nameParts.push(`L=${length}`);
+  // if (className) nameParts.push(className);
+  // if (length) nameParts.push(`L=${length}`);
 
-  const name = nameParts.join(' ');
+  //  const name = nameParts.join(' ');
+  const rawCode = `Ø${diameter} ${className ?? ''}`.trim();
+
+  const name = buildName('Арматура', rawCode, {
+    length,
+  });
 
   return {
     code,

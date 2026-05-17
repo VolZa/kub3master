@@ -7,6 +7,7 @@ import {
 } from './element.mapper';
 import { mapRowToFull } from './element.mapper';
 import { ElementType } from '../../config/config';
+import { forceText } from '../../utils/sheets.utils';
 
 export interface ElementRepository {
   findById(id: string): ElementFull | null;
@@ -46,26 +47,36 @@ export class GoogleSheetsElementRepository implements ElementRepository {
   insert(row: ElementRow): void {
     const sheet = getSheetByNameSafe(this.SHEET_NAME);
 
+    // const asText = (v: any) => `'${String(v)}`;
+
     sheet.appendRow([
-      row.ID,
-      row.Code,
+      forceText(row.ID), // 🔥 гарантія string
+      forceText(row.Code), // 🔥 гарантія string
+
       row.Name,
       row.Type,
       row.Category,
       row.BaseUnit,
-      row.ProfileType || '',
-      row.ParentMaterialID || '',
-      row.Diameter || '',
-      row.Class || '',
-      row.Width || '',
-      row.Length || '',
-      row.Thickness || '',
+
+      row.ProfileType ?? '',
+      row.ParentMaterialID ? forceText(row.ParentMaterialID) : '',
+
+      row.Diameter ?? '',
+      row.Class ?? '',
+
+      row.Width ?? '',
+      row.Length ?? '',
+      row.Thickness ?? '',
+
       row.IsActive ?? true,
-      row.ParentType || '',
-      row.WeightPerUnit || '',
-      row.Density || '',
-      row.Comment || '',
-      row.CreatedAt || new Date(),
+
+      row.ParentType ?? '',
+      row.WeightPerUnit ?? '',
+      row.Density ?? '',
+
+      row.Comment ?? '',
+
+      row.CreatedAt instanceof Date ? row.CreatedAt : new Date(),
     ]);
 
     this.rows.push(row); // оновлюємо локальний кеш після вставки

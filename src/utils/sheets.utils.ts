@@ -25,3 +25,7 @@ export function getFirstEmptyRow(
 
   return 2; // тільки header
 }
+
+export function forceText(value: any): string {
+  return `'${String(value)}`;
+}
