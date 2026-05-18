@@ -8,31 +8,11 @@ import { parseBeam } from './parseBeam';
 import { parseChannel } from './parseChannel';
 import { normalize } from '../../../utils/normalize';
 
-// export function parseSpec(input: string): ParsedSpec {
-//   const normalized = normalize(input);
-
-//   console.log('🧩 parseSpec input:', JSON.stringify(input));
-//   console.log('🧩 parseSpec normalized:', JSON.stringify(normalized));
-
-//   const parsed =
-//     parseRebar(normalized) ||
-//     parseAngle(normalized) ||
-//     parsePlate(normalized) ||
-//     parsePipe(normalized) ||
-//     parseBeam(normalized) ||
-//     parseChannel(normalized);
-
-//   if (!parsed) {
-//     return {
-//       kind: 'assembly',
-//       name: input.trim(),
-//     };
-//   }
-
-//   return parsed;
-// }
-
 export function parseSpec(input: string): ParsedSpec {
+  // 🔥 якщо це вже code → не чіпаємо
+  if (/^[A-Z]+_\d+/.test(input)) {
+    return parseFromCode(input);
+  }
   const normalized = normalize(input);
 
   console.log('🧩 parseSpec input:', JSON.stringify(input));
@@ -91,6 +71,51 @@ export function parseSpec(input: string): ParsedSpec {
   };
 }
 
+export function parseFromCode(code: string): ParsedSpec {
+  // 🔹 REBAR
+  const rebarMatch = code.match(/^R_(\d+)_([A-Z0-9]+)(?:_L(\d+))?/);
+  if (rebarMatch) {
+    return {
+      kind: 'rebar',
+      diameter: Number(rebarMatch[1]),
+      className: rebarMatch[2],
+      length: rebarMatch[3] ? Number(rebarMatch[3]) : undefined,
+    };
+  }
+
+  // 🔹 PLATE (мінімально)
+  const plateMatch = code.match(/^P_(\d+)_([0-9]+)(?:_L(\d+))?/);
+  if (plateMatch) {
+    return {
+      kind: 'plate',
+      thickness: Number(plateMatch[1]),
+      width: Number(plateMatch[2]),
+      length: plateMatch[3] ? Number(plateMatch[3]) : undefined,
+    };
+  }
+
+  // 🔹 FALLBACK → НЕ unknown!
+  return {
+    kind: 'assembly',
+    name: code,
+  };
+}
+
+// export function parseFromCode(code: string): ParsedSpec {
+//   const rebarMatch = code.match(/^R_(\d+)_([A-Z0-9]+)(?:_L(\d+))?/);
+
+//   if (rebarMatch) {
+//     return {
+//       kind: 'rebar',
+//       diameter: Number(rebarMatch[1]),
+//       className: rebarMatch[2],
+//       length: rebarMatch[3] ? Number(rebarMatch[3]) : undefined,
+//     };
+//   }
+
+//   // fallback
+//   return { kind: 'unknown' };
+// }
 // export function parseSpec(input: string): ParsedSpec {
 //   const normalized = normalize(input);
 //   console.log('🧩 parseSpec input:', JSON.stringify(input));
@@ -189,3 +214,27 @@ export function parseSpec(input: string): ParsedSpec {
 // const lBeam = parseLBeam(line); // Двутавр
 // if (lBeam) return lBeam;
 //===================
+
+// export function parseSpec(input: string): ParsedSpec {
+//   const normalized = normalize(input);
+
+//   console.log('🧩 parseSpec input:', JSON.stringify(input));
+//   console.log('🧩 parseSpec normalized:', JSON.stringify(normalized));
+
+//   const parsed =
+//     parseRebar(normalized) ||
+//     parseAngle(normalized) ||
+//     parsePlate(normalized) ||
+//     parsePipe(normalized) ||
+//     parseBeam(normalized) ||
+//     parseChannel(normalized);
+
+//   if (!parsed) {
+//     return {
+//       kind: 'assembly',
+//       name: input.trim(),
+//     };
+//   }
+
+//   return parsed;
+// }

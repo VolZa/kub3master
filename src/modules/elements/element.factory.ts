@@ -11,8 +11,13 @@ import {
 import { toShort } from './element.mapper';
 import { BuiltElementExtended } from './element.builder';
 import { getOrCreateMaterialFromPart } from '../../domain/materials/material.service';
-import { ElementType, MaterialCategory } from '../../config/config';
+import {
+  ELEMENT_TYPES,
+  ElementType,
+  MaterialCategory,
+} from '../../config/config';
 import { CatalogService } from '../catalog/catalog.service';
+import { getOrCreateMaterialFromCode } from './material.service';
 
 export function getOrCreateElement(
   parsed: ParsedSpec,
@@ -25,7 +30,12 @@ export function getOrCreateElement(
   // 🔥 2. Catalog resolve
   const catalog = catalogService.getByCode(built.code);
 
-  const type = catalog?.type ?? built.type;
+  // const type = catalog?.type ?? built.type;
+
+  const isPart = built.code.includes('_L');
+
+  const type = isPart ? ELEMENT_TYPES.PART : ELEMENT_TYPES.MATERIAL;
+
   const category = catalog?.category ?? built.category;
   const profileType = catalog?.profileType ?? built.profileType;
 
@@ -42,16 +52,40 @@ export function getOrCreateElement(
     addElementToCache(short);
     return short;
   }
+  // -------------------------
+  // 🔗 MATERIAL LINK (NEW)
+  // -------------------------
+  let parentMaterialId: string | undefined;
 
+  // const isPart = built.code.includes('_L');
+  console.log(
+    'Determining if element is part based on code:',
+    built.code,
+    'isPart:',
+    isPart,
+  );
+  if (isPart) {
+    const materialCode = built.code.split('_L')[0];
+
+    const material = getOrCreateMaterialFromCode(materialCode, repo as any);
+
+    parentMaterialId = material.id;
+  }
+  console.log(
+    'Resolved parentMaterialId:',
+    parentMaterialId,
+    'for code:',
+    built.code,
+  );
   // 🆕 5. create
   const id = generateIdByType(type);
-
   const row = buildElementRow(
     {
       ...built,
       type,
       category,
       profileType,
+      parentMaterialId,
     },
     id,
   );

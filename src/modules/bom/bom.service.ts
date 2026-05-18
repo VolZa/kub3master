@@ -33,7 +33,10 @@ import { CatalogService } from '../catalog/catalog.service';
 import { calcRebarWeight } from '../../utils/rebar';
 import { getOrCreateMaterialFromCode } from '../elements/material.service';
 import { getSheetByNameSafe } from '../../utils/sheets';
-// Виправлена (гнучка) версія для роботи з різними типами специфікацій (через парсер)
+import { parseFromCode } from './parsers/parseSpec';
+import { ParsedSpec } from './model/parsed-spec.model';
+import { normalizeNumberString } from '../../utils/normalize';
+
 export function buildBOMRow(
   parentId: string,
   structuredRow: StructuredLine,
@@ -45,14 +48,44 @@ export function buildBOMRow(
 ): any[][] {
   const { prefix, code, suffix, qty } = structuredRow;
 
-  const safeQty = qty ?? 1;
+  const safeQty =
+    typeof qty === 'number' ? qty : normalizeNumberString(String(qty ?? 1));
 
-  const name = [prefix, code, suffix].filter(Boolean).join(' ');
+  // ----------------------------
+  // 🔍 1. Визначаємо через Catalog
+  // ----------------------------
+  const catalog = catalogService.resolveFromRow({
+    codeEl: code,
+    rawCode: code, // 🔥 мінімальний фікс (Це тимчасовий костиль) прокинь rawCode з parser: StructuredLine {code: codeEl,rawCode: rawCode, // ✔}
+    prefix,
+    sufix: suffix,
+  });
 
-  const normalized = normalizeSpec(name);
-  const parsed = parseSpec(normalized);
+  let parsed: ParsedSpec;
 
+  // ----------------------------
+  // 🧠 2. Логіка вибору парсингу
+  // ----------------------------
+  const isNormalizedCode = /^[A-Z]+_\d+/.test(code);
+
+  if (catalog.type === 'part' || catalog.type === 'assembly') {
+    // 🔥 НЕ парсимо геометрію
+    parsed = {
+      kind: 'assembly',
+      name: code,
+    };
+  } else {
+    // 🔥 геометрія (арматура, труба, полоса...)
+    const name = [prefix, code, suffix].filter(Boolean).join(' ');
+
+    parsed = isNormalizedCode ? parseFromCode(code) : parseSpec(name);
+  }
+
+  // ----------------------------
+  // 🧱 3. Створюємо елемент
+  // ----------------------------
   const element = getOrCreateElement(parsed, repo, catalogService);
+
   const parent = repo.findById(parentId);
 
   if (!parent) {
@@ -60,9 +93,10 @@ export function buildBOMRow(
   }
 
   // ----------------------------
-  // 🧱 MATERIAL
+  // 🧱 MATERIAL (простий випадок)
   // ----------------------------
   if (element.type === 'material') {
+    console.log('FINAL Qty (material) type:', typeof safeQty, safeQty);
     return [
       [
         parentId,
@@ -119,10 +153,11 @@ export function buildBOMRow(
 
     // 🔥 FALLBACK (через Elements)
     else {
-      const requestedMaterialCode = extractMaterialCode(structuredRow.code);
+      const materialCodeBase = element.code.split('_L')[0];
 
-      const material = getOrCreateMaterialFromCode(requestedMaterialCode, repo);
+      const material = getOrCreateMaterialFromCode(materialCodeBase, repo);
 
+      // 🔥 розрахунок ваги для арматури
       if (
         built.category === 'rebar' &&
         typeof built.length === 'number' &&
@@ -138,7 +173,11 @@ export function buildBOMRow(
     materialQty = Math.round(materialQty * 100) / 100;
 
     updateElementParentMaterial(element.id, materialId);
-
+    console.log(
+      'FINAL Qty (FALLBACK (через Elements) type:',
+      typeof safeQty,
+      safeQty,
+    );
     return [
       [
         parentId,
@@ -164,6 +203,7 @@ export function buildBOMRow(
   // ----------------------------
   // 🔧 ASSEMBLY / PRODUCT
   // ----------------------------
+  console.log('FINAL Qty (ASSEMBLY / PRODUCT) type:', typeof safeQty, safeQty);
   return [
     [
       parentId,
@@ -177,11 +217,164 @@ export function buildBOMRow(
   ];
 }
 
+// Виправлена (гнучка) версія для роботи з різними типами специфікацій (через парсер)
+// export function buildBOMRow(
+//   parentId: string,
+//   structuredRow: StructuredLine,
+//   now: Date,
+//   repo: ElementRepository,
+//   catalogService: CatalogService,
+//   materialRepo?: MaterialRepository,
+//   batchRepo?: MaterialBatchRepository,
+// ): any[][] {
+//   const { prefix, code, suffix, qty } = structuredRow;
+
+//   const safeQty = qty ?? 1;
+
+//   const name = [prefix, code, suffix].filter(Boolean).join(' ');
+
+//   // const normalized = normalizeSpec(name);
+//   // const parsed = parseSpec(normalized);
+
+//   const isNormalized = /^[A-Z]+_\d+/.test(code);
+
+//   const parsed = isNormalized
+//     ? parseFromCode(code) // 🔥 новий шлях
+//     : parseSpec(normalizeSpec(name));
+
+//   const element = getOrCreateElement(parsed, repo, catalogService);
+//   const parent = repo.findById(parentId);
+
+//   if (!parent) {
+//     throw new Error(`Parent element not found: ${parentId}`);
+//   }
+
+//   // ----------------------------
+//   // 🧱 MATERIAL
+//   // ----------------------------
+//   if (element.type === 'material') {
+//     return [
+//       [
+//         parentId,
+//         element.id,
+//         safeQty,
+//         element.baseUnit,
+//         now,
+//         parent.code,
+//         element.code,
+//       ],
+//     ];
+//   }
+
+//   // ----------------------------
+//   // 🔩 PART → MATERIAL
+//   // ----------------------------
+//   if (element.type === 'part') {
+//     const built = buildByKind(parsed);
+
+//     let materialQty = safeQty;
+
+//     let materialId: string | null = null;
+//     let materialCode: string | null = null;
+
+//     // 🔥 FULL режим (через склад)
+//     if (materialRepo && batchRepo) {
+//       const material = materialRepo.findBySpec({
+//         profileType: built.profileType,
+//         diameter: built.diameter,
+//         class: built.className,
+//         width: built.width,
+//         height: built.height,
+//         thickness: built.thickness,
+//       });
+
+//       if (!material) {
+//         throw new Error(`❌ Material not found for part: ${element.code}`);
+//       }
+
+//       const batch = batchRepo.getActiveBatch(material.materialId);
+
+//       if (!batch) {
+//         throw new Error(`❌ No batch for material: ${material.code}`);
+//       }
+
+//       if (built.length) {
+//         const meters = built.length / 1000;
+//         materialQty = meters * batch.weightPerUnit * safeQty;
+//       }
+
+//       materialId = String(material.materialId);
+//       materialCode = material.code;
+//     }
+
+//     // 🔥 FALLBACK (через Elements)
+//     else {
+//       const requestedMaterialCode = extractMaterialCode(structuredRow.code);
+
+//       const material = getOrCreateMaterialFromCode(requestedMaterialCode, repo);
+
+//       if (
+//         built.category === 'rebar' &&
+//         typeof built.length === 'number' &&
+//         typeof built.diameter === 'number'
+//       ) {
+//         materialQty = calcRebarWeight(built.length, built.diameter, safeQty);
+//       }
+
+//       materialId = material.id;
+//       materialCode = material.code;
+//     }
+
+//     materialQty = Math.round(materialQty * 100) / 100;
+
+//     updateElementParentMaterial(element.id, materialId);
+
+//     return [
+//       [
+//         parentId,
+//         element.id,
+//         safeQty,
+//         element.baseUnit,
+//         now,
+//         parent.code,
+//         element.code,
+//       ],
+//       [
+//         element.id,
+//         materialId,
+//         materialQty,
+//         'кг',
+//         now,
+//         element.code,
+//         materialCode,
+//       ],
+//     ];
+//   }
+
+//   // ----------------------------
+//   // 🔧 ASSEMBLY / PRODUCT
+//   // ----------------------------
+//   return [
+//     [
+//       parentId,
+//       element.id,
+//       safeQty,
+//       element.baseUnit,
+//       now,
+//       parent.code,
+//       element.code,
+//     ],
+//   ];
+// }
+
 function extractMaterialCode(code: string): string {
   return code.split(',')[0];
 }
 
-function updateElementParentMaterial(elementId: string, materialId: string | null) {
+function updateElementParentMaterial(
+  elementId: string,
+  materialId: string | null,
+) {
   if (!materialId) return;
 
   const sheet = getSheetByNameSafe('00_Elements');
@@ -202,7 +395,9 @@ function updateElementParentMaterial(elementId: string, materialId: string | nul
     if (String(data[i][idIdx]) === String(elementId)) {
       const rowIndex = i + 1;
 
-      sheet.getRange(rowIndex, parentMaterialIdx + 1).setValue(String(materialId));
+      sheet
+        .getRange(rowIndex, parentMaterialIdx + 1)
+        .setValue(String(materialId));
       sheet.getRange(rowIndex, parentTypeIdx + 1).setValue('material');
       return;
     }
