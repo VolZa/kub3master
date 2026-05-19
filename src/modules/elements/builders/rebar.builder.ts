@@ -30,6 +30,7 @@ export function buildRebar(parsed: ParsedSpec): BuiltElement {
 
   return {
     code,
+    prefixName: 'арматура', // 🔥 для Catalog
     name,
     type: ELEMENT_TYPES.PART, // ✔ строго типізовано
     category: 'rebar',

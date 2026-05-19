@@ -16,6 +16,7 @@ export function buildPipeRound(parsed: ParsedSpec): BuiltElement {
 
   return {
     code,
+    prefixName: 'труба кругла', // 🔥 для Catalog
     name,
     type: 'part',
     category: 'pipe_round',

@@ -16,6 +16,7 @@ export function buildAngle(parsed: ParsedSpec) {
 
   return {
     code,
+    prefixName: 'кутник', // 🔥 для Catalog
     name,
     type: ELEMENT_TYPES.PART,
     category: 'angle',

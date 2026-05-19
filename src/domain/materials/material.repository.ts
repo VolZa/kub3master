@@ -103,4 +103,7 @@ export class MaterialRepository {
         return null;
     }
   }
+  findByCode(code: string): Material | null {
+    return this.materials.find((m) => m.code === code) || null;
+  }
 }

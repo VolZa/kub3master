@@ -3,13 +3,14 @@ import { ParsedSpec } from '../bom/model/parsed-spec.model';
 
 export interface BuiltElement {
   code: string;
+  prefixName: string;
   name: string;
-  type: ElementType;
-  category: string;
+  // type: ElementType;
+  // category: string;
   baseUnit: string;
 
   // optional
-  profileType?: string;
+  // profileType?: string;
   className?: string;
   // geometry
   diameter?: number;

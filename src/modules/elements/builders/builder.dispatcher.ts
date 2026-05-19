@@ -41,6 +41,7 @@ export function buildByKind(parsed: ParsedSpec): BuiltElement {
       return {
         type: 'assembly',
         code: parsed.name,
+        prefixName: 'що передати сюди',
         name: parsed.name,
         baseUnit: 'шт',
         category: 'steel component',

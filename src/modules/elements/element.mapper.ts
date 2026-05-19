@@ -14,6 +14,7 @@ export function mapSheetRowToElementRow(
   return {
     ID: getValue(row, map, 'ID')!,
     Code: getValue(row, map, 'Code')!,
+    PrefixName: getValue(row, map, 'PrefixName')!,
     Name: getValue(row, map, 'Name')!,
     Type: getValue(row, map, 'Type')!,
     Category: getValue(row, map, 'Category')!,
@@ -41,6 +42,7 @@ export function mapElementRowToDomain(row: ElementRow): ElementFull {
   return {
     id: row.ID,
     code: row.Code,
+    prefixName: row.PrefixName,
     name: row.Name,
     type: row.Type as any,
     category: row.Category,
@@ -55,6 +57,7 @@ export function mapElementToRow(el: ElementFull): ElementRow {
   return {
     ID: el.id,
     Code: el.code,
+    PrefixName: el.prefixName,
     Name: el.name,
     Type: el.type,
     Category: el.category || '',
@@ -74,6 +77,7 @@ export function buildElementRow(
   return {
     ID: id,
     Code: built.code,
+    PrefixName: built.prefixName,
     Name: built.name,
     Type: built.type,
     Category: built.category,
@@ -104,9 +108,10 @@ export function buildAssemblyRow(id: string, code: string): ElementRow {
   return {
     ID: id,
     Code: code,
+    PrefixName: '', // 🔥 що задати для Catalog ?
     Name: `Вузол ${code}`,
     Type: 'assembly',
-    Category: 'steel component',
+    Category: 'steel',
     BaseUnit: 'шт',
     CreatedAt: new Date(),
   };
@@ -130,6 +135,7 @@ export function mapRowToFull(row: any[], headers: string[]) {
   return {
     id: String(get('ID')),
     code: get('Code'),
+    prefixName: get('PrefixName'),
     name: get('Name'),
     type: get('Type'),
     category: get('Category'),

@@ -8,6 +8,7 @@ export function buildConcrete(parsed: {
   return {
     type: ELEMENT_TYPES.MATERIAL,
     code: `C_${parsed.className}`,
+    prefixName: 'бетон', // 🔥 для Catalog
     name: `Бетон ${parsed.className}`,
     baseUnit: 'л',
     category: 'concrete',

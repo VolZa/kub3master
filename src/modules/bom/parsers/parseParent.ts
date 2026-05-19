@@ -1,4 +1,8 @@
-export function parseParent(input: string): { code: string; name: string } {
+export function parseParent(input: string): {
+  code: string;
+  prefix: string;
+  name: string;
+} {
   const parts = input.split(';').map((p) => p.trim());
 
   if (parts.length < 2 || parts.length > 3) {
@@ -15,6 +19,7 @@ export function parseParent(input: string): { code: string; name: string } {
 
   return {
     code,
-    name: [prefix, code, suffix].filter(Boolean).join(' '),
+    prefix,
+    name: [code, suffix].filter(Boolean).join(' '),
   };
 }

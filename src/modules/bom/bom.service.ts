@@ -217,156 +217,6 @@ export function buildBOMRow(
   ];
 }
 
-// Виправлена (гнучка) версія для роботи з різними типами специфікацій (через парсер)
-// export function buildBOMRow(
-//   parentId: string,
-//   structuredRow: StructuredLine,
-//   now: Date,
-//   repo: ElementRepository,
-//   catalogService: CatalogService,
-//   materialRepo?: MaterialRepository,
-//   batchRepo?: MaterialBatchRepository,
-// ): any[][] {
-//   const { prefix, code, suffix, qty } = structuredRow;
-
-//   const safeQty = qty ?? 1;
-
-//   const name = [prefix, code, suffix].filter(Boolean).join(' ');
-
-//   // const normalized = normalizeSpec(name);
-//   // const parsed = parseSpec(normalized);
-
-//   const isNormalized = /^[A-Z]+_\d+/.test(code);
-
-//   const parsed = isNormalized
-//     ? parseFromCode(code) // 🔥 новий шлях
-//     : parseSpec(normalizeSpec(name));
-
-//   const element = getOrCreateElement(parsed, repo, catalogService);
-//   const parent = repo.findById(parentId);
-
-//   if (!parent) {
-//     throw new Error(`Parent element not found: ${parentId}`);
-//   }
-
-//   // ----------------------------
-//   // 🧱 MATERIAL
-//   // ----------------------------
-//   if (element.type === 'material') {
-//     return [
-//       [
-//         parentId,
-//         element.id,
-//         safeQty,
-//         element.baseUnit,
-//         now,
-//         parent.code,
-//         element.code,
-//       ],
-//     ];
-//   }
-
-//   // ----------------------------
-//   // 🔩 PART → MATERIAL
-//   // ----------------------------
-//   if (element.type === 'part') {
-//     const built = buildByKind(parsed);
-
-//     let materialQty = safeQty;
-
-//     let materialId: string | null = null;
-//     let materialCode: string | null = null;
-
-//     // 🔥 FULL режим (через склад)
-//     if (materialRepo && batchRepo) {
-//       const material = materialRepo.findBySpec({
-//         profileType: built.profileType,
-//         diameter: built.diameter,
-//         class: built.className,
-//         width: built.width,
-//         height: built.height,
-//         thickness: built.thickness,
-//       });
-
-//       if (!material) {
-//         throw new Error(`❌ Material not found for part: ${element.code}`);
-//       }
-
-//       const batch = batchRepo.getActiveBatch(material.materialId);
-
-//       if (!batch) {
-//         throw new Error(`❌ No batch for material: ${material.code}`);
-//       }
-
-//       if (built.length) {
-//         const meters = built.length / 1000;
-//         materialQty = meters * batch.weightPerUnit * safeQty;
-//       }
-
-//       materialId = String(material.materialId);
-//       materialCode = material.code;
-//     }
-
-//     // 🔥 FALLBACK (через Elements)
-//     else {
-//       const requestedMaterialCode = extractMaterialCode(structuredRow.code);
-
-//       const material = getOrCreateMaterialFromCode(requestedMaterialCode, repo);
-
-//       if (
-//         built.category === 'rebar' &&
-//         typeof built.length === 'number' &&
-//         typeof built.diameter === 'number'
-//       ) {
-//         materialQty = calcRebarWeight(built.length, built.diameter, safeQty);
-//       }
-
-//       materialId = material.id;
-//       materialCode = material.code;
-//     }
-
-//     materialQty = Math.round(materialQty * 100) / 100;
-
-//     updateElementParentMaterial(element.id, materialId);
-
-//     return [
-//       [
-//         parentId,
-//         element.id,
-//         safeQty,
-//         element.baseUnit,
-//         now,
-//         parent.code,
-//         element.code,
-//       ],
-//       [
-//         element.id,
-//         materialId,
-//         materialQty,
-//         'кг',
-//         now,
-//         element.code,
-//         materialCode,
-//       ],
-//     ];
-//   }
-
-//   // ----------------------------
-//   // 🔧 ASSEMBLY / PRODUCT
-//   // ----------------------------
-//   return [
-//     [
-//       parentId,
-//       element.id,
-//       safeQty,
-//       element.baseUnit,
-//       now,
-//       parent.code,
-//       element.code,
-//     ],
-//   ];
-// }
-
 function extractMaterialCode(code: string): string {
   return code.split(',')[0];
 }
@@ -420,7 +270,7 @@ export function validateParentCode(code: string) {
 }
 
 export function buildBOMFromTable(
-  parent: { code: string; name: string },
+  parent: { code: string; prefix: string; name: string },
   rows: TableRowInput[],
   repo: ElementRepository,
   // catalogRepo: ICatalogRepository,
@@ -428,7 +278,12 @@ export function buildBOMFromTable(
 ) {
   console.log('👉 START buildBOMFromTable');
 
-  const root = getOrCreateAssemblyWithName(parent.code, parent.name, repo);
+  const root = getOrCreateAssemblyWithName(
+    parent.code,
+    parent.prefix,
+    parent.name,
+    repo,
+  );
 
   const parentId = root.id;
 

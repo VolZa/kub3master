@@ -49,6 +49,7 @@ export function getOrCreateAssembly(
 
 export function getOrCreateAssemblyWithName(
   code: string,
+  prefixName: string,
   name: string,
   repo: ElementRepository,
 ) {
@@ -61,6 +62,7 @@ export function getOrCreateAssemblyWithName(
   repo.insert({
     ID: id,
     Code: code,
+    PrefixName: prefixName,
     Name: name || code,
     Type: ELEMENT_TYPES.ASSEMBLY,
     Category: 'steel component',

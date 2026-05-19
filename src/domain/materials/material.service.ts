@@ -41,6 +41,7 @@ export function getOrCreateMaterialFromPart(
   const row = {
     ID: id,
     Code: code,
+    PrefixName: part.prefixName, // 🔥 для Catalog
     Name: buildMaterialName(part),
     Type: ELEMENT_TYPES.MATERIAL,
     Category: part.category,

@@ -1,26 +1,4 @@
-// import {
-//   mapSheetRowToElementRow,
-//   mapElementRowToDomain,
-// } from '../modules/elements/element.mapper';
-
 import { ElementShort } from '../modules/elements/element.model';
-// import { createColumnMap, getValue } from '../utils/column-mapper';
-
-// type ElementMap = Record<string, ElementShort>;
-
-// let elementCache: ElementMap | null = null;
-
-/**
- * Додає елемент у cache (після створення нового елемента)
- */
-// export function addElementToCache(element: ElementShort) {
-//   // якщо cache ще не ініціалізований — створюємо
-//   if (!elementCache) {
-//     elementCache = {};
-//   }
-
-//   elementCache[element.code] = element;
-// }
 
 // 🔥 внутрішнє сховище
 const elementCache: Record<string, ElementShort> = {};

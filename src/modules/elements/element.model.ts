@@ -4,6 +4,7 @@ import { ElementType } from '../../config/config';
 export interface ElementRow {
   ID: string;
   Code: string;
+  PrefixName: string;
   Name: string;
   Type: ElementType;
   Category: string;
@@ -35,6 +36,7 @@ export interface ElementShort {
 export type ElementFull = {
   id: string;
   code: string;
+  prefixName: string;
   name: string;
   type: ElementType;
   category?: string;
@@ -59,6 +61,7 @@ export interface CreateElementDto {
 
 export interface ParsedPart {
   code: string;
+  prefixName: string;
   name: string;
   category?: string;
   baseUnit?: string;

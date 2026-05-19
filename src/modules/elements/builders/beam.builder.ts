@@ -16,6 +16,7 @@ export function buildBeam(parsed: ParsedSpec): BuiltElement {
 
   return {
     code,
+    prefixName: 'двутавр', // 🔥 для Catalog
     name,
     type: 'part',
     category: 'beam',

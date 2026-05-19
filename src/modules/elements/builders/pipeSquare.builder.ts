@@ -16,6 +16,7 @@ export function buildPipeSquare(parsed: ParsedSpec): BuiltElement {
 
   return {
     code,
+    prefixName: 'труба квадратна', // 🔥 для Catalog
     name,
     type: 'part',
     category: 'pipe_square',

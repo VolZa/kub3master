@@ -9,7 +9,7 @@ import {
   getElementFromCache,
 } from '../../services/cache.service';
 import { toShort } from './element.mapper';
-import { BuiltElementExtended } from './element.builder';
+import { BuiltElement, BuiltElementExtended } from './element.builder';
 import { getOrCreateMaterialFromPart } from '../../domain/materials/material.service';
 import {
   ELEMENT_TYPES,
@@ -18,6 +18,69 @@ import {
 } from '../../config/config';
 import { CatalogService } from '../catalog/catalog.service';
 import { getOrCreateMaterialFromCode } from './material.service';
+import { MaterialRepository } from '../../domain/materials/material.repository';
+import { ICatalogRepository } from '../catalog/catalog.repository.interface';
+
+export function getOrCreateElementFromBuilt(
+  built: BuiltElement,
+  repo: ElementRepository,
+  catalogRepo: ICatalogRepository,
+  materialRepo: MaterialRepository,
+): ElementFull {
+  // 🔹 1. існує?
+  let el = repo.findByCode(built.code);
+  if (el) return el;
+
+  // 🔥 2. Catalog (через PrefixName)
+  const catalog = catalogRepo.requireByCode(built.prefixName.toLowerCase());
+
+  // 🔹 3. Material
+  let material = materialRepo.findByCode(built.code);
+
+  if (!material && built.code.includes('_L')) {
+    const baseCode = built.code.split('_L')[0];
+    material = materialRepo.findByCode(baseCode);
+  }
+
+  // 🔹 4. BaseUnit
+  let baseUnit = 'шт';
+
+  if (catalog.type === 'material') {
+    baseUnit = material?.baseUnit || 'кг';
+  }
+
+  const id = generateIdByType(catalog.type);
+
+  // 🔥 5. створення
+  repo.insert({
+    ID: id,
+    Code: built.code,
+    PrefixName: built.prefixName,
+    Name: built.name,
+
+    Type: catalog.type,
+    Category: catalog.category,
+    ProfileType: catalog.profileType || '',
+
+    BaseUnit: baseUnit,
+    ParentMaterialID: material?.id || '',
+
+    Diameter: built.diameter,
+    Class: built.className,
+    Length: built.length,
+
+    IsActive: true,
+    CreatedAt: new Date(),
+  });
+
+  const created = repo.findByCode(built.code);
+
+  if (!created) {
+    throw new Error(`Failed to create element: ${built.code}`);
+  }
+
+  return created;
+}
 
 export function getOrCreateElement(
   parsed: ParsedSpec,
