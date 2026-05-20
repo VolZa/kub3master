@@ -99,8 +99,8 @@ export function getOrCreateElement(
 
   const type = isPart ? ELEMENT_TYPES.PART : ELEMENT_TYPES.MATERIAL;
 
-  const category = catalog?.category ?? built.category;
-  const profileType = catalog?.profileType ?? built.profileType;
+  // const category = catalog?.category ?? built.category;
+  // const profileType = catalog?.profileType ?? built.profileType;
 
   const cacheKey = `${type}:${built.code}`;
 

@@ -18,8 +18,8 @@ export function buildPipeSquare(parsed: ParsedSpec): BuiltElement {
     code,
     prefixName: 'труба квадратна', // 🔥 для Catalog
     name,
-    type: 'part',
-    category: 'pipe_square',
+    // type: 'part',
+    // category: 'pipe_square',
     baseUnit: 'шт',
 
     width: parsed.width,

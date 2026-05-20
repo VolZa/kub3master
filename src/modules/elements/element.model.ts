@@ -39,7 +39,7 @@ export type ElementFull = {
   prefixName: string;
   name: string;
   type: ElementType;
-  category?: string;
+  category: string; //?
   baseUnit: string;
   weightPerUnit?: number;
 };
@@ -63,7 +63,8 @@ export interface ParsedPart {
   code: string;
   prefixName: string;
   name: string;
-  category?: string;
+
+  category: string; //?
   baseUnit?: string;
   profileType?: string;
   diameter: number;

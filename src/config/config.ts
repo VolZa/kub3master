@@ -50,8 +50,13 @@ export type ProductType = (typeof PRODUCT_TYPES)[keyof typeof PRODUCT_TYPES];
 
 // ------------------ PRODUCTION ------------------
 export const PRODUCTION_TYPES = {
-  PRODUCED: 'produced',
-  PURCHASED: 'purchased',
+  BEND: 'bend',
+  CUT: 'cut',
+  FORM: 'form',
+  MIX: 'mix',
+  RAW: 'raw',
+  TIE: 'tie',
+  WELD: 'weld',
 } as const;
 
 export type ProductionType =

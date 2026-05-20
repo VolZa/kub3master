@@ -12,7 +12,7 @@ export interface CatalogItem {
   name: string;
 
   type: ElementType;
-  category?: ProductType | MaterialCategory | string; // 🔥 НОРМАЛІЗАЦІЯ
+  category: ProductType | MaterialCategory | string; // 🔥 НОРМАЛІЗАЦІЯ
   profileType?: ProfileType;
 
   hasBOM: boolean;

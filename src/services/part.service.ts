@@ -20,6 +20,7 @@ export function getOrCreateRebarPart(
   repo.insert({
     ID: id,
     Code: code,
+    PrefixName: 'арматура',
     Name: `Арматура Ø${diameter} ${className} L=${length}`,
     Type: ELEMENT_TYPES.PART,
     Category: 'rebar',

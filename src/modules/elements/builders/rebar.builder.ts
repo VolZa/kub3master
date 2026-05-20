@@ -10,18 +10,10 @@ export function buildRebar(parsed: ParsedSpec): BuiltElement {
 
   const { diameter, className, length } = parsed;
 
-  // 🔥 code (чистий)
   const code = ['R', diameter, className ?? '', length ? `L${length}` : '']
     .filter(Boolean)
     .join('_');
 
-  // 🔥 name (людський)
-  // const nameParts = [`Арматура Ø${diameter}`];
-
-  // if (className) nameParts.push(className);
-  // if (length) nameParts.push(`L=${length}`);
-
-  //  const name = nameParts.join(' ');
   const rawCode = `Ø${diameter} ${className ?? ''}`.trim();
 
   const name = buildName('Арматура', rawCode, {
@@ -30,18 +22,54 @@ export function buildRebar(parsed: ParsedSpec): BuiltElement {
 
   return {
     code,
-    prefixName: 'арматура', // 🔥 для Catalog
+    prefixName: 'арматура', // 🔥 тільки це важливо
     name,
-    type: ELEMENT_TYPES.PART, // ✔ строго типізовано
-    category: 'rebar',
-    baseUnit: 'шт', // 🔥 ВАЖЛИВО
-    profileType: 'rebar', // 🔥 для матеріалу
-    className,
-
+    baseUnit: length ? 'шт' : 'кг', // 🔥 ВАЖЛИВО
     diameter,
     length,
+    className,
   };
 }
+// export function buildRebar(parsed: ParsedSpec): BuiltElement {
+//   if (parsed.kind !== 'rebar') {
+//     throw new Error('Invalid spec for rebar builder');
+//   }
+
+//   const { diameter, className, length } = parsed;
+
+//   // 🔥 code (чистий)
+//   const code = ['R', diameter, className ?? '', length ? `L${length}` : '']
+//     .filter(Boolean)
+//     .join('_');
+
+//   // 🔥 name (людський)
+//   // const nameParts = [`Арматура Ø${diameter}`];
+
+//   // if (className) nameParts.push(className);
+//   // if (length) nameParts.push(`L=${length}`);
+
+//   //  const name = nameParts.join(' ');
+//   const rawCode = `Ø${diameter} ${className ?? ''}`.trim();
+
+//   const name = buildName('Арматура', rawCode, {
+//     length,
+//   });
+
+//   return {
+//     code,
+//     prefixName: 'арматура', // 🔥 для Catalog
+//     name,
+//     type: ELEMENT_TYPES.PART, // ✔ строго типізовано
+//     category: 'rebar',
+//     baseUnit: 'шт', // 🔥 ВАЖЛИВО
+//     profileType: 'rebar', // 🔥 для матеріалу
+//     className,
+
+//     diameter,
+//     length,
+//   };
+// }
+
 // import { ELEMENT_TYPES } from '../../../config/config';
 // import { ParsedSpec } from '../../bom/model/parsed-spec.model';
 
