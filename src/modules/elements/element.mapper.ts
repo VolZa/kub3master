@@ -24,6 +24,7 @@ export function mapSheetRowToElementRow(
     Diameter: getValue(row, map, 'Diameter'),
     Class: getValue(row, map, 'Class'),
     Width: getValue(row, map, 'Width'),
+    Height: getValue(row, map, 'Height'),
     Length: getValue(row, map, 'Length'),
     Thickness: getValue(row, map, 'Thickness'),
     IsActive: getValue(row, map, 'IsActive'),
@@ -47,6 +48,9 @@ export function mapElementRowToDomain(row: ElementRow): ElementFull {
     type: row.Type as any,
     category: row.Category,
     baseUnit: row.BaseUnit,
+    parentMaterialID: row.ParentMaterialID, // 🔥 ДОДАТИ
+    weightPerUnit: row.WeightPerUnit,
+    isActive: row.IsActive ?? true, // 🔥 ОБОВʼЯЗКОВО
   };
 }
 
@@ -69,37 +73,38 @@ export function mapElementToRow(el: ElementFull): ElementRow {
 //
 // 🔹 4. Builder → Row
 //
+// ❌ buildElementRow → зайва (deprecated)
+// export function buildElementRow(
+//   built: BuiltElement & { parentMaterialId?: string },
+//   id: string,
+// ): ElementRow {
+//   return {
+//     ID: id,
+//     Code: built.code,
+//     PrefixName: built.prefixName,
+//     Name: built.name,
+//     Type: built.type,
+//     Category: built.category,
+//     BaseUnit: built.baseUnit,
 
-export function buildElementRow(
-  built: BuiltElement & { parentMaterialId?: string },
-  id: string,
-): ElementRow {
-  return {
-    ID: id,
-    Code: built.code,
-    PrefixName: built.prefixName,
-    Name: built.name,
-    Type: built.type,
-    Category: built.category,
-    BaseUnit: built.baseUnit,
+//     // 🔥 НОВЕ
+//     ParentMaterialID: built.parentMaterialId,
 
-    // 🔥 НОВЕ
-    ParentMaterialID: built.parentMaterialId,
+//     Diameter: built.diameter,
+//     Class: built.className,
+//     Length: built.length,
+//     Width: built.width,
+//     Height: built.height,
+//     Thickness: built.thickness,
 
-    Diameter: built.diameter,
-    Class: built.className,
-    Length: built.length,
-    Width: built.width,
-    Thickness: built.thickness,
+//     WeightPerUnit:
+//       built.category === 'rebar' && built.length && built.diameter
+//         ? calcRebarWeight(built.length, built.diameter, 1)
+//         : undefined,
 
-    WeightPerUnit:
-      built.category === 'rebar' && built.length && built.diameter
-        ? calcRebarWeight(built.length, built.diameter, 1)
-        : undefined,
-
-    CreatedAt: new Date(),
-  };
-}
+//     CreatedAt: new Date(),
+//   };
+// }
 
 //
 // 🔹 5. Assembly helper
@@ -131,7 +136,19 @@ export function mapRowToFull(row: any[], headers: string[]) {
     const idx = headers.indexOf(name);
     return idx !== -1 ? row[idx] : undefined;
   };
+  const weightRaw = get('WeightPerUnit');
 
+  let weightPerUnit: number | undefined;
+
+  if (weightRaw !== undefined && weightRaw !== '') {
+    const normalized = String(weightRaw)
+      .replace(/\s+/g, '') // прибрати пробіли
+      .replace(',', '.'); // кома → крапка
+
+    const num = Number(normalized);
+
+    weightPerUnit = isNaN(num) ? undefined : num;
+  }
   return {
     id: String(get('ID')),
     code: get('Code'),
@@ -141,13 +158,15 @@ export function mapRowToFull(row: any[], headers: string[]) {
     category: get('Category'),
     baseUnit: get('BaseUnit'),
 
+    parentMaterialID: get('ParentMaterialID'), // 🔥
+
     diameter: Number(get('Diameter')) || undefined,
     className: get('Class'),
     length: Number(get('Length')) || undefined,
     width: Number(get('Width')) || undefined,
     thickness: Number(get('Thickness')) || undefined,
 
-    weightPerUnit: Number(get('WeightPerUnit')) || 0,
+    weightPerUnit: weightPerUnit,
     density: Number(get('Density')) || undefined,
   };
 }

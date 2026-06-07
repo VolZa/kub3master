@@ -53,6 +53,7 @@ export class GoogleSheetsElementRepository implements ElementRepository {
       forceText(row.ID), // 🔥 гарантія string
       forceText(row.Code), // 🔥 гарантія string
 
+      row.PrefixName, // 🔥 ДОДАТИ СЮДИ
       row.Name,
       row.Type,
       row.Category,
@@ -65,6 +66,7 @@ export class GoogleSheetsElementRepository implements ElementRepository {
       row.Class ?? '',
 
       row.Width ?? '',
+      row.Height ?? '',
       row.Length ?? '',
       row.Thickness ?? '',
 

@@ -18,9 +18,9 @@ export function buildPipeRound(parsed: ParsedSpec): BuiltElement {
     code,
     prefixName: 'труба кругла', // 🔥 для Catalog
     name,
-    type: 'part',
-    category: 'pipe_round',
-    baseUnit: 'шт',
+    // type: 'part',
+    // category: 'pipe_round',
+    // baseUnit: 'шт',
 
     diameter: parsed.diameter,
     thickness: parsed.thickness,

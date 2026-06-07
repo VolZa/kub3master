@@ -11,8 +11,8 @@ export function mapElementToBOMItem(child: ElementShort) {
 export function mapTableRowToStructured(row: TableRowInput): StructuredLine {
   return {
     prefix: row.prefix ?? '',
-    code: row.codeEl,
-    suffix: row.sufix,
+    code: row.code,
+    // suffix: row.sufix,
     qty: row.qty ?? 1,
   };
 }

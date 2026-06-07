@@ -11,13 +11,31 @@ import { toShort } from '../../modules/elements/element.mapper';
 import { MaterialRepository } from './material.repository';
 import { getMaterialUnit } from './material.utils';
 import { Material } from './material.model';
+import { ICatalogRepository } from '../../modules/catalog/catalog.repository.interface';
+import {
+  getCatalogByPrefix,
+  getCategoryByPrefix,
+} from '../../modules/catalog/utils/catalog.util';
+import { CatalogHelper } from '../../modules/catalog/catalog.helper';
 
 export function getOrCreateMaterialFromPart(
   part: BuiltElement,
   repo: ElementRepository,
+  catalogHelper: CatalogHelper,
 ): ElementShort {
-  // 🔥 код матеріалу без довжини
-  const codeParts = [part.category];
+  // 🔥 1. отримуємо дані з Catalog
+  const type = catalogHelper.getType(part.prefixName);
+  if (type !== 'material') {
+    throw new Error(`Expected material type for ${part.prefixName}`);
+  }
+  const category = catalogHelper.getCategory(part.prefixName);
+  const profileType = catalogHelper.getProfileType(part.prefixName);
+
+  // 🔥 2. формуємо код матеріалу (БЕЗ довжини)
+  const codeParts: string[] = [];
+
+  // 👉 база — category або profile
+  codeParts.push(category.toUpperCase());
 
   if (part.diameter) codeParts.push(String(part.diameter));
   if (part.width) codeParts.push(String(part.width));
@@ -26,9 +44,11 @@ export function getOrCreateMaterialFromPart(
 
   const code = codeParts.join('_');
 
+  // 🔹 cache
   const cached = getElementFromCache(code);
   if (cached) return cached;
 
+  // 🔹 існує?
   const existing = repo.findByCode(code);
   if (existing) {
     const short = toShort(existing);
@@ -36,26 +56,31 @@ export function getOrCreateMaterialFromPart(
     return short;
   }
 
-  const id = generateIdByType(ELEMENT_TYPES.MATERIAL);
+  // 🔥 3. створення
+  const id = generateIdByType(type);
 
   const row = {
     ID: id,
     Code: code,
-    PrefixName: part.prefixName, // 🔥 для Catalog
-    Name: buildMaterialName(part),
-    Type: ELEMENT_TYPES.MATERIAL,
-    Category: part.category,
-    BaseUnit: 'кг',
+    PrefixName: part.prefixName,
+    Name: buildMaterialName(part, catalogHelper),
+
+    Type: type, // 🔥 через helper
+    Category: category, // 🔥 через helper
+    ProfileType: profileType || '',
+
+    BaseUnit: 'кг', // 👉 тимчасово (потім через 05_Materials)
     Density: 7850,
+
     CreatedAt: new Date(),
   };
 
   repo.insert(row);
 
-  const short = {
+  const short: ElementShort = {
     id,
     code,
-    baseUnit: 'кг',
+    baseUnit: row.BaseUnit,
     type: row.Type,
   };
 
@@ -63,9 +88,81 @@ export function getOrCreateMaterialFromPart(
 
   return short;
 }
+// export function getOrCreateMaterialFromPart(
+//   part: BuiltElement,
+//   repo: ElementRepository,
+//   catalogHelper: CatalogHelper,
+// ): ElementShort {
 
-function buildMaterialName(part: BuiltElement): string {
-  switch (part.category) {
+//   // 🔥 1. беремо catalog
+//   const catalog = catalogHelper.get(part.prefixName);
+
+//   const category = catalog.category;
+//   const type = catalog.type;
+
+//   // 🔥 2. формуємо код
+//   const codeParts: string[] = [];
+
+//   // 👉 можна додати category або profileType (залежить від стратегії)
+//   codeParts.push(category.toUpperCase());
+
+//   if (part.diameter) codeParts.push(String(part.diameter));
+//   if (part.width) codeParts.push(String(part.width));
+//   if (part.thickness) codeParts.push(String(part.thickness));
+//   if (part.className) codeParts.push(part.className);
+
+//   const code = codeParts.join('_');
+
+//  // 🔹 cache
+//   const cached = getElementFromCache(code);
+//   if (cached) return cached;
+
+//   // 🔹 існує?
+//   const existing = repo.findByCode(code);
+//   if (existing) {
+//     const short = toShort(existing);
+//     addElementToCache(short);
+//     return short;
+//   }
+
+// // 🔥 3. створення
+//   const id = generateIdByType(type);
+
+//    const row = {
+//     ID: id,
+//     Code: code,
+//     PrefixName: part.prefixName,
+//     Name: buildMaterialName(part),
+
+//     Type: type,              // 🔥 через catalog
+//     Category: category,      // 🔥 через catalog
+//     BaseUnit: 'кг',          // 👉 поки ок
+//     Density: 7850,           // 👉 потім винесеш у Materials
+
+//     CreatedAt: new Date(),
+//   };
+
+//   repo.insert(row);
+
+//   const short = {
+//     id,
+//     code,
+//     baseUnit: row.BaseUnit,
+//     type: row.Type,
+//   };
+
+//   addElementToCache(short);
+
+//   return short;
+// }
+
+function buildMaterialName(
+  part: BuiltElement,
+  catalogHelper: CatalogHelper,
+): string {
+  const category = catalogHelper.getCategory(part.prefixName);
+
+  switch (category) {
     case 'rebar':
       return `Арматура Ø${part.diameter} ${part.className ?? ''}`;
 
@@ -83,9 +180,11 @@ function buildMaterialName(part: BuiltElement): string {
 export function findMaterialForPart(
   part: BuiltElement,
   materialRepo: MaterialRepository,
+  catalogHelper: CatalogHelper,
 ): Material {
-  if (part.category !== 'rebar') {
-    throw new Error('Material lookup not implemented for: ' + part.category);
+  const category = catalogHelper.getCategory(part.prefixName);
+  if (category !== 'rebar') {
+    throw new Error('Material lookup not implemented for: ' + category);
   }
 
   const material = materialRepo.findRebar(part.diameter!, part.className!);

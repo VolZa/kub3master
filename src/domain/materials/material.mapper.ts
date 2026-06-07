@@ -34,7 +34,8 @@ export function mapRowsToMaterials(rows: any[][]): Material[] {
   };
 
   return data.map((row) => ({
-    materialId: String(row[idx.id]),
+    id: String(row[0]),
+    materialId: String(row[0]),
     code: String(row[idx.code]).trim(),
     name: String(row[idx.name] || '').trim(),
 

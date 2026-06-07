@@ -1,27 +1,41 @@
 import { ElementType } from '../../config/config';
 import { ParsedSpec } from '../bom/model/parsed-spec.model';
 
-export interface BuiltElement {
+export type BuiltElement = {
   code: string;
   prefixName: string;
   name: string;
-  // type: ElementType;
-  // category: string;
-  baseUnit: string;
 
-  // optional
-  // profileType?: string;
-  className?: string;
-  // geometry
+  // 🔹 геометрія (опційно)
   diameter?: number;
   length?: number;
+  className?: string;
+
   width?: number;
   height?: number;
   thickness?: number;
+};
+// export interface BuiltElement {
+//   code: string;
+//   prefixName: string;
+//   name: string;
+//   type: ElementType;
+//   category: string;
+//   baseUnit: string;
 
-  weightPerUnit?: number;
-  density?: number;
-}
+//   // optional
+//   profileType?: string;
+//   className?: string;
+//   // geometry
+//   diameter?: number;
+//   length?: number;
+//   width?: number;
+//   height?: number;
+//   thickness?: number;
+
+//   weightPerUnit?: number;
+//   density?: number;
+// }
 
 export type BuiltElementExtended = BuiltElement & {
   parentMaterialId?: string;

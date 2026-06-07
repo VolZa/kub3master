@@ -6,11 +6,11 @@ export function buildConcrete(parsed: {
   className: string;
 }): BuiltElement {
   return {
-    type: ELEMENT_TYPES.MATERIAL,
+    // type: ELEMENT_TYPES.MATERIAL,
     code: `C_${parsed.className}`,
     prefixName: 'бетон', // 🔥 для Catalog
     name: `Бетон ${parsed.className}`,
-    baseUnit: 'л',
-    category: 'concrete',
+    // baseUnit: 'л',
+    // category: 'concrete',
   };
 }

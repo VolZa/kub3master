@@ -14,6 +14,7 @@ export interface ElementRow {
   Diameter?: number;
   Class?: string;
   Width?: number;
+  Height?: number; // 🔥 ДОДАЛИ
   Length?: number;
   Thickness?: number;
   IsActive?: boolean;
@@ -33,16 +34,38 @@ export interface ElementShort {
 }
 
 // повна модель (для repository)
-export type ElementFull = {
+export interface ElementFull {
   id: string;
   code: string;
   prefixName: string;
   name: string;
+
   type: ElementType;
-  category: string; //?
+  category: string;
+  profileType?: string;
+
   baseUnit: string;
-  weightPerUnit?: number;
-};
+
+  parentMaterialID?: string; // 🔥 ДОДАТИ
+
+  diameter?: number;
+  className?: string;
+  width?: number;
+  length?: number;
+
+  isActive: boolean;
+  weightPerUnit?: number; // 🔥 ДОДАТИ
+}
+// export type ElementFull = {
+//   id: string;
+//   code: string;
+//   prefixName: string;
+//   name: string;
+//   type: ElementType;
+//   category: string; //?
+//   baseUnit: string;
+//   weightPerUnit?: number;
+// };
 
 //  що потрібно для створення CreateElementDto
 export interface CreateElementDto {

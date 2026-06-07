@@ -6,14 +6,15 @@ import { parsePlate } from './parsePlate';
 import { parsePipe } from './parsePipe';
 import { parseBeam } from './parseBeam';
 import { parseChannel } from './parseChannel';
-import { normalize } from '../../../utils/normalize';
+import { normalizePipeline } from '../normalizers/normalize.pipeline';
 
 export function parseSpec(input: string): ParsedSpec {
   // 🔥 якщо це вже code → не чіпаємо
   if (/^[A-Z]+_\d+/.test(input)) {
     return parseFromCode(input);
   }
-  const normalized = normalize(input);
+  // const normalized = normalize(input);
+  const normalized = normalizePipeline(input);
 
   console.log('🧩 parseSpec input:', JSON.stringify(input));
   console.log('🧩 parseSpec normalized:', JSON.stringify(normalized));

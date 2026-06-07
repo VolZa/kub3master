@@ -18,9 +18,9 @@ export function buildBeam(parsed: ParsedSpec): BuiltElement {
     code,
     prefixName: 'двутавр', // 🔥 для Catalog
     name,
-    type: 'part',
-    category: 'beam',
-    baseUnit: 'шт',
+    // type: 'part',
+    // category: 'beam',
+    // baseUnit: 'шт',
 
     height: parsed.height,
     width: parsed.width,

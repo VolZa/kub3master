@@ -8,7 +8,14 @@
     "rootDir": "src",
     "types": ["node", "google-apps-script"],
     "esModuleInterop": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "baseUrl": "./src",
+    "paths": {
+      "domain/*": ["domain/*"],
+      "technology/*": ["technology/*"],
+      "core/*": ["core/*"],
+      "shared/*": ["shared/*"]
+    }
   }
 }
 
@@ -16,3 +23,16 @@
 
 //** Перевірити чи не потрібно змінити на node16, бо тоді можна буде використовувати імпорти з розширенням .js, що потрібно для імпорту файлів з папки dist після компіляції. Але це може викликати проблеми з деякими бібліотеками, які не підтримують цей режим. Потрібно протестувати і перевірити сумісність. **//
 //"moduleResolution":"node16",
+// {
+//   "compilerOptions": {
+//     "target": "ES2019",
+//     "lib": ["ES2019"],
+//     "module": "ESNext",
+//     "moduleResolution": "node",
+//     "strict": true,
+//     "rootDir": "src",
+//     "types": ["node", "google-apps-script"],
+//     "esModuleInterop": true,
+//     "sourceMap": true
+//   }
+// }

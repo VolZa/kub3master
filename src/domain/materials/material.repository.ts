@@ -1,12 +1,13 @@
 // src/domain/materials/material.repository.ts
 
+import { normalizeCode } from 'utils/normalize';
 import { mapRowsToMaterials } from './material.mapper';
 import { Material } from './material.model';
 
 export class MaterialRepository {
   private materials: Material[] = [];
 
-  constructor(rows: any[][]) {
+  constructor(rows: any[][] = []) {
     this.materials = rows.length ? mapRowsToMaterials(rows) : [];
   }
 
@@ -103,7 +104,25 @@ export class MaterialRepository {
         return null;
     }
   }
+  // findByCode(code: string): Material | null {
+  //   return this.materials.find((m) => m.code === code) || null;
+  // }
   findByCode(code: string): Material | null {
-    return this.materials.find((m) => m.code === code) || null;
+    const normalizedInput = normalizeCode(code);
+
+    return (
+      this.materials.find((m) => normalizeCode(m.code) === normalizedInput) ||
+      null
+    );
+  }
+
+  findById(id: string): Material | null {
+    const material = this.materials.find((m) => m.id === id) || null;
+
+    if (!material) {
+      console.warn(`⚠️ Material not found by id: ${id}`);
+    }
+
+    return material;
   }
 }

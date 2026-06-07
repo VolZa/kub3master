@@ -8,9 +8,9 @@ export class GoogleSheetsMaterialBatchRepository extends MaterialBatchRepository
   constructor() {
     const sheet = getSheetByNameSafe('06_MaterialBatches');
     const rows = sheet.getDataRange().getValues();
-
+    const materialBatchRepo = new MaterialBatchRepository(rows);
     const batches = mapRowsToBatches(rows);
 
-    super(batches);
+    super(rows);
   }
 }

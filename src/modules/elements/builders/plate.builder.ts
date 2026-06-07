@@ -10,7 +10,7 @@ export function buildPlate(parsed: ParsedSpec) {
     code: `P_${parsed.width}_${parsed.thickness}_${parsed.length}`,
     prefixName: 'полоса', // 🔥 для Catalog
     name: `Полоса ${parsed.width}x${parsed.thickness} L=${parsed.length}`,
-    type: ELEMENT_TYPES.PART,
+    // type: ELEMENT_TYPES.PART,
     category: 'plate',
     baseUnit: 'шт',
 

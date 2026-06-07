@@ -1,7 +1,13 @@
 export function getSheetByNameSafe(
   sheetName: string,
 ): GoogleAppsScript.Spreadsheet.Sheet {
-  const sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
+  const ss = SpreadsheetApp.getActive();
+
+  if (!ss) {
+    throw new Error('Spreadsheet не знайдено');
+  }
+
+  const sheet = ss.getSheetByName(sheetName);
 
   if (!sheet) {
     throw new Error(`Лист ${sheetName} не знайдено`);

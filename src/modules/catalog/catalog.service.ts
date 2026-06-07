@@ -14,29 +14,30 @@ export class CatalogService {
     return this.repo.getByCode(code);
   }
 
-  findByTypeCode(typeCode: string): CatalogItem | null {
-    return (
-      this.items.find(
-        (i) => i.typeCode.toLowerCase() === typeCode.toLowerCase(),
-      ) || null
-    );
-  }
+  // findByTypeCode(typeCode: string): CatalogItem | null {
+  //   return (
+  //     this.items.find(
+  //       (i) => i.typeCode.toLowerCase() === typeCode.toLowerCase(),
+  //     ) || null
+  //   );
+  // }
   requireByTypeCode(typeCode: string): CatalogItem {
-    const item = this.findByTypeCode(typeCode);
+    // const item = this.findByTypeCode(typeCode);
+    const item = this.repo.getByCode(typeCode);
 
     if (!item) {
       throw new Error(`Catalog item not found: ${typeCode}`);
     }
 
-    if (!item.Category) {
+    if (!item.category) {
       throw new Error(`Catalog missing Category: ${typeCode}`);
     }
 
     return item as Required<CatalogItem>;
   }
-  // requireByCode(code: string): CatalogItem {
-  //   return this.repo.requireByCode(code);
-  // }
+  requireByCode(code: string): CatalogItem {
+    return this.repo.requireByCode(code);
+  }
 
   // -------------------------------
   // 🔥 RESOLVE FROM ROW (через code)

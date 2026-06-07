@@ -22,13 +22,26 @@ export function buildRebar(parsed: ParsedSpec): BuiltElement {
 
   return {
     code,
-    prefixName: 'арматура', // 🔥 тільки це важливо
+    prefixName: 'арматура', // 🔥 для Catalog
     name,
-    baseUnit: length ? 'шт' : 'кг', // 🔥 ВАЖЛИВО
+    // baseUnit: 'шт',
+
+    // type: 'part',
+    // category: 'rebar',
+
     diameter,
     length,
     className,
   };
+  // return {
+  //   code,
+  //   prefixName: 'арматура', // 🔥 тільки це важливо
+  //   name,
+  //   baseUnit: length ? 'шт' : 'кг', // 🔥 ВАЖЛИВО
+  //   diameter,
+  //   length,
+  //   className,
+  // };
 }
 // export function buildRebar(parsed: ParsedSpec): BuiltElement {
 //   if (parsed.kind !== 'rebar') {

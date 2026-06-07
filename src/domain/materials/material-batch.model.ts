@@ -4,12 +4,12 @@ export interface MaterialBatch {
   batchId: string;
   materialId: string;
 
-  batchCode: string;
+  batchCode?: string;
   supplier?: string;
 
   receivedAt?: Date;
 
-  weightPerUnit: number;
+  weightPerMeter?: number;
 
   length?: number;
 

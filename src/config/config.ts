@@ -57,6 +57,9 @@ export const PRODUCTION_TYPES = {
   RAW: 'raw',
   TIE: 'tie',
   WELD: 'weld',
+  // 🔥 ДОДАТИ
+  PURCHASED: 'purchased',
+  PRODUCED: 'produced',
 } as const;
 
 export type ProductionType =
@@ -71,28 +74,3 @@ export const ID_RANGES: Record<ElementType, IdRange> = {
   material: [3000, 3999],
   part: [4000, 5999],
 };
-// export const STEEL_DENSITY = 7850;
-
-// export const ELEMENT_TYPES = {
-//   PRODUCT: 'product',
-//   ASSEMBLY: 'assembly',
-//   MATERIAL: 'material',
-//   PART: 'part',
-// } as const;
-
-// export const MATERIAL_CATEGORIES = {
-//   REBAR: 'rebar',
-//   CONCRETE: 'concrete',
-//   STEEL: 'steel',
-// } as const;
-
-// export const ID_RANGES: Record<ElementType, IdRange> = {
-//   product: [1000, 1999],
-//   assembly: [2000, 2999],
-//   material: [3000, 3999],
-//   part: [4000, 9999],
-// };
-
-// export type ElementType = (typeof ELEMENT_TYPES)[keyof typeof ELEMENT_TYPES];
-
-// export type IdRange = [number, number];

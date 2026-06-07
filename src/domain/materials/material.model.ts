@@ -5,6 +5,7 @@ import { ProfileType } from '../../config/config';
 export type MaterialCategory = 'rebar' | 'concrete' | 'steel' | 'other';
 
 export interface Material {
+  id: string;
   materialId: string;
   code: string;
   name: string;

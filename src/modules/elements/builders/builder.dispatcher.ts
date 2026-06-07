@@ -39,12 +39,9 @@ export function buildByKind(parsed: ParsedSpec): BuiltElement {
     // 🔥 ДОДАТИ ОЦЕ
     case 'assembly':
       return {
-        type: 'assembly',
         code: parsed.name,
         prefixName: 'що передати сюди',
         name: parsed.name,
-        baseUnit: 'шт',
-        category: 'steel component',
       };
     case 'concrete':
       return buildConcrete(parsed);

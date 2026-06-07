@@ -10,10 +10,7 @@ export function getOrCreateMaterialFromCode(
   code: string,
   repo: MaterialRepository,
 ): ElementFull {
-  const materialCode = code
-    .split('_L')[0]
-    .trim()
-    .toUpperCase();
+  const materialCode = code.split('_L')[0].trim().toUpperCase();
 
   console.log('Looking for material with code:', materialCode);
   const existing = repo.findByCode(materialCode);
@@ -36,7 +33,9 @@ export function getOrCreateMaterialFromCode(
 
   repo.insert({
     ID: id,
+    PrefixName: '', // 🔥 для Catalog тимчасово
     Code: materialCode,
+    //PrefixName: 'арматура', // 🔥 для Catalog
     Name: name,
     Type: ELEMENT_TYPES.MATERIAL,
     Category: 'rebar',

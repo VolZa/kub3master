@@ -13,18 +13,32 @@ export function buildPipeSquare(parsed: ParsedSpec): BuiltElement {
   const name = parsed.length
     ? `Труба ${parsed.width}x${parsed.height}x${parsed.thickness}, L=${parsed.length}`
     : `Труба ${parsed.width}x${parsed.height}x${parsed.thickness}`;
-
+  const { width, height, thickness, length } = parsed;
   return {
     code,
     prefixName: 'труба квадратна', // 🔥 для Catalog
     name,
-    // type: 'part',
-    // category: 'pipe_square',
-    baseUnit: 'шт',
+    // baseUnit: 'шт',
 
-    width: parsed.width,
-    height: parsed.height,
-    thickness: parsed.thickness,
-    length: parsed.length,
+    // type: 'material',
+    // category: 'steel',
+
+    width,
+    height,
+    thickness,
+    length,
   };
+  // return {
+  //   code,
+  //   prefixName: 'труба квадратна', // 🔥 для Catalog
+  //   name,
+  //   // type: 'part',
+  //   // category: 'pipe_square',
+  //   baseUnit: 'шт',
+
+  //   width: parsed.width,
+  //   height: parsed.height,
+  //   thickness: parsed.thickness,
+  //   length: parsed.length,
+  // };
 }

@@ -44,7 +44,6 @@ export function mapRowsToCatalogItems(rows: any[][]): CatalogItem[] {
     supportsLength: getCol(headers, 'SupportsLength'),
     comment: getCol(headers, 'Comment'),
   };
-
   return data.map((row, i) => {
     const typeCode = normalizeString(row[idx.typeCode]);
 
@@ -52,14 +51,20 @@ export function mapRowsToCatalogItems(rows: any[][]): CatalogItem[] {
       throw new Error(`❌ Empty code at row ${i + 2}`);
     }
 
+    const category = normalizeString(row[idx.category]);
+
+    if (!category) {
+      throw new Error(`❌ Missing category for TypeCode: ${typeCode}`);
+    }
+
     return {
       id: Number(row[idx.id]),
       typeCode: String(row[idx.typeCode]).trim().toLowerCase(),
       name: String(row[idx.name] || '').trim(),
 
-      type: row[idx.type], // далі можна строго типізувати
+      type: row[idx.type],
 
-      category: normalizeString(row[idx.category]),
+      category, // 🔥 тепер гарантовано string
 
       profileType: normalizeString(row[idx.profileType]) as any,
 
@@ -72,6 +77,33 @@ export function mapRowsToCatalogItems(rows: any[][]): CatalogItem[] {
       comment: normalizeString(row[idx.comment]),
     };
   });
+  // return data.map((row, i) => {
+  //   const typeCode = normalizeString(row[idx.typeCode]);
+
+  //   if (!typeCode) {
+  //     throw new Error(`❌ Empty code at row ${i + 2}`);
+  //   }
+
+  //   return {
+  //     id: Number(row[idx.id]),
+  //     typeCode: String(row[idx.typeCode]).trim().toLowerCase(),
+  //     name: String(row[idx.name] || '').trim(),
+
+  //     type: row[idx.type], // далі можна строго типізувати
+
+  //     category: normalizeString(row[idx.category]),
+
+  //     profileType: normalizeString(row[idx.profileType]) as any,
+
+  //     hasBOM: normalizeBoolean(row[idx.hasBOM]),
+
+  //     productionType: row[idx.productionType],
+
+  //     supportsLength: normalizeBoolean(row[idx.supportsLength]),
+
+  //     comment: normalizeString(row[idx.comment]),
+  //   };
+  // });
 }
 
 // import { CatalogItem } from './catalog.model';

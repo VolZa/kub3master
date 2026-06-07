@@ -1,4 +1,7 @@
-import { normalizeNumberString } from '../../../../utils/normalize';
+import {
+  normalizeNumberString,
+  normalizeToLatin,
+} from '../../../../utils/normalize';
 
 export function extractLength(spec: string): number | undefined {
   const match = spec.match(/L\s*=\s*([\d\s,]+)/i);
@@ -14,9 +17,23 @@ export function extractQty(parts: string[]): number {
   return normalizeNumberString(last);
 }
 
-export function normalizeSpec(input: string): string {
-  //return input.replace(/(\d)\s+(\d)/g, '$1$2');
+// export function normalizeSpec(input: string): string {
+//   //return input.replace(/(\d)\s+(\d)/g, '$1$2');
+//   return input
+//     .replace(/(\d)\s+(\d)/g, '$1$2') // 3 390 → 3390
+//     .replace(',', '.'); // 0,505 → 0.505
+// }
+
+export function normalizeNumeric(input: string): string {
   return input
     .replace(/(\d)\s+(\d)/g, '$1$2') // 3 390 → 3390
     .replace(',', '.'); // 0,505 → 0.505
+}
+
+export function normalizeSpec(input: string): string {
+  return normalizeToLatin(input)
+    .replace(/ø|⌀/gi, 'D')
+    .replace(/L\s*=\s*/gi, 'L=')
+    .replace(/\s+/g, ' ')
+    .trim();
 }

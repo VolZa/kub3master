@@ -15,3 +15,9 @@ export function buildName(
     .filter(Boolean)
     .join(' ');
 }
+
+// name.builder.ts
+
+export function buildAssemblyName(prefix?: string, code?: string): string {
+  return [prefix?.trim(), code?.trim()].filter(Boolean).join(' ');
+}

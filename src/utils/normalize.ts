@@ -1,3 +1,8 @@
+import {
+  normalizeNumeric,
+  normalizeSpec,
+} from 'modules/bom/parsers/utils/spec.utils';
+
 export function normalize(input: string): string {
   return input
     .toLowerCase()
@@ -8,40 +13,34 @@ export function normalize(input: string): string {
     .trim();
 }
 
-function normalizeCode(input: string): string {
-  Logger.log('input= ' + input);
-  if (!input) return '';
+export function normalizeToLatin(value: string): string {
+  return value
+    .toUpperCase()
+    .trim()
+    .replace(/А/g, 'A')
+    .replace(/В/g, 'B')
+    .replace(/С/g, 'C')
+    .replace(/Р/g, 'P')
+    .replace(/О/g, 'O')
+    .replace(/І/g, 'I')
+    .replace(/[–—−]/g, '-');
+}
 
-  let upper = input.toUpperCase().trim();
-
-  // нормалізація дефісів
-  upper = upper.replace(/[–—−]/g, '-');
-
-  // латиниця → кирилиця
-  upper = upper.replace(/C/g, 'С');
-  upper = upper.replace(/A/g, 'А');
-  upper = upper.replace(/O/g, 'О');
-  upper = upper.replace(/P/g, 'Р');
-  upper = upper.replace(/X/g, 'Х');
-  upper = upper.replace(/I/g, 'І');
-  Logger.log('upper= ' + upper);
-  return upper;
+export function normalizeCode(code: string): string {
+  return normalizeToLatin(code).replace(/\s+/g, '').replace(/,/g, '');
 }
 
 export function normalizeLine(line: string): string {
-  return line
-    .trim()
-    .toUpperCase()
+  return normalizeToLatin(line)
     .replace(/Ø/g, '')
     .replace(/АРМАТУРА/g, '')
     .replace(/\(.*?\)/g, '')
     .replace(/,/g, '')
     .replace(/L\s*=\s*/g, ' ')
-    .replace(/І/g, '1') // 🔥 ДОДАТИ
-    .replace(/А-І\b/g, 'А1')
-    .replace(/А-ІІ\b/g, 'А2')
-    .replace(/А-ІІІ\b/g, 'А3')
-    .replace(/ВР-?1/g, 'ВР1')
+    .replace(/А-І\b/g, 'A1')
+    .replace(/А-ІІ\b/g, 'A2')
+    .replace(/А-ІІІ\b/g, 'A3')
+    .replace(/ВР-?1/g, 'BP1')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -109,4 +108,8 @@ export function parseDate(value: any): Date {
 
   // fallback
   return new Date();
+}
+
+export function normalizeClassName(value: string): string {
+  return normalizeToLatin(value).replace(/ВР/g, 'BP'); // специфіка сталі
 }

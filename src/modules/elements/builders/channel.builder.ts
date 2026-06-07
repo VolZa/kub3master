@@ -18,9 +18,9 @@ export function buildChannel(parsed: ParsedSpec): BuiltElement {
     code,
     prefixName: 'швелер', // 🔥 для Catalog
     name,
-    type: 'part',
-    category: 'channel',
-    baseUnit: 'шт',
+    // type: 'part',
+    // category: 'channel',
+    // baseUnit: 'шт',
 
     height: parsed.height,
     width: parsed.width,
