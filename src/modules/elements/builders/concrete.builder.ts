@@ -12,5 +12,6 @@ export function buildConcrete(parsed: {
     name: `Бетон ${parsed.className}`,
     // baseUnit: 'л',
     // category: 'concrete',
+    category: 'concrete',
   };
 }

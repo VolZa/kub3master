@@ -24,8 +24,8 @@ function setupElementSheetFormats(): void {
 
   const lastRow = sheet.getMaxRows();
 
-  const intFields = ['Diameter', 'Length', 'Width', 'Thickness', 'Density'];
-  const decimalFields = ['WeightPerUnit'];
+  const intFields = ['Diameter', 'Length', 'Width', 'Thickness'];
+  const decimalFields: string[] = [];
 
   intFields.forEach((field) => {
     if (map[field] !== undefined) {

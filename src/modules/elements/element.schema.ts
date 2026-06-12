@@ -1,12 +1,7 @@
-import { ElementRow } from './element.model';
-
-/**
- * Порядок колонок у таблиці 00_Elements
- * Це єдине джерело правди для запису
- */
 export const ELEMENT_HEADERS = [
   'ID',
   'Code',
+  'PrefixName',
   'Name',
   'Type',
   'Category',
@@ -16,12 +11,10 @@ export const ELEMENT_HEADERS = [
   'Diameter',
   'Class',
   'Width',
+  'Height',
   'Length',
   'Thickness',
   'IsActive',
-  'ParentType',
-  'WeightPerUnit',
-  'Density',
   'Comment',
   'CreatedAt',
 ] as const;

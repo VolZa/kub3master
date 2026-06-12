@@ -21,6 +21,8 @@ export function buildChannel(parsed: ParsedSpec): BuiltElement {
     // type: 'part',
     // category: 'channel',
     // baseUnit: 'шт',
+    category: 'steel',
+    profileType: 'channel',
 
     height: parsed.height,
     width: parsed.width,

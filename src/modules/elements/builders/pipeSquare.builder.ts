@@ -21,7 +21,8 @@ export function buildPipeSquare(parsed: ParsedSpec): BuiltElement {
     // baseUnit: 'шт',
 
     // type: 'material',
-    // category: 'steel',
+    category: 'steel',
+    profileType: 'pipe_square',
 
     width,
     height,

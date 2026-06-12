@@ -105,7 +105,8 @@ export function calcAssemblyWeight(
 
     if (!element) continue;
 
-    const weight = element.weightPerUnit ?? 0;
+    // TODO: calculate assembly weight from BOM/material batches after removing element-level Weight.
+    const weight = 0;
 
     total += qty * weight;
   }

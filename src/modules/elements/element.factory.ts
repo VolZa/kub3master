@@ -22,6 +22,8 @@ import { MaterialRepository } from '../../domain/materials/material.repository';
 import { ICatalogRepository } from '../catalog/catalog.repository.interface';
 import { MaterialBatchRepository } from '../../domain/materials/material-batch.repository';
 import { CatalogHelper } from '../catalog/catalog.helper';
+import { normalizeMaterialCode } from './utils/code.util';
+import { normalizeClassName } from 'utils/normalize';
 
 export function getOrCreateElementFromBuilt(
   built: BuiltElement,
@@ -54,31 +56,75 @@ export function getOrCreateElementFromBuilt(
     material = materialRepo.findByCode(built.code);
   }
 
+  // if (type === 'part') {
+  //   // const baseCode = built.code.split('_L')[0];
+  //   // console.log(
+  //   //   'Шукаємо матеріал для',
+  //   //   built.code,
+  //   //   'за базовим кодом',
+  //   //   baseCode,
+  //   // );
+
+  //   // material = materialRepo.findByCode(baseCode);
+  //   const baseCodeRaw = built.code.split('_L')[0];
+
+  //   const baseCode = normalizeMaterialCode(baseCodeRaw);
+
+  //   // const material = materialRepo.findByCode(baseCode);
+  //   material = materialRepo.findBySpec({
+  //     profileType: built.profileType,
+  //     diameter: built.diameter,
+  //     class: normalizeClassName(built.className),
+  //   });
+
+  //   if (!material) {
+  //     // material = getOrCreateMaterialFromPart(built, elementRepo, catalogHelper);
+  //     materialRepo.findBySpec({
+  //       profileType,
+  //       diameter: built.diameter,
+  //       class: built.className,
+  //       width: built.width,
+  //       height: built.height,
+  //       thickness: built.thickness,
+  //     });
+
+  //     if (!material) {
+  //       throw new Error('Material not found in 05_Materials');
+  //     }
+  //   }
+  // }
+
+  // if (type === 'part') {
+  //   material = materialRepo.findBySpec({
+  //     profileType: built.profileType,
+  //     diameter: built.diameter,
+  //     class: normalizeClassName(built.className),
+  //   });
+
+  //   if (!material) {
+  //     throw new Error(`❌ Material not found in 05_Materials: ${built.code}`);
+  //   }
+  // }
+
   if (type === 'part') {
-    const baseCode = built.code.split('_L')[0];
-    console.log(
-      'Шукаємо матеріал для',
-      built.code,
-      'за базовим кодом',
-      baseCode,
-    );
+    let materialClass: string | undefined;
 
-    material = materialRepo.findByCode(baseCode);
-
-    if (!material) {
-      // material = getOrCreateMaterialFromPart(built, elementRepo, catalogHelper);
-      materialRepo.findBySpec({
-        profileType,
-        diameter: built.diameter,
-        class: built.className,
-        width: built.width,
-        height: built.height,
-        thickness: built.thickness,
-      });
-
-      if (!material) {
-        throw new Error('Material not found in 05_Materials');
+    if (built.category === 'rebar') {
+      if (!built.className) {
+        throw new Error(`className missing for ${built.code}`);
       }
+
+      materialClass = normalizeClassName(built.className);
+    }
+
+    material = materialRepo.findBySpec({
+      profileType: built.category, // 🔥
+      diameter: built.diameter,
+      class: materialClass,
+    });
+    console.log('MATERIAL:', material);
+    if (!material) {
+      throw new Error(`Material not found in 05_Materials for: ${built.code}`);
     }
   }
 
@@ -88,6 +134,10 @@ export function getOrCreateElementFromBuilt(
   const id = generateIdByType(type);
 
   // 🔥 6. створення
+  if (!material) {
+    throw new Error(`Material not found for element: ${built.code}`);
+  }
+
   const row: ElementRow = {
     ID: id,
     Code: built.code,
@@ -99,7 +149,8 @@ export function getOrCreateElementFromBuilt(
     ProfileType: profileType,
     BaseUnit: baseUnit,
 
-    ParentMaterialID: material?.id || '',
+    // ParentMaterialID: material?.id || '',
+    ParentMaterialID: material.id,
 
     Diameter: built.diameter,
     Class: built.className,
@@ -110,9 +161,6 @@ export function getOrCreateElementFromBuilt(
     Thickness: built.thickness,
 
     IsActive: true,
-    ParentType: '',
-    WeightPerUnit: undefined,
-    Density: undefined,
     Comment: '',
     CreatedAt: new Date(),
   };

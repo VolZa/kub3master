@@ -1,6 +1,9 @@
 import { ParsedSpec } from '../model/parsed-spec.model';
 
 export function parsePipe(input: string): ParsedSpec | null {
+  if (!input.includes('D') && !input.includes('PIPE')) {
+    return null;
+  }
   const str = input.toLowerCase().replace(/,/g, '').replace(/\s+/g, ' ').trim();
 
   // 🔹 1. Довжина

@@ -70,8 +70,6 @@ export function getOrCreateMaterialFromPart(
     ProfileType: profileType || '',
 
     BaseUnit: 'кг', // 👉 тимчасово (потім через 05_Materials)
-    Density: 7850,
-
     CreatedAt: new Date(),
   };
 
@@ -137,7 +135,6 @@ export function getOrCreateMaterialFromPart(
 //     Type: type,              // 🔥 через catalog
 //     Category: category,      // 🔥 через catalog
 //     BaseUnit: 'кг',          // 👉 поки ок
-//     Density: 7850,           // 👉 потім винесеш у Materials
 
 //     CreatedAt: new Date(),
 //   };
@@ -246,8 +243,6 @@ export function findMaterialForPart(
 
 //     Diameter: part.diameter,
 //     Class: part.className,
-//     WeightPerUnit: calcRebarWeightPerMeter(part.diameter),
-//     Density: 7850,
 
 //     CreatedAt: new Date(),
 //   });

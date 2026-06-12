@@ -1,6 +1,6 @@
 // src/domain/materials/material.repository.ts
 
-import { normalizeCode } from 'utils/normalize';
+import { normalizeClassName, normalizeCode } from 'utils/normalize';
 import { mapRowsToMaterials } from './material.mapper';
 import { Material } from './material.model';
 
@@ -32,7 +32,16 @@ export class MaterialRepository {
       ) || null
     );
   }
-
+  // findRebar(diameter: number, rebarClass: string): Material | null {
+  //   return (
+  //     this.materials.find(
+  //       (m) =>
+  //         m.profileType === 'rebar' &&
+  //         m.diameter === diameter &&
+  //         normalizeClassName(m.class) === normalizeClassName(rebarClass || ''),
+  //     ) || null
+  //   );
+  // }
   // -----------------------------
   // 🪵 PLATE
   // -----------------------------
@@ -79,6 +88,32 @@ export class MaterialRepository {
   // -----------------------------
   // 🔥 UNIVERSAL
   // -----------------------------
+  // findBySpec(spec: {
+  //   profileType?: string;
+  //   diameter?: number;
+  //   class?: string;
+  //   width?: number;
+  //   height?: number;
+  //   thickness?: number;
+  // }): Material | null {
+  //   switch (spec.profileType) {
+  //     case 'rebar':
+  //       return this.findRebar(spec.diameter!, spec.class!);
+
+  //     case 'plate':
+  //       return this.findPlate(spec.width!, spec.thickness!);
+
+  //     case 'angle':
+  //       return this.findAngle(spec.width!, spec.height!, spec.thickness!);
+
+  //     case 'pipe_round':
+  //       return this.findPipe(spec.diameter!, spec.thickness!);
+
+  //     default:
+  //       return null;
+  //   }
+  // }
+
   findBySpec(spec: {
     profileType?: string;
     diameter?: number;
@@ -87,10 +122,83 @@ export class MaterialRepository {
     height?: number;
     thickness?: number;
   }): Material | null {
-    switch (spec.profileType) {
-      case 'rebar':
-        return this.findRebar(spec.diameter!, spec.class!);
+    if (!spec.class) {
+      return null;
+    }
 
+    const targetClass = normalizeClassName(spec.class);
+    switch (spec.profileType) {
+      // case 'rebar':
+      //   return (
+      //     this.materials.find((m) => {
+      //       return (
+      //         m.profileType === 'rebar' &&
+      //         m.diameter === spec.diameter &&
+      //         normalizeClassName(m.class) ===
+      //           normalizeClassName(spec.class || '')
+      //       );
+      //     }) || null
+      //   );
+
+      // case 'rebar': {
+      //   if (!spec.diameter || !spec.class) return null;
+
+      //   return (
+      //     this.materials.find((m) => {
+      //       return (
+      //         m.profileType === 'rebar' &&
+      //         m.diameter === spec.diameter &&
+      //         normalizeClassName(m.class) === normalizeClassName(spec.class)
+      //       );
+      //     }) || null
+      //   );
+      // }
+
+      // case 'rebar': {
+      //   if (spec.diameter == null || spec.class == null) {
+      //     return null;
+      //   }
+
+      //   // return (
+      //   //   this.materials.find((m) => {
+      //   //     if (m.class == null) return false;
+
+      //   //     return (
+      //   //       m.profileType === 'rebar' &&
+      //   //       m.diameter === spec.diameter &&
+      //   //       normalizeClassName(m.class) === normalizeClassName(spec.class)
+      //   //     );
+      //   //   }) || null
+      //   // );
+      //   return this.materials.find((m) => {
+      //     if (m.class == null) return false;
+
+      //     return (
+      //       m.profileType === 'rebar' &&
+      //       m.diameter === spec.diameter &&
+      //       normalizeClassName(m.class) === targetClass
+      //     );
+      //   });
+      // }
+      case 'rebar': {
+        if (spec.diameter == null || spec.class == null) {
+          return null;
+        }
+
+        const targetClass = normalizeClassName(spec.class);
+
+        return (
+          this.materials.find((m) => {
+            if (m.class == null) return false;
+
+            return (
+              m.category === 'rebar' &&
+              m.diameter === spec.diameter &&
+              normalizeClassName(m.class) === targetClass
+            );
+          }) || null
+        );
+      }
       case 'plate':
         return this.findPlate(spec.width!, spec.thickness!);
 

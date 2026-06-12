@@ -1,6 +1,5 @@
 import { ElementType } from '../../config/config';
 
-// як зберігається в таблиці
 export interface ElementRow {
   ID: string;
   Code: string;
@@ -14,26 +13,21 @@ export interface ElementRow {
   Diameter?: number;
   Class?: string;
   Width?: number;
-  Height?: number; // 🔥 ДОДАЛИ
+  Height?: number;
   Length?: number;
   Thickness?: number;
   IsActive?: boolean;
-  ParentType?: string;
-  WeightPerUnit?: number;
-  Density?: number;
   Comment?: string;
   CreatedAt: Date;
 }
 
-// коротке представлення (cache)
 export interface ElementShort {
   id: string;
   code: string;
   baseUnit: string;
-  type: ElementType; // 🔥 додав
+  type: ElementType;
 }
 
-// повна модель (для repository)
 export interface ElementFull {
   id: string;
   code: string;
@@ -46,7 +40,7 @@ export interface ElementFull {
 
   baseUnit: string;
 
-  parentMaterialID?: string; // 🔥 ДОДАТИ
+  parentMaterialID?: string;
 
   diameter?: number;
   className?: string;
@@ -54,20 +48,8 @@ export interface ElementFull {
   length?: number;
 
   isActive: boolean;
-  weightPerUnit?: number; // 🔥 ДОДАТИ
 }
-// export type ElementFull = {
-//   id: string;
-//   code: string;
-//   prefixName: string;
-//   name: string;
-//   type: ElementType;
-//   category: string; //?
-//   baseUnit: string;
-//   weightPerUnit?: number;
-// };
 
-//  що потрібно для створення CreateElementDto
 export interface CreateElementDto {
   code: string;
   name: string;
@@ -75,7 +57,6 @@ export interface CreateElementDto {
   category: string;
   baseUnit: string;
 
-  // optional
   diameter?: number;
   length?: number;
   width?: number;
@@ -87,11 +68,10 @@ export interface ParsedPart {
   prefixName: string;
   name: string;
 
-  category: string; //?
+  category: string;
   baseUnit?: string;
   profileType?: string;
   diameter: number;
   class: string;
   length: number;
-  weightPerUnit?: number;
 }

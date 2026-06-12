@@ -21,6 +21,8 @@ export function buildBeam(parsed: ParsedSpec): BuiltElement {
     // type: 'part',
     // category: 'beam',
     // baseUnit: 'шт',
+    category: 'steel',
+    profileType: 'beam',
 
     height: parsed.height,
     width: parsed.width,

@@ -7,11 +7,11 @@ export function extractPrefixFromSpec(parsed: ParsedSpec): string {
     case 'rebar':
       return 'арматура';
 
-    case 'angle':
-      return 'кутник';
-
     case 'plate':
       return 'полоса';
+
+    case 'angle':
+      return 'кутник';
 
     case 'pipe_round':
       return 'труба кругла';

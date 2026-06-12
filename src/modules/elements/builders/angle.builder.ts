@@ -23,6 +23,8 @@ export function buildAngle(parsed: ParsedSpec) {
     // type: ELEMENT_TYPES.PART,
     // category: 'angle',
     // baseUnit: 'шт',
+    category: 'steel',
+    profileType: 'angle',
 
     width: parsed.width,
     height: parsed.height,

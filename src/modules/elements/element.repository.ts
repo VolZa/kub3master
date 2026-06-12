@@ -72,10 +72,6 @@ export class GoogleSheetsElementRepository implements ElementRepository {
 
       row.IsActive ?? true,
 
-      row.ParentType ?? '',
-      row.WeightPerUnit ?? '',
-      row.Density ?? '',
-
       row.Comment ?? '',
 
       row.CreatedAt instanceof Date ? row.CreatedAt : new Date(),

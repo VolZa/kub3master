@@ -5,10 +5,63 @@ import { normalizeClassName } from '../../../utils/normalize';
 import { normalizeNumeric, normalizeSpec } from './utils/spec.utils';
 import { normalizePipeline } from '../normalizers/normalize.pipeline';
 
+// export function parseRebar(input: string): ParsedSpec | null {
+//   console.log('🧩 parseRebar input:', JSON.stringify(input));
+
+//   // const normalized = normalizeNumeric(normalizeSpec(input));
+//   const normalized = normalizePipeline(input);
+
+//   console.log('🧩 parseRebar normalized:', JSON.stringify(normalized));
+
+//   // ===== LENGTH =====
+//   const lengthMatch = normalized.match(/L\s*=\s*(\d+)/i);
+//   const length = lengthMatch
+//     ? normalizeNumberString(lengthMatch[1])
+//     : undefined;
+
+//   // ===== DIAMETER =====
+//   let diameter: number | undefined;
+
+//   const rMatch = normalized.match(/R[_\s]?(\d+)/i);
+//   const dMatch = normalized.match(/D\s*(\d+)/i);
+
+//   if (rMatch) {
+//     diameter = Number(rMatch[1]);
+//   } else if (dMatch) {
+//     diameter = Number(dMatch[1]);
+//   }
+
+//   // ===== CLASS =====
+//   let className: string | undefined;
+
+//   const aClass = normalized.match(/A\d{3,4}C?/);
+//   const bpMatch = normalized.match(/BP[-\s]?1/);
+
+//   if (aClass) {
+//     className = normalizeClassName(aClass[0]);
+//   } else if (bpMatch) {
+//     className = normalizeClassName(bpMatch[0]);
+//   }
+//   // fallback
+
+//   if (bpMatch) {
+//     className = 'BP-1';
+//   }
+
+//   if (!diameter || !className) {
+//     return null;
+//   }
+
+//   return {
+//     kind: 'rebar',
+//     diameter,
+//     className,
+//     length,
+//   };
+// }
 export function parseRebar(input: string): ParsedSpec | null {
   console.log('🧩 parseRebar input:', JSON.stringify(input));
 
-  // const normalized = normalizeNumeric(normalizeSpec(input));
   const normalized = normalizePipeline(input);
 
   console.log('🧩 parseRebar normalized:', JSON.stringify(normalized));
@@ -23,7 +76,7 @@ export function parseRebar(input: string): ParsedSpec | null {
   let diameter: number | undefined;
 
   const rMatch = normalized.match(/R[_\s]?(\d+)/i);
-  const dMatch = normalized.match(/D\s*(\d+)/i);
+  const dMatch = normalized.match(/D(\d+)/i);
 
   if (rMatch) {
     diameter = Number(rMatch[1]);
@@ -35,14 +88,13 @@ export function parseRebar(input: string): ParsedSpec | null {
   let className: string | undefined;
 
   const aClass = normalized.match(/A\d{3,4}C?/);
+  // const bpMatch = normalized.match(/BP[-\s]?1/);
+  const bpMatch = normalized.match(/BP[-\s]?[1I]/);
 
   if (aClass) {
     className = normalizeClassName(aClass[0]);
-  }
-
-  // fallback
-  if (/BP1/.test(normalized)) {
-    className = 'A240';
+  } else if (bpMatch) {
+    className = normalizeClassName(bpMatch[0]);
   }
 
   if (!diameter || !className) {
@@ -56,7 +108,6 @@ export function parseRebar(input: string): ParsedSpec | null {
     length,
   };
 }
-
 // export function parseRebar(input: string): ParsedSpec | null {
 //   const lengthMatch = input.match(/L\s*=\s*([\d\s]+)/i);
 

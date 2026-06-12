@@ -48,9 +48,6 @@ export function getOrCreateMaterialFromCode(
     Length: undefined,
     Thickness: undefined,
     IsActive: true,
-    ParentType: '',
-    WeightPerUnit: undefined,
-    Density: 7850,
     Comment: '',
     CreatedAt: new Date(),
   });

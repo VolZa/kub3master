@@ -28,17 +28,17 @@ export function parseSpec(input: string): ParsedSpec {
     return parsed;
   }
 
-  // 🔍 parseAngle
-  parsed = parseAngle(normalized);
-  if (parsed) {
-    console.log('⚠️ matched: parseAngle', parsed);
-    return parsed;
-  }
-
   // 🔍 parsePlate
   parsed = parsePlate(normalized);
   if (parsed) {
     console.log('⚠️ matched: parsePlate', parsed);
+    return parsed;
+  }
+
+  // 🔍 parseAngle
+  parsed = parseAngle(normalized);
+  if (parsed) {
+    console.log('⚠️ matched: parseAngle', parsed);
     return parsed;
   }
 

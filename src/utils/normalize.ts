@@ -110,6 +110,18 @@ export function parseDate(value: any): Date {
   return new Date();
 }
 
+// export function normalizeClassName(value: string): string {
+//   return normalizeToLatin(value).replace(/ВР/g, 'BP'); // специфіка сталі
+// }
+
 export function normalizeClassName(value: string): string {
-  return normalizeToLatin(value).replace(/ВР/g, 'BP'); // специфіка сталі
+  return value
+    .toUpperCase()
+    .replace(/А/g, 'A')
+    .replace(/С/g, 'C')
+    .replace(/ВР/g, 'BP')
+    .replace(/[ІI]/g, '1')
+    .replace(/BP1/g, 'BP-1')
+    .replace(/\s+/g, '')
+    .trim();
 }

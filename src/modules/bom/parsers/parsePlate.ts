@@ -3,7 +3,8 @@ import { ParsedSpec } from '../model/parsed-spec.model';
 export function parsePlate(input: string): ParsedSpec | null {
   const normalized = input
     .toLowerCase()
-    .replace('х', 'x') // кирилична
+    .replace('-', '') // 🔥 КЛЮЧОВЕ
+    .replace('х', 'x')
     .replace(/мм/g, '')
     .replace(/пластина|лист|полоса/g, '')
     .trim();
@@ -16,39 +17,128 @@ export function parsePlate(input: string): ParsedSpec | null {
 
   const numbers = matches.map(Number);
 
-  // 200x100x10
-  if (numbers.length === 3) {
-    const [width, length, thickness] = numbers;
+  if (numbers.length === 2) {
+    const [thickness, width] = numbers; // 🔥 порядок важливий
 
     return {
-      kind: 'plate', // пластина / полоса
+      kind: 'plate',
+      thickness,
+      width,
+    };
+  }
+
+  if (numbers.length === 3) {
+    const [thickness, width, length] = numbers;
+
+    return {
+      kind: 'plate',
       thickness,
       width,
       length,
     };
   }
 
-  // 40x5 (полоса)
-  if (numbers.length === 2) {
-    const [width, thickness] = numbers;
-
-    return {
-      kind: 'plate',
-      width,
-      thickness,
-    };
-  }
-
-  // тільки товщина (лист 8мм)
-  if (numbers.length === 1) {
-    return {
-      kind: 'plate',
-      thickness: numbers[0],
-    };
-  }
-
   return { kind: 'unknown' };
 }
+
+// export function parsePlate(input: string): ParsedSpec | null {
+//   // 🔥 ФІЛЬТР — НЕ ЛОВИМО ВСЕ ПІДРЯД
+//   if (!/[xх]/.test(input) && !/(лист|полоса|пластина)/i.test(input)) {
+//     return null;
+//   }
+
+//   const normalized = input
+//     .toLowerCase()
+//     .replace('-', '') // 🔥 ДОДАТИ
+//     .replace('х', 'x')
+//     .replace(/мм/g, '')
+//     .replace(/пластина|лист|полоса/g, '')
+//     .trim();
+
+//   const matches = normalized.match(/\d+/g);
+
+//   if (!matches) {
+//     return null; // 🔥 НЕ unknown!
+//   }
+
+//   const numbers = matches.map(Number);
+
+//   // 200x100x10
+//   if (numbers.length === 3) {
+//     const [width, length, thickness] = numbers;
+
+//     return {
+//       kind: 'plate',
+//       thickness,
+//       width,
+//       length,
+//     };
+//   }
+
+//   // 40x5
+//   if (numbers.length === 2) {
+//     const [width, thickness] = numbers;
+
+//     return {
+//       kind: 'plate',
+//       width,
+//       thickness,
+//     };
+//   }
+
+//   // ❌ ОДИНАРНЕ ЧИСЛО — НЕ plate
+//   return null;
+// }
+
+// export function parsePlate(input: string): ParsedSpec | null {
+//   const normalized = input
+//     .toLowerCase()
+//     .replace('х', 'x') // кирилична
+//     .replace(/мм/g, '')
+//     .replace(/пластина|лист|полоса/g, '')
+//     .trim();
+
+//   const matches = normalized.match(/\d+/g);
+
+//   if (!matches) {
+//     return { kind: 'unknown' };
+//   }
+
+//   const numbers = matches.map(Number);
+
+//   // 200x100x10
+//   if (numbers.length === 3) {
+//     const [width, length, thickness] = numbers;
+
+//     return {
+//       kind: 'plate', // пластина / полоса
+//       thickness,
+//       width,
+//       length,
+//     };
+//   }
+
+//   // 40x5 (полоса)
+//   if (numbers.length === 2) {
+//     const [width, thickness] = numbers;
+
+//     return {
+//       kind: 'plate',
+//       width,
+//       thickness,
+//     };
+//   }
+
+//   // тільки товщина (лист 8мм)
+//   if (numbers.length === 1) {
+//     return {
+//       kind: 'plate',
+//       thickness: numbers[0],
+//     };
+//   }
+
+//   return { kind: 'unknown' };
+// }
 
 // import { ParsedSpec } from '../bom.parser';
 

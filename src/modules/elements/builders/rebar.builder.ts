@@ -27,11 +27,13 @@ export function buildRebar(parsed: ParsedSpec): BuiltElement {
     // baseUnit: 'шт',
 
     // type: 'part',
-    // category: 'rebar',
+    category: 'rebar', // 🔥 ДОДАТИ
 
     diameter,
     length,
     className,
+
+    profileType: 'round', // 🔥 для матеріалу
   };
   // return {
   //   code,

@@ -5,7 +5,8 @@ export type BuiltElement = {
   code: string;
   prefixName: string;
   name: string;
-
+  // 🔥 ДОДАТИ
+  category?: string; // rebar, plate, angle...
   // 🔹 геометрія (опційно)
   diameter?: number;
   length?: number;
@@ -14,6 +15,8 @@ export type BuiltElement = {
   width?: number;
   height?: number;
   thickness?: number;
+
+  profileType?: string; // 🔥 ДОДАТИ
 };
 // export interface BuiltElement {
 //   code: string;
@@ -33,8 +36,6 @@ export type BuiltElement = {
 //   height?: number;
 //   thickness?: number;
 
-//   weightPerUnit?: number;
-//   density?: number;
 // }
 
 export type BuiltElementExtended = BuiltElement & {

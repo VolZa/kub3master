@@ -11,7 +11,8 @@ export function buildPlate(parsed: ParsedSpec) {
     prefixName: 'полоса', // 🔥 для Catalog
     name: `Полоса ${parsed.width}x${parsed.thickness} L=${parsed.length}`,
     // type: ELEMENT_TYPES.PART,
-    category: 'plate',
+    profileType: 'plate',
+    category: 'steel',
     baseUnit: 'шт',
 
     width: parsed.width,

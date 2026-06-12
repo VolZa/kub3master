@@ -21,6 +21,8 @@ export function buildPipeRound(parsed: ParsedSpec): BuiltElement {
     // type: 'part',
     // category: 'pipe_round',
     // baseUnit: 'шт',
+    category: 'steel',
+    profileType: 'pipe_round',
 
     diameter: parsed.diameter,
     thickness: parsed.thickness,

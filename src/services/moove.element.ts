@@ -16,8 +16,5 @@
 //   width?: number;
 //   thickness?: number;
 
-//   weightPerUnit?: number;
-//   density?: number;
-
 //   comment?: string;
 // }

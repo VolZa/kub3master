@@ -122,24 +122,62 @@ export function buildBOMRow(
   materialRepo: MaterialRepository,
   materialBatchRepo: MaterialBatchRepository,
 ): any[][] {
+  // const prefix = row.prefix;
+  // const qty = row.qty ?? 1;
   const prefix = row.prefix;
   const qty = row.qty ?? 1;
 
-  const parsed = /^[A-Z]+_\d+/.test(row.code)
-    ? parseFromCode(row.code)
-    : parseSpec(row.spec);
+  const result: any[][] = [];
 
-  let built;
+  const parent = repo.findById(parentId);
 
-  if (parsed.kind === 'assembly') {
-    built = {
-      code: row.code,
-      name: [row.prefix, row.spec].join(' '),
-      baseUnit: 'шт',
-    };
-  } else {
-    built = buildByKind(parsed);
+  if (!parent) {
+    throw new Error(`Parent not found: ${parentId}`);
   }
+
+  // 🔥 1. СПРОБА ЗНАЙТИ ЯК Є (ключове!)
+  const existingElement = repo.findByCode(row.code);
+
+  if (existingElement) {
+    result.push([
+      parentId,
+      existingElement.id,
+      qty,
+      existingElement.baseUnit,
+      now,
+      parent.code,
+      existingElement.code,
+    ]);
+
+    return result; // 🔥 ВИХІД — нічого більше не робимо
+  }
+
+  // 🔥 2. PARSE (тільки якщо НЕ знайдено)
+  const parsed = parseSpec(row.spec);
+
+  // 🔥 3. НЕ РОЗПІЗНАНО → STOP
+  if (parsed.kind === 'assembly') {
+    throw new Error(`❌ Element not found in 00_Elements: ${row.code}`);
+  }
+
+  // const parsed = /^[A-Z]+_\d+/.test(row.code)
+  //   ? parseFromCode(row.code)
+  //   : parseSpec(row.spec);
+
+  // if (parsed.kind === 'assembly') {
+  //   built = {
+  //     code: row.code,
+  //     name: [row.prefix, row.spec].join(' '),
+  //     baseUnit: 'шт',
+  //   };
+  // } else {
+  //   built = buildByKind(parsed);
+  // }
+  if (parsed.kind === 'unknown') {
+    throw new Error(`❌ Element not found in 00_Elements: ${row.code}`);
+  }
+
+  const built = buildByKind(parsed);
 
   const element = getOrCreateElementFromBuilt(
     {
@@ -154,9 +192,9 @@ export function buildBOMRow(
 
   const unit = element.baseUnit;
 
-  const result: any[][] = [];
+  // const result: any[][] = [];
 
-  const parent = repo.findById(parentId);
+  // const parent = repo.findById(parentId);
 
   if (!parent) {
     throw new Error(`Parent not found: ${parentId}`);
@@ -187,7 +225,8 @@ export function buildBOMRow(
     const batch = materialBatchRepo.findActiveByMaterialId(materialId);
 
     if (!batch) {
-      throw new Error(`No active batch for material: ${material.code}`);
+      throw new Error(`❌ Немає партії для матеріалу ${material.code}. 
+        Додайте в 06_MaterialBatches активну партію для цього матеріалу.`);
     }
 
     if (built.length == null) {
