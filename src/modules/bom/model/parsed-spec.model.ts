@@ -46,12 +46,12 @@ export type ParsedSpec =
       length?: number;
     }
   | {
-      kind: 'assembly';
-      name: string;
+      kind: 'concrete';
+      className: string;
     }
   | {
-      kind: 'concrete'; // 🔥 ДОДАТИ
-      className: string;
+      kind: 'assembly';
+      name: string;
     }
   | {
       kind: 'unknown';

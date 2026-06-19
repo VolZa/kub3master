@@ -35,7 +35,7 @@ export function resolveElement(
     repo,
     catalogHelper, // 🔥 замість repo
     materialRepo,
-    materialBatchRepo,
+    // materialBatchRepo,
   );
 
   // 🔹 4. short

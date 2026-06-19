@@ -28,6 +28,7 @@ export function mapRowsToMaterials(rows: any[][]): Material[] {
     height: col('Height'),
     thickness: col('Thickness'),
     density: col('Density'),
+    weightPerMeter: col('WeightPerMeter'),
     baseUnit: col('BaseUnit'),
     isActive: col('IsActive'),
     comment: col('Comment'),
@@ -49,6 +50,9 @@ export function mapRowsToMaterials(rows: any[][]): Material[] {
     height: row[idx.height] ? Number(row[idx.height]) : undefined,
     thickness: row[idx.thickness] ? Number(row[idx.thickness]) : undefined,
     density: row[idx.density] ? Number(row[idx.density]) : undefined,
+    weightPerMeter: row[idx.weightPerMeter]
+      ? Number(row[idx.weightPerMeter])
+      : undefined,
 
     baseUnit: row[idx.baseUnit] || 'кг',
     isActive: normalizeBoolean(row[idx.isActive]),

@@ -4,13 +4,15 @@ import {
 } from 'modules/bom/parsers/utils/spec.utils';
 
 export function normalize(input: string): string {
-  return input
-    .toLowerCase()
-    .replace(/,/g, '')
-    .replace(/×/g, 'x') // unicode ×
-    .replace(/\*/g, 'x') // *
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    input
+      .toLowerCase()
+      // .replace(/,/g, '')
+      .replace(/×/g, 'x') // unicode ×
+      .replace(/\*/g, 'x') // *
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 export function normalizeToLatin(value: string): string {

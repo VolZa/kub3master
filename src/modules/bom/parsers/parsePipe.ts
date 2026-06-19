@@ -1,9 +1,9 @@
 import { ParsedSpec } from '../model/parsed-spec.model';
 
 export function parsePipe(input: string): ParsedSpec | null {
-  if (!input.includes('D') && !input.includes('PIPE')) {
-    return null;
-  }
+  // if (!input.includes('D') && !input.includes('PIPE')) {
+  //   return null;
+  // }
   const str = input.toLowerCase().replace(/,/g, '').replace(/\s+/g, ' ').trim();
 
   // 🔹 1. Довжина
@@ -11,7 +11,10 @@ export function parsePipe(input: string): ParsedSpec | null {
   const length = lengthMatch ? Number(lengthMatch[1]) : undefined;
 
   // 🔹 2. ПРОФІЛЬНА ТРУБА (100x50x4)
-  const squareMatch = str.match(/(\d+)\s*[xх]\s*(\d+)\s*[xх]\s*(\d+)/i);
+  // const squareMatch = str.match(/(\d+)\s*[xх]\s*(\d+)\s*[xх]\s*(\d+)/i);
+  const squareMatch = str.match(
+    /(\d+)\s*[xх]\s*(\d+)\s*[xх]\s*(\d+(?:\.\d+)?)/i,
+  );
 
   if (squareMatch) {
     const width = Number(squareMatch[1]);
@@ -28,7 +31,8 @@ export function parsePipe(input: string): ParsedSpec | null {
   }
 
   // 🔹 3. КРУГЛА ТРУБА (Ø108x4)
-  const roundMatch = str.match(/ø?\s*(\d+)\s*[xх]\s*(\d+)/i);
+  // const roundMatch = str.match(/ø?\s*(\d+)\s*[xх]\s*(\d+)/i);
+  const roundMatch = str.match(/ø?\s*(\d+)\s*[xх]\s*(\d+(?:\.\d+)?)/i);
 
   if (roundMatch) {
     const diameter = Number(roundMatch[1]);

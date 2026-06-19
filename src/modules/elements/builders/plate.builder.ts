@@ -7,7 +7,7 @@ export function buildPlate(parsed: ParsedSpec) {
   }
   console.log('🔨 buildPlate with parsed:', parsed);
   return {
-    code: `P_${parsed.width}_${parsed.thickness}_${parsed.length}`,
+    code: `P_${parsed.width}_${parsed.thickness}_L${parsed.length}`,
     prefixName: 'полоса', // 🔥 для Catalog
     name: `Полоса ${parsed.width}x${parsed.thickness} L=${parsed.length}`,
     // type: ELEMENT_TYPES.PART,

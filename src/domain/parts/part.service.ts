@@ -46,7 +46,7 @@ export function getOrCreatePart(
     repo,
     catalogHelper,
     materialRepo,
-    materialBatchRepo,
+    // materialBatchRepo,
   );
 
   // const row = buildElementRow(built, id);

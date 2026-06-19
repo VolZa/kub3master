@@ -36,6 +36,10 @@ export function buildByKind(parsed: ParsedSpec): BuiltElement {
 
     case 'channel':
       return buildChannel(parsed);
+
+    case 'concrete':
+      return buildConcrete(parsed);
+
     // 🔥 ДОДАТИ ОЦЕ
     case 'assembly':
       return {
@@ -43,8 +47,6 @@ export function buildByKind(parsed: ParsedSpec): BuiltElement {
         prefixName: 'що передати сюди',
         name: parsed.name,
       };
-    case 'concrete':
-      return buildConcrete(parsed);
 
     case 'unknown':
       throw new Error('Spec not recognized');

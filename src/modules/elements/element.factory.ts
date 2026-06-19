@@ -24,13 +24,14 @@ import { MaterialBatchRepository } from '../../domain/materials/material-batch.r
 import { CatalogHelper } from '../catalog/catalog.helper';
 import { normalizeMaterialCode } from './utils/code.util';
 import { normalizeClassName } from 'utils/normalize';
+import { MaterialResolver } from 'domain/materials/material.resolver';
 
 export function getOrCreateElementFromBuilt(
   built: BuiltElement,
   elementRepo: ElementRepository,
   catalogHelper: CatalogHelper,
   materialRepo: MaterialRepository,
-  materialBatchRepo: MaterialBatchRepository,
+  // materialBatchRepo: MaterialBatchRepository,
 ): ElementFull {
   console.log('getOrCreateElementFromBuilt with built:', built);
   // 🔹 1. вже існує?
@@ -43,89 +44,32 @@ export function getOrCreateElementFromBuilt(
   const catalogType = catalog.type;
   const category = catalog.category;
   const profileType = catalog.profileType || '';
-
+  console.log(
+    'getOrCreateElementFromBuilt 🔥 catalogType:',
+    catalogType,
+    'category:',
+    category,
+    'profileType:',
+    profileType,
+  );
   // 🔥 визначення типу
-  const isPart = built.length !== undefined;
-  const type = isPart ? 'part' : catalogType;
+  let type = catalogType;
+  if (catalogType === 'material' && built.length !== undefined) {
+    type = 'part';
+  }
 
   // 🔥 material
   let material;
 
   if (type === 'material') {
-    console.log('Шукаємо матеріал для', built.code);
     material = materialRepo.findByCode(built.code);
   }
 
-  // if (type === 'part') {
-  //   // const baseCode = built.code.split('_L')[0];
-  //   // console.log(
-  //   //   'Шукаємо матеріал для',
-  //   //   built.code,
-  //   //   'за базовим кодом',
-  //   //   baseCode,
-  //   // );
-
-  //   // material = materialRepo.findByCode(baseCode);
-  //   const baseCodeRaw = built.code.split('_L')[0];
-
-  //   const baseCode = normalizeMaterialCode(baseCodeRaw);
-
-  //   // const material = materialRepo.findByCode(baseCode);
-  //   material = materialRepo.findBySpec({
-  //     profileType: built.profileType,
-  //     diameter: built.diameter,
-  //     class: normalizeClassName(built.className),
-  //   });
-
-  //   if (!material) {
-  //     // material = getOrCreateMaterialFromPart(built, elementRepo, catalogHelper);
-  //     materialRepo.findBySpec({
-  //       profileType,
-  //       diameter: built.diameter,
-  //       class: built.className,
-  //       width: built.width,
-  //       height: built.height,
-  //       thickness: built.thickness,
-  //     });
-
-  //     if (!material) {
-  //       throw new Error('Material not found in 05_Materials');
-  //     }
-  //   }
-  // }
-
-  // if (type === 'part') {
-  //   material = materialRepo.findBySpec({
-  //     profileType: built.profileType,
-  //     diameter: built.diameter,
-  //     class: normalizeClassName(built.className),
-  //   });
-
-  //   if (!material) {
-  //     throw new Error(`❌ Material not found in 05_Materials: ${built.code}`);
-  //   }
-  // }
-
   if (type === 'part') {
-    let materialClass: string | undefined;
+    const resolver = new MaterialResolver(materialRepo);
 
-    if (built.category === 'rebar') {
-      if (!built.className) {
-        throw new Error(`className missing for ${built.code}`);
-      }
-
-      materialClass = normalizeClassName(built.className);
-    }
-
-    material = materialRepo.findBySpec({
-      profileType: built.category, // 🔥
-      diameter: built.diameter,
-      class: materialClass,
-    });
-    console.log('MATERIAL:', material);
-    if (!material) {
-      throw new Error(`Material not found in 05_Materials for: ${built.code}`);
-    }
+    material = resolver.resolve(built);
+    console.log('Resolved material:', material, 'for', built.code);
   }
 
   // 🔥 base unit
@@ -207,7 +151,7 @@ export function getOrCreateElement(
     repo,
     catalogHelper,
     materialRepo,
-    materialBatchRepo,
+    // materialBatchRepo,
   );
 
   const short: ElementShort = {

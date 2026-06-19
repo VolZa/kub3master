@@ -2,13 +2,18 @@ import { ParsedSpec } from '../model/parsed-spec.model';
 
 import { parseRebar } from './parseRebar';
 import { parseAngle } from './parseAngle';
+import { parseConcrete } from './parseConcrete';
 import { parsePlate } from './parsePlate';
 import { parsePipe } from './parsePipe';
 import { parseBeam } from './parseBeam';
 import { parseChannel } from './parseChannel';
 import { normalizePipeline } from '../normalizers/normalize.pipeline';
 
-export function parseSpec(input: string): ParsedSpec {
+const UNKNOWN_SPEC: ParsedSpec = {
+  kind: 'unknown',
+};
+
+export function parseSpec(input: string, prefix?: string): ParsedSpec {
   // 🔥 якщо це вже code → не чіпаємо
   if (/^[A-Z]+_\d+/.test(input)) {
     return parseFromCode(input);
@@ -18,49 +23,57 @@ export function parseSpec(input: string): ParsedSpec {
 
   console.log('🧩 parseSpec input:', JSON.stringify(input));
   console.log('🧩 parseSpec normalized:', JSON.stringify(normalized));
-
+  console.log('🧩 parseSpec prefix:', JSON.stringify(prefix));
+  const p = (prefix || '').toLowerCase();
   let parsed: ParsedSpec | null = null;
 
-  // 🔍 пробуємо parseRebar
-  parsed = parseRebar(normalized);
-  if (parsed) {
-    console.log('✅ matched: parseRebar', parsed);
-    return parsed;
+  if (p.includes('арматура')) {
+    parsed = parseRebar(normalized);
+    if (parsed) {
+      return parsed;
+    }
   }
 
-  // 🔍 parsePlate
-  parsed = parsePlate(normalized);
-  if (parsed) {
-    console.log('⚠️ matched: parsePlate', parsed);
-    return parsed;
+  if (p.includes('полоса')) {
+    parsed = parsePlate(normalized);
+    if (parsed) {
+      return parsed;
+    }
   }
 
-  // 🔍 parseAngle
-  parsed = parseAngle(normalized);
-  if (parsed) {
-    console.log('⚠️ matched: parseAngle', parsed);
-    return parsed;
+  if (p.includes('труба')) {
+    parsed = parsePipe(normalized);
+    if (parsed) {
+      return parsed;
+    }
   }
 
-  // 🔍 parsePipe
-  parsed = parsePipe(normalized);
-  if (parsed) {
-    console.log('⚠️ matched: parsePipe', parsed);
-    return parsed;
+  if (p.includes('кутник')) {
+    parsed = parseAngle(normalized);
+    if (parsed) {
+      return parsed;
+    }
   }
 
-  // 🔍 parseBeam
-  parsed = parseBeam(normalized);
-  if (parsed) {
-    console.log('⚠️ matched: parseBeam', parsed);
-    return parsed;
+  if (p.includes('швелер')) {
+    parsed = parseChannel(normalized);
+    if (parsed) {
+      return parsed;
+    }
   }
 
-  // 🔍 parseChannel
-  parsed = parseChannel(normalized);
-  if (parsed) {
-    console.log('⚠️ matched: parseChannel', parsed);
-    return parsed;
+  if (p.includes('двутавр')) {
+    parsed = parseBeam(normalized);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  if (p.includes('бетон')) {
+    parsed = parseConcrete(normalized);
+    if (parsed) {
+      return parsed;
+    }
   }
 
   // ❌ нічого не підійшло
@@ -101,6 +114,57 @@ export function parseFromCode(code: string): ParsedSpec {
     name: code,
   };
 }
+
+// let parsed: ParsedSpec | null = null;
+
+// // 🔍 пробуємо parseRebar
+// parsed = parseRebar(normalized);
+// if (parsed) {
+//   console.log('✅ matched: parseRebar', parsed);
+//   return parsed;
+// }
+
+// parsed = parseConcrete(normalized);
+
+// if (parsed) {
+//   console.log('⚠️ matched: parseConcrete', parsed);
+//   return parsed;
+// }
+
+// // 🔍 parsePipe
+// parsed = parsePipe(normalized);
+// if (parsed) {
+//   console.log('⚠️ matched: parsePipe', parsed);
+//   return parsed;
+// }
+
+// // 🔍 parseAngle
+// parsed = parseAngle(normalized);
+// if (parsed) {
+//   console.log('⚠️ matched: parseAngle', parsed);
+//   return parsed;
+// }
+
+// // 🔍 parseBeam
+// parsed = parseBeam(normalized);
+// if (parsed) {
+//   console.log('⚠️ matched: parseBeam', parsed);
+//   return parsed;
+// }
+
+// // 🔍 parseChannel
+// parsed = parseChannel(normalized);
+// if (parsed) {
+//   console.log('⚠️ matched: parseChannel', parsed);
+//   return parsed;
+// }
+
+// // 🔍 parsePlate
+// parsed = parsePlate(normalized);
+// if (parsed) {
+//   console.log('⚠️ matched: parsePlate', parsed);
+//   return parsed;
+// }
 
 // export function parseFromCode(code: string): ParsedSpec {
 //   const rebarMatch = code.match(/^R_(\d+)_([A-Z0-9]+)(?:_L(\d+))?/);

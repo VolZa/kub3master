@@ -21,6 +21,7 @@ export interface Material {
   thickness?: number;
   density?: number;
 
+  weightPerMeter?: number; // 🔥 НОВЕ
   baseUnit: string;
   isActive: boolean;
 

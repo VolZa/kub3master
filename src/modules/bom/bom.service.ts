@@ -1,117 +1,27 @@
 //🏗️
 import { parseSpec } from './parsers/parseSpec';
-import { getOrCreateElement } from '../elements/element.factory';
 import { parseTableText } from '../../utils/parseTableText';
 import { deleteBOMTree, insertBOMRows } from './bom.repository';
-import { mapTableRowToStructured } from './parsers/mappers/table-row.mapper';
-import { mapElementToBOMItem } from './bom.mapper';
-import { ElementShort } from '../elements/element.model';
 import { TableRowInput } from './model/table-row-input.model';
 import {
   ElementRepository,
   GoogleSheetsElementRepository,
 } from '../elements/element.repository';
-import { MockElementRepository } from '../elements/mock/mock.element.repository';
-import {
-  findMaterialForPart,
-  getOrCreateMaterialFromPart,
-} from '../../domain/materials/material.service';
-import { buildByKind } from '../../modules/elements/builders/builder.dispatcher';
-import { deleteBOMByParentId } from './bom.repository';
-import { ProductDetector } from '../product/product.detector';
 
-import { generateIdByType } from '../../utils/id';
+import { buildByKind } from '../../modules/elements/builders/builder.dispatcher';
+
 import { parseParent } from './parsers/parseParent';
 import { getOrCreateAssemblyWithName } from '../elements/assembly.service';
 import { CatalogInMemoryRepository } from '../catalog/catalog.repository';
 import { GoogleSheetsCatalogDataSource } from '../../infrastructure/sheets/catalog/GoogleSheetsCatalogDataSource';
-import { StructuredLine } from './parsers/model/structured-line.model';
 
 import { MaterialRepository } from '../../domain/materials/material.repository';
 import { MaterialBatchRepository } from '../../domain/materials/material-batch.repository';
-import { CatalogService } from '../catalog/catalog.service';
-import { calcRebarWeight } from '../../utils/rebar';
-import { getOrCreateMaterialFromCode } from '../elements/material.service';
-import { getSheetByNameSafe } from '../../utils/sheets';
-import { parseFromCode } from './parsers/parseSpec';
-import { ParsedSpec } from './model/parsed-spec.model';
-import { normalize, normalizeNumberString } from '../../utils/normalize';
-import { extractPrefixFromSpec } from './parsers/prefix.resolver';
-
 import { getOrCreateElementFromBuilt } from '../elements/element.factory';
-import { parseStructuredLine } from './parsers/parseStucturedLine';
-import { ICatalogRepository } from '../catalog/catalog.repository.interface';
-import { buildFromTableRow } from './builders/tableRow.builder';
 import { CatalogHelper } from '../catalog/catalog.helper';
 import { GoogleSheetsMaterialBatchDataSource } from '../../domain/materials/googleSheetsMaterialBatch.datasource';
 import { GoogleSheetsMaterialDataSource } from '../../domain/materials/googleSheetsMaterial.datasource';
 import { buildAssemblyName } from 'modules/elements/builders/name.builder';
-
-// const materialRepo = new MaterialRepository();
-
-// export function buildBOMRow(
-//   parentId: string,
-//   // line: string,
-//   row: TableRowInput,
-//   now: Date,
-//   repo: ElementRepository,
-//   catalogHelper: CatalogHelper, // 🔥 зміна
-//   materialRepo: MaterialRepository,
-//   materialBatchRepo: MaterialBatchRepository,
-// ): any[][] {
-//   // const row = parseStructuredLine(line);
-//   const prefix = row.prefix; //.toLowerCase();
-//   const qty = row.qty ?? 1;
-//   console.log('--- ROW DEBUG ---');
-//   console.log('prefix:', prefix);
-//   console.log('code:', row.code);
-//   console.log('rawCode:', row.spec);
-
-//   // ❌ БІЛЬШЕ НЕ ВИКОРИСТОВУЄМО
-//   // const { resolvedType } = catalogService.resolveWithContext(...)
-
-//   const parsed = /^[A-Z]+_\d+/.test(row.code)
-//     ? parseFromCode(row.code)
-//     : parseSpec(row.spec);
-
-//   let built;
-
-//   if (parsed.kind === 'assembly') {
-//     built = {
-//       code: row.code,
-//       name: [row.prefix, row.spec].join(' '),
-//       baseUnit: 'шт',
-//     };
-//   } else {
-//     built = buildByKind(parsed);
-//   }
-
-//   if (!built.code || built.code.includes(' ')) {
-//     throw new Error('❌ Invalid built code: ' + JSON.stringify(built));
-//   }
-//   console.log('PARSED:', parsed);
-
-//   console.log('BUILT:', built);
-
-//   // 🔥 тільки додаємо prefixName
-//   const element = getOrCreateElementFromBuilt(
-//     {
-//       ...built,
-//       prefixName: prefix, // ✔
-//     },
-//     repo,
-//     catalogHelper, // 🔥 замість service
-//     materialRepo,
-//     materialBatchRepo,
-//   );
-//   console.log('BUILT:', built);
-//   // 🔥 одиниця виміру
-//   const unit = element.baseUnit;
-
-//   console.log('RAW SPEC:', row.spec);
-//   console.log('NORMALIZED SPEC:', normalize(row.spec));
-//   return [[parentId, element.id, qty, unit, now]];
-// }
 
 export function buildBOMRow(
   parentId: string,
@@ -120,64 +30,62 @@ export function buildBOMRow(
   repo: ElementRepository,
   catalogHelper: CatalogHelper,
   materialRepo: MaterialRepository,
-  materialBatchRepo: MaterialBatchRepository,
+  // materialBatchRepo: MaterialBatchRepository,
 ): any[][] {
-  // const prefix = row.prefix;
-  // const qty = row.qty ?? 1;
   const prefix = row.prefix;
   const qty = row.qty ?? 1;
-
-  const result: any[][] = [];
 
   const parent = repo.findById(parentId);
 
   if (!parent) {
     throw new Error(`Parent not found: ${parentId}`);
   }
-
-  // 🔥 1. СПРОБА ЗНАЙТИ ЯК Є (ключове!)
+  // console.log('🔥 buildBOMRow with row:', row, 'parent:', parent);
+  // 🔥 1. EXISTING
   const existingElement = repo.findByCode(row.code);
 
+  console.log('Existing element for code', row.code, existingElement);
+  // 🔹 Якщо елемент вже існує, просто повертаємо зв'язок Parent → Child
   if (existingElement) {
-    result.push([
-      parentId,
-      existingElement.id,
-      qty,
-      existingElement.baseUnit,
-      now,
-      parent.code,
-      existingElement.code,
-    ]);
-
-    return result; // 🔥 ВИХІД — нічого більше не робимо
+    return [
+      [
+        parentId,
+        existingElement.id,
+        qty,
+        existingElement.baseUnit,
+        now,
+        parent.code,
+        existingElement.code,
+      ],
+    ];
   }
 
-  // 🔥 2. PARSE (тільки якщо НЕ знайдено)
-  const parsed = parseSpec(row.spec);
+  // пошук в матеріалах
+  const material = materialRepo.findByCode(row.code);
 
-  // 🔥 3. НЕ РОЗПІЗНАНО → STOP
-  if (parsed.kind === 'assembly') {
-    throw new Error(`❌ Element not found in 00_Elements: ${row.code}`);
+  if (material) {
+    return [
+      [
+        parentId,
+        material.materialId,
+        qty,
+        material.baseUnit,
+        now,
+        parent.code,
+        material.code,
+      ],
+    ];
   }
 
-  // const parsed = /^[A-Z]+_\d+/.test(row.code)
-  //   ? parseFromCode(row.code)
-  //   : parseSpec(row.spec);
+  // 🔥 2. PARSE
+  const parsed = parseSpec(row.spec, row.prefix);
 
-  // if (parsed.kind === 'assembly') {
-  //   built = {
-  //     code: row.code,
-  //     name: [row.prefix, row.spec].join(' '),
-  //     baseUnit: 'шт',
-  //   };
-  // } else {
-  //   built = buildByKind(parsed);
-  // }
-  if (parsed.kind === 'unknown') {
+  if (parsed.kind === 'assembly' || parsed.kind === 'unknown') {
     throw new Error(`❌ Element not found in 00_Elements: ${row.code}`);
   }
 
   const built = buildByKind(parsed);
+  console.log('buildBOMRow 🔥 2. PARSE Built element from parsed spec:', built);
 
   const element = getOrCreateElementFromBuilt(
     {
@@ -187,74 +95,61 @@ export function buildBOMRow(
     repo,
     catalogHelper,
     materialRepo,
-    materialBatchRepo,
   );
-
-  const unit = element.baseUnit;
-
-  // const result: any[][] = [];
-
-  // const parent = repo.findById(parentId);
-
-  if (!parent) {
-    throw new Error(`Parent not found: ${parentId}`);
-  }
+  console.log('Built element:', element);
 
   // 🔹 1. Parent → Child
-  result.push([
+  const baseRow = [
     parentId,
     element.id,
     qty,
-    unit,
+    element.baseUnit,
     now,
     parent.code,
     element.code,
-  ]);
+  ];
 
-  // 🔥 2. PART → MATERIAL (КЛЮЧОВЕ!)
-
-  if (element.type === 'part' && element.parentMaterialID) {
-    const materialId = element.parentMaterialID;
-
-    const material = materialRepo.findById(materialId);
+  // 🔥 2. PART → MATERIAL
+  if (element.type === 'part') {
+    console.log(
+      'PART → MATERIAL element.parentMaterialID:',
+      element.parentMaterialID,
+    );
+    const material = materialRepo.findById(element.parentMaterialID || '');
 
     if (!material) {
-      throw new Error(`Material not found: ${materialId}`);
+      throw new Error(`❌ Material not found for ${element.code}`);
     }
 
-    const batch = materialBatchRepo.findActiveByMaterialId(materialId);
-
-    if (!batch) {
-      throw new Error(`❌ Немає партії для матеріалу ${material.code}. 
-        Додайте в 06_MaterialBatches активну партію для цього матеріалу.`);
+    if (!material.weightPerMeter) {
+      throw new Error(`❌ No weightPerMeter for ${material.code}`);
     }
 
-    if (built.length == null) {
-      throw new Error(`Length missing for element: ${built.code}`);
+    let materialQty = qty;
+
+    if (built.length) {
+      const meters = built.length / 1000;
+      materialQty = meters * material.weightPerMeter;
     }
-
-    if (batch.weightPerMeter == null) {
-      throw new Error(`weightPerMeter missing for material: ${material.code}`);
-    }
-
-    const meters = built.length / 1000;
-
-    let materialQty = meters * batch.weightPerMeter * qty;
 
     materialQty = Math.round(materialQty * 100) / 100;
 
-    result.push([
-      element.id,
-      materialId,
-      materialQty,
-      'кг',
-      now,
-      element.code,
-      material.code,
-    ]);
+    return [
+      baseRow,
+      [
+        element.id,
+        material.materialId,
+        materialQty,
+        'кг',
+        now,
+        element.code,
+        material.code,
+      ],
+    ];
   }
 
-  return result;
+  // 🔥 DEFAULT (assembly / product)
+  return [baseRow];
 }
 
 type Input = {
@@ -307,7 +202,7 @@ export function buildBOMFromTable(
         elementRepo, // ✔ виправлено
         catalogHelper,
         materialRepo,
-        materialBatchRepo,
+        // materialBatchRepo,
       );
 
       rawRows.push(...lines); // ✔ замість result
@@ -329,224 +224,6 @@ export function buildBOMFromTable(
     errorCount: errors.length,
   };
 }
-
-// export function buildBOMFromTable(
-//   parent: { code: string; prefix: string; name: string },
-//   rows: TableRowInput[],
-//   elementRepo: ElementRepository,
-//   // catalogRepo: ICatalogRepository,
-//   catalogHelper: CatalogHelper,
-//   materialRepo: MaterialRepository,
-//   materialBatchRepo: MaterialBatchRepository,
-// ) {
-//   console.log('👉 START buildBOMFromTable');
-
-//   // 🔹 Root element
-//   const root = getOrCreateAssemblyWithName(
-//     parent.code,
-//     parent.prefix,
-//     parent.name,
-//     elementRepo,
-//   );
-
-//   const parentId = root.id;
-
-//   deleteBOMTree(parentId);
-
-//   const now = new Date();
-
-//   const rawRows: any[][] = [];
-//   const errors: any[] = [];
-
-//   // for (const row of rows) {
-//   //   try {
-//   //     // 🔥 1. parse spec
-//   //     const parsed = parseSpec(row.spec);
-
-//   //     if (parsed.kind === 'assembly') {
-//   //       throw new Error('❌ Spec not parsed: ' + row.spec);
-//   //     }
-
-//   //     // 🔥 2. build
-//   //     const built = buildByKind(parsed);
-
-//   //     // 🔥 3. create element
-//   //     const element = getOrCreateElementFromBuilt(
-//   //       {
-//   //         ...built,
-//   //         prefixName: row.prefix.toLowerCase(),
-//   //       },
-//   //       elementRepo,
-//   //       catalogHelper,
-//   //       materialRepo,
-//   //       materialBatchRepo,
-//   //     );
-
-//   //     // 🔥 4. unit
-//   //     const unit = element.baseUnit;
-
-//   //     rawRows.push([parentId, element.id, row.qty, unit, now]);
-//   //   } catch (e) {
-//   //     console.error('❌ ROW ERROR:', row, e);
-//   //     errors.push(row);
-//   //   }
-//   // }
-
-//   for (const row of rows) {
-//     const lines = buildBOMRow(
-//       parentId,
-//       row,
-//       now,
-//       materialRepo,
-//       catalogHelper,
-//       materialRepo,
-//       materialBatchRepo,
-//     );
-
-//     result.push(...lines);
-//   }
-
-//   console.log('BOM ROWS:', rows);
-
-//   const aggregated = aggregateBOMRows(rawRows);
-
-//   insertBOMRows(aggregated);
-
-//   return {
-//     added: aggregated.length,
-//     errors,
-//     errorCount: errors.length,
-//   };
-// }
-
-// export function buildBOMFromTable(
-//   parent: { code: string; prefix: string; name: string },
-//   rows: TableRowInput[],
-//   repo: ElementRepository,
-//   catalogService: CatalogService,
-//   materialBatchRepo: MaterialBatchRepository,
-// ) {
-//   console.log('👉 START buildBOMFromTable');
-
-//   const root = getOrCreateAssemblyWithName(
-//     parent.code,
-//     parent.prefix,
-//     parent.name,
-//     repo,
-//   );
-
-//   const parentId = root.id;
-
-//   deleteBOMTree(parentId);
-
-//   const now = new Date();
-
-//   const rawRows: any[][] = [];
-//   const errors: any[] = [];
-
-//   // 🔥 ДОДАТИ
-//   const materialSheet = getSheetByNameSafe('05_Materials');
-//   const materialRows = materialSheet.getDataRange().getValues();
-
-//   const materialRepo = new MaterialRepository(materialRows);
-//   // const materialRepo = new MaterialRepository();
-
-//   function buildLineFromRow(row: TableRowInput): string {
-//     return `${row.prefix}; ${row.spec}; ${row.qty}`;
-//   }
-
-//   for (const row of rows) {
-//     try {
-//       const line = buildLineFromRow(row); // 🔥
-
-//       const bomRows = buildBOMRow(
-//         parentId,
-//         line,
-//         now,
-//         repo,
-//         catalogService,
-//         materialRepo,
-//         materialBatchRepo, // 🔥 додати
-//       );
-
-//       rawRows.push(...bomRows);
-//     } catch (e) {
-//       console.error('❌ ROW ERROR:', row, e);
-//       errors.push(row);
-//     }
-//   }
-//   console.log('BOM ROWS:', rows);
-
-//   const aggregated = aggregateBOMRows(rawRows);
-
-//   insertBOMRows(aggregated);
-
-//   return {
-//     added: aggregated.length,
-//     errors,
-//     errorCount: errors.length,
-//   };
-// }
-
-// export function buildBOMFromTable(
-//   parent: { code: string; prefix: string; name: string },
-//   rows: TableRowInput[],
-//   repo: ElementRepository,
-//   // catalogRepo: ICatalogRepository,
-//   catalogService: CatalogService,
-// ) {
-//   console.log('👉 START buildBOMFromTable');
-
-//   const root = getOrCreateAssemblyWithName(
-//     parent.code,
-//     parent.prefix,
-//     parent.name,
-//     repo,
-//   );
-
-//   const parentId = root.id;
-
-//   deleteBOMTree(parentId);
-
-//   const now = new Date();
-
-//   const rawRows: any[][] = [];
-//   const errors: any[] = [];
-
-//   for (const row of rows) {
-//     try {
-//       const structured = mapTableRowToStructured(row);
-
-//       const bomRows = buildBOMRow(
-//         parentId,
-//         line,
-//         now,
-//         repo,
-//         catalogService,
-//         materialRepo, // 🔥 ОБОВʼЯЗКОВО
-//       );
-
-//       rawRows.push(...bomRows);
-//     } catch (e) {
-//       console.error('❌ ROW ERROR:', row, e);
-//       errors.push(row);
-//     }
-//   }
-
-//   const aggregated = aggregateBOMRows(rawRows);
-
-//   insertBOMRows(aggregated);
-
-//   //👉 тимчасово прибери
-//   // const detector = new ProductDetector(repo);
-//   // detector.detectAndUpdate(parentId, aggregated);
-
-//   return {
-//     added: aggregated.length,
-//     errors,
-//     errorCount: errors.length,
-//   };
-// }
 
 // 🔥 допоміжна функція для визначення типу батьківського елемента
 function detectParentTypeFromInput(lines: string[]): 'product' | 'assembly' {
@@ -646,7 +323,6 @@ function extractSpecAndQty(line: string): {
     qty: 1,
   };
 }
-
 // export function buildBOMRow(
 //   parentId: string,
 //   structuredRow: StructuredLine,
