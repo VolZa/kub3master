@@ -1,16 +1,15 @@
 import { onOpen } from './main';
 import { openForm, openFormTable } from './ui/openForm';
 import { buildBOMFromText, buildBOMFromTable } from './modules/bom/bom.service';
-// import { buildBOMFromTable } from './modules/bom/bom-table.parser';
-// import { testBOM } from './dev/test-bom';
+
 import { register } from './core/register';
 
 import { GoogleSheetsElementRepository } from './modules/elements/element.repository';
 import { parseTableText } from './utils/parseTableText';
-// import { GoogleSheetsCatalogRepository } from './infrastructure/sheets/catalog/GoogleSheetsCatalogRepository';
+
 import { GoogleSheetsCatalogDataSource } from './infrastructure/sheets/catalog/GoogleSheetsCatalogDataSource';
 import { CatalogInMemoryRepository } from './modules/catalog/catalog.repository';
-import { CatalogService } from './modules/catalog/catalog.service';
+
 import { parseParent } from './modules/bom/parsers/parseParent';
 import { validateParentCode } from './modules/bom/bom.service';
 import { GoogleSheetsMaterialBatchRepository } from './domain/materials/googleSheetsMaterialBatch.repository';
@@ -19,23 +18,17 @@ import { MaterialBatchRepository } from './domain/materials/material-batch.repos
 import { GoogleSheetsMaterialDataSource } from './domain/materials/googleSheetsMaterial.datasource';
 import { GoogleSheetsMaterialBatchDataSource } from './domain/materials/googleSheetsMaterialBatch.datasource';
 import { CatalogHelper } from './modules/catalog/catalog.helper';
+import { onEditProductionJournal } from 'modules/productionJournal/productionJournal.trigger';
+import {
+  handleProductionEdit_,
+  handleKrabsEdit_,
+} from 'modules/productionJournal/productionJournal.service';
+import { testBOMExplorer } from './modules/bom/tests/test.bom-explorer';
+import { testBOMTree } from './modules/bom/tests/testBOMTree';
+import { testMaterials } from './modules/bom/tests/test-materials';
+import { testProductionRequirement } from './modules/bom/tests/test-production';
+import { testProductMatrix } from './modules/reports/tests/testProductMatrix';
 
-// import { parseTableText } from './modules/bom/utils/parseTableText';
-// import { buildBOMFromTable } from './modules/bom/bom-table.parser';
-// import { testBOM } from './dev/test-bom';
-// import { register } from './core/register';
-//from './modules/bom/utils/parseTableText';
-
-// 🔥 НОВА ФУНКЦІЯ
-// function runTableParser(parentCode: string, text: string) {
-//   const repo = new GoogleSheetsElementRepository();
-//   const catalogRepo = new GoogleSheetsCatalogDataSource();
-//   const rows = parseTableText(text);
-
-//   const count = buildBOMFromTable(rows, parentCode, repo, catalogRepo);
-
-//   return `Inserted rows: ${count}`;
-// }
 function runTableParser(parentCode: string, text: string) {
   // 🔹 Elements
   const elementRepo = new GoogleSheetsElementRepository();
@@ -80,32 +73,24 @@ function runTableParser(parentCode: string, text: string) {
   return `Inserted rows: ${count}`;
 }
 
-// function runTableParser(parentCode: string, text: string) {
-//   const repo = new GoogleSheetsElementRepository();
+function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit) {
+  if (!e.range || !e.value) return;
 
-//   const ds = new GoogleSheetsCatalogDataSource();
-//   const rowsCatalog = ds.getRows();
+  const sheet = e.range.getSheet();
 
-//   const catalogRepo = new CatalogInMemoryRepository(rowsCatalog); // ✅
-//   // console.log('🔹CATALOG ITEMS:', JSON.stringify(catalogRepo, null, 2));
-//   // 🔥 додаємо сервіс
-//   const catalogService = new CatalogService(catalogRepo);
+  if (
+    sheet.getName() === '01_Виготовлення' &&
+    e.range.getA1Notation() === 'A2'
+  ) {
+    handleProductionEdit_();
+    return;
+  }
 
-//   // 🔹 Матеріали
-//   const materialBatchRepo = new GoogleSheetsMaterialBatchRepository();
-
-//   // 🔹 Parent
-//   const parsedParent = parseParent(parentCode);
-//   validateParentCode(parsedParent.code);
-
-//   const rows = parseTableText(text);
-
-//   // console.log('PARSED ROWS:', JSON.stringify(rows, null, 2));
-//   const count = buildBOMFromTable(parsedParent, rows, repo, catalogService, materialBatchRepo);
-//   // console.log('FINAL COUNT:', count);
-
-//   return `Inserted rows: ${count}`;
-// }
+  if (sheet.getName() === '03_Краби' && e.range.getA1Notation() === 'A2') {
+    handleKrabsEdit_();
+    return;
+  }
+}
 
 // 🔥 РЕЄСТРАЦІЯ ВСЬОГО
 register({
@@ -113,8 +98,12 @@ register({
   openForm,
   openFormTable,
   buildBOMFromText,
-  // testBOM,
+  testBOMExplorer,
+  testBOMTree,
+  testMaterials,
   runTableParser,
+  testProductionRequirement,
+  testProductMatrix,
 });
 // import { onOpen } from './main';
 // import { openForm, openFormTable } from './ui/openForm';

@@ -28,14 +28,38 @@ export interface ElementShort {
   type: ElementType;
 }
 
+// export interface ElementFull {
+//   id: string;
+//   code: string;
+//   prefixName: string;
+//   name: string;
+
+//   type: ElementType;
+//   category: string;
+//   profileType?: string;
+
+//   baseUnit: string;
+
+//   parentMaterialID?: string;
+
+//   diameter?: number;
+//   className?: string;
+//   width?: number;
+//   length?: number;
+
+//   isActive: boolean;
+// }
+
 export interface ElementFull {
   id: string;
   code: string;
+
   prefixName: string;
   name: string;
 
   type: ElementType;
   category: string;
+
   profileType?: string;
 
   baseUnit: string;
@@ -44,12 +68,14 @@ export interface ElementFull {
 
   diameter?: number;
   className?: string;
+
   width?: number;
+  height?: number;
+  thickness?: number;
   length?: number;
 
   isActive: boolean;
 }
-
 export interface CreateElementDto {
   code: string;
   name: string;

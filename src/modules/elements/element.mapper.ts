@@ -31,12 +31,24 @@ export function mapElementRowToDomain(row: ElementRow): ElementFull {
   return {
     id: row.ID,
     code: row.Code,
+
     prefixName: row.PrefixName,
     name: row.Name,
+
     type: row.Type as any,
     category: row.Category,
+    profileType: row.ProfileType,
+
     baseUnit: row.BaseUnit,
+
     parentMaterialID: row.ParentMaterialID,
+
+    diameter: row.Diameter,
+    className: row.Class,
+
+    width: row.Width,
+    length: row.Length,
+
     isActive: row.IsActive ?? true,
   };
 }

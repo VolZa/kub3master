@@ -1,5 +1,6 @@
 import { getSheetByNameSafe } from '../../utils/sheets';
 import { forceText, insertRows } from '../../utils/sheets.utils';
+import { BOMRow } from './model/bom-row.model';
 
 export function insertBOMRows(rows: any[][]) {
   console.log('INPUT ROWS:', JSON.stringify(rows, null, 2));
@@ -70,7 +71,9 @@ export function insertBOMRows(rows: any[][]) {
   // 🔥 1. UPDATE батчем
   updates.forEach((u) => {
     sheet.getRange(u.rowIndex, 3).setValue(u.newQty);
-    sheet.getRange(u.rowIndex, 6, 1, 2).setValues([[u.parentCode, u.childCode]]);
+    sheet
+      .getRange(u.rowIndex, 6, 1, 2)
+      .setValues([[u.parentCode, u.childCode]]);
   });
 
   // 🔥 2. INSERT батчем (дуже важливо)
@@ -146,4 +149,38 @@ export function deleteBOMTree(parentId: string) {
 
   sheet.clearContents();
   sheet.getRange(1, 1, filtered.length, filtered[0].length).setValues(filtered);
+}
+
+// Сервіс для отримання всіх рядків BOM з листа "01_BOM"
+export function getAllBOMRows(): BOMRow[] {
+  const sheet = getSheetByNameSafe('01_BOM');
+
+  const values = sheet.getDataRange().getValues();
+
+  if (values.length <= 1) {
+    return [];
+  }
+
+  return values.slice(1).map((row) => ({
+    parentId: String(row[0]),
+    childId: String(row[1]),
+    qty: Number(row[2]),
+    unit: String(row[3]),
+
+    parentCode: String(row[5] ?? ''),
+    childCode: String(row[6] ?? ''),
+  }));
+}
+
+// Сервіс для отримання всіх дочірніх елементів (BOMRow) за ParentID
+export function getChildrenRows(parentId: string): BOMRow[] {
+  return getAllBOMRows().filter((row) => row.parentId === String(parentId));
+}
+// Сервіс для отримання всіх батьківських елементів (BOMRow) за ChildID
+export function getParentsRows(childId: string): BOMRow[] {
+  return getAllBOMRows().filter((row) => row.childId === String(childId));
+}
+
+export function hasChildren(elementId: string): boolean {
+  return getChildrenRows(elementId).length > 0;
 }

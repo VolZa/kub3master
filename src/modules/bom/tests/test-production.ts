@@ -1,0 +1,30 @@
+import { GoogleSheetsElementRepository } from '../../elements/element.repository';
+
+import { BOMExplorerService } from '../services/bom-explorer.service';
+import { BOMMaterialsService } from '../services/bom-materials.service';
+import { ProductionRequirementService } from '../services/production-requirement.service';
+
+import { GoogleSheetsMaterialDataSource } from '../../../domain/materials/googleSheetsMaterial.datasource';
+import { MaterialRepository } from '../../../domain/materials/material.repository';
+
+export function testProductionRequirement() {
+  const elementRepo = new GoogleSheetsElementRepository();
+
+  const materialDS = new GoogleSheetsMaterialDataSource();
+  const materialRepo = new MaterialRepository(materialDS.getRows());
+
+  const bomExplorer = new BOMExplorerService(elementRepo);
+
+  const bomMaterials = new BOMMaterialsService(bomExplorer, materialRepo);
+
+  const service = new ProductionRequirementService(bomMaterials);
+
+  const result = service.calculate([
+    {
+      productId: '2024', // П-1.1
+      qty: 10,
+    },
+  ]);
+
+  console.log(JSON.stringify(result, null, 2));
+}

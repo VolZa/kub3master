@@ -36,16 +36,7 @@ export class MaterialRepository {
 
     return m || null;
   }
-  // findRebar(diameter: number, rebarClass: string): Material | null {
-  //   return (
-  //     this.materials.find(
-  //       (m) =>
-  //         m.profileType === 'rebar' &&
-  //         m.diameter === diameter &&
-  //         normalizeClassName(m.class) === normalizeClassName(rebarClass || ''),
-  //     ) || null
-  //   );
-  // }
+
   // -----------------------------
   // 🪵 PLATE
   // -----------------------------
@@ -88,67 +79,6 @@ export class MaterialRepository {
       ) || null
     );
   }
-  // 🧱 PIPE з додатковими логами
-  // findPipe(diameter: number, thickness: number): Material | null {
-  //   console.log(
-  //     'SEARCH PIPE:',
-  //     diameter,
-  //     typeof diameter,
-  //     thickness,
-  //     typeof thickness,
-  //   );
-
-  //   this.materials.forEach((m) => {
-  //     if (m.profileType === 'pipe_round') {
-  //       console.log(
-  //         'PIPE CHECK:',
-  //         m.code,
-  //         m.diameter,
-  //         typeof m.diameter,
-  //         m.thickness,
-  //         typeof m.thickness,
-  //       );
-  //     }
-  //   });
-
-  //   return (
-  //     this.materials.find(
-  //       (m) =>
-  //         m.profileType === 'pipe_round' &&
-  //         m.diameter === diameter &&
-  //         m.thickness === thickness,
-  //     ) || null
-  //   );
-  // }
-
-  // -----------------------------
-  // 🔥 UNIVERSAL
-  // -----------------------------
-  // findBySpec(spec: {
-  //   profileType?: string;
-  //   diameter?: number;
-  //   class?: string;
-  //   width?: number;
-  //   height?: number;
-  //   thickness?: number;
-  // }): Material | null {
-  //   switch (spec.profileType) {
-  //     case 'rebar':
-  //       return this.findRebar(spec.diameter!, spec.class!);
-
-  //     case 'plate':
-  //       return this.findPlate(spec.width!, spec.thickness!);
-
-  //     case 'angle':
-  //       return this.findAngle(spec.width!, spec.height!, spec.thickness!);
-
-  //     case 'pipe_round':
-  //       return this.findPipe(spec.diameter!, spec.thickness!);
-
-  //     default:
-  //       return null;
-  //   }
-  // }
 
   findBySpec(spec: {
     category?: string;
@@ -197,9 +127,7 @@ export class MaterialRepository {
         return null;
     }
   }
-  // findByCode(code: string): Material | null {
-  //   return this.materials.find((m) => m.code === code) || null;
-  // }
+
   findByCode(code: string): Material | null {
     const normalizedInput = normalizeCode(code);
 
