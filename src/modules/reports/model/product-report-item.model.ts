@@ -1,4 +1,4 @@
-export interface ReportCell {
+export interface ProductReportItem {
   materialId: string;
 
   materialCode: string;

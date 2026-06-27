@@ -41,8 +41,9 @@ export class BOMMaterialsService {
       } else {
         result.set(material.id, {
           materialId: material.id,
-          materialCode: material.code,
-          materialName: material.name,
+          //?
+          // materialCode: material.code,
+          // materialName: material.name,
 
           qty: node.totalQty,
 
@@ -90,8 +91,8 @@ export class BOMMaterialsService {
       } else {
         result.set(material.id, {
           materialId: material.id,
-          materialCode: material.code,
-          materialName: material.name,
+          // materialCode: material.code,
+          // materialName: material.name,
 
           qty: qtyKg,
 

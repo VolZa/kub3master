@@ -36,10 +36,11 @@ export function testProductMatrix() {
   const matrixService = new ProductMatrixService(
     elementRepo,
     materialService,
+    materialRepo,
     reportRepo,
   );
 
-  const matrix = matrixService.getProductMatrix('2024'); // П-1.1
+  const matrix = matrixService.getProductReportData('2024'); // П-1.1
 
   console.log(JSON.stringify(matrix, null, 2));
   materialRepo.getAll().forEach((m) => {

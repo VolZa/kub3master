@@ -1,49 +1,26 @@
 import { ReportColumn } from '../model/report-column.model';
 
-import { normalizeCode } from '../../../utils/normalize';
-
-// findByMaterialCode(code: string): ReportColumn | null {
-//   const normalized = normalizeCode(code);
-
-//   return (
-//     this.columns.find(
-//       (c) =>
-//         c.isActive &&
-//         normalizeCode(c.materialCode) === normalized,
-//     ) ?? null
-//   );
-// }
+// import { normalizeCode } from '../../../utils/normalize';
 
 export class ReportColumnRepository {
   constructor(private readonly columns: ReportColumn[]) {}
 
-  // findByMaterialCode(code: string): ReportColumn | null {
-  //   return (
-  //     this.columns.find((c) => c.isActive && c.materialCode === code) ?? null
-  //   );
-  // }
-  findByMaterialCode(code: string): ReportColumn | null {
-    const normalized = normalizeCode(code);
-
-    return (
-      this.columns.find(
-        (c) => c.isActive && normalizeCode(c.materialCode) === normalized,
-      ) ?? null
-    );
+  findByMaterialId(id: string): ReportColumn | null {
+    return this.columns.find((c) => c.isActive && c.materialId === id) ?? null;
   }
 
+  getActiveColumns(): ReportColumn[] {
+    return this.columns
+      .filter((c) => c.isActive)
+      .sort((a, b) => a.sort - b.sort);
+  }
   // findByMaterialCode(code: string): ReportColumn | null {
-  //   console.log('LOOKUP:', code);
+  //   const normalized = normalizeCode(code);
 
-  //   const found =
-  //     this.columns.find((c) => c.isActive && c.materialCode === code) ?? null;
-
-  //   console.log('FOUND:', found);
-
-  //   return found;
-  // }
-
-  // getAll(): ReportColumn[] {
-  //   return [...this.columns].sort((a, b) => a.sort - b.sort);
+  //   return (
+  //     this.columns.find(
+  //       (c) => c.isActive && normalizeCode(c.materialCode) === normalized,
+  //     ) ?? null
+  //   );
   // }
 }

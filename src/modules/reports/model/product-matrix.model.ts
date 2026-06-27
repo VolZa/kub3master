@@ -1,6 +1,6 @@
 import { ReportCell } from './report-cell.model';
 
-export interface ProductMatrix {
+export interface ProductReportData {
   productCode: string;
   productName: string;
 

@@ -1,14 +1,15 @@
-export interface ReportCell {
+export interface ReportLayoutColumn {
   materialId: string;
 
   materialCode: string;
-  materialName: string;
 
   reportGroup: string;
   reportColumn: string;
 
-  qty: number;
-  unit: string;
-
   sort: number;
+  decimals: number;
+
+  isActive: boolean;
+
+  comment?: string;
 }

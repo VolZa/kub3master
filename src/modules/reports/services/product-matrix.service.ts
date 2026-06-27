@@ -1,17 +1,19 @@
 import { BOMMaterialsService } from '../../bom/services/bom-materials.service';
 import { ElementRepository } from '../../elements/element.repository';
 import { ReportColumnRepository } from '../repository/report-column.repository';
-import { ProductMatrix } from '../model/product-matrix.model';
+import { ProductReportData } from '../model/product-matrix.model';
 import { normalizeCode } from 'utils/normalize';
+import { MaterialRepository } from 'domain/materials/material.repository';
 
 export class ProductMatrixService {
   constructor(
     private readonly elementRepo: ElementRepository,
     private readonly materialsService: BOMMaterialsService,
+    private readonly materialRepo: MaterialRepository,
     private readonly reportColumnRepo: ReportColumnRepository,
   ) {}
 
-  getProductMatrix(productId: string): ProductMatrix {
+  getProductReportData(productId: string): ProductReportData {
     const product = this.elementRepo.findById(productId);
 
     if (!product) {
@@ -22,21 +24,31 @@ export class ProductMatrixService {
 
     const cells = materials
       .map((material) => {
-        const column = this.reportColumnRepo.findByMaterialCode(
-          material.materialCode,
+        // const column = this.reportColumnRepo.findByMaterialCode(
+        //   material.materialCode,
+        // );
+        const column = this.reportColumnRepo.findByMaterialId(
+          material.materialId,
         );
 
         if (!column) {
           return null;
         }
+        const materialInfo = this.materialRepo.findById(material.materialId);
+
+        if (!materialInfo) {
+          return null;
+        }
 
         return {
-          materialCode: normalizeCode(material.materialCode),
+          materialId: material.materialId,
+          materialCode: normalizeCode(materialInfo.code),
+          materialName: materialInfo.name,
 
           reportGroup: column.reportGroup,
           reportColumn: column.reportColumn,
 
-          qty: material.qty,
+          qty: Number(material.qty.toFixed(column.decimals)),
           unit: material.unit,
 
           sort: column.sort,
