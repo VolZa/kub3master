@@ -1,0 +1,36 @@
+// src/modules/placement/placement.factory.ts
+//Для майбутнього використання, якщо знадобиться створювати Placement з DTO
+import { Placement } from './placement.model';
+import { PlacementStatus } from './placement.status';
+
+export interface CreatePlacementDto {
+  id: number;
+  houseId: string;
+  productCode: string;
+
+  section: string;
+  floor: number;
+  axis: string;
+
+  priority?: number;
+}
+
+export function createPlacement(dto: CreatePlacementDto): Placement {
+  return {
+    id: dto.id,
+
+    houseId: dto.houseId,
+
+    productCode: dto.productCode,
+
+    location: {
+      section: dto.section,
+      floor: dto.floor,
+      axis: dto.axis,
+    },
+
+    status: PlacementStatus.NONE,
+
+    priority: dto.priority ?? 0,
+  };
+}
