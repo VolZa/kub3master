@@ -14,10 +14,10 @@ export function createColumnMap(headers: string[]) {
 }
 
 export function getValue(
-  row: any[],
+  row: readonly unknown[],
   map: Record<string, number>,
   field: string,
-) {
+): unknown {
   const index = map[field];
 
   if (index === undefined) {
@@ -25,4 +25,8 @@ export function getValue(
   }
 
   return row[index];
+}
+
+export function hasColumn(map: Record<string, number>, field: string): boolean {
+  return field in map;
 }

@@ -3,7 +3,6 @@ import { openForm, openFormTable } from './ui/openForm';
 import { buildBOMFromText, buildBOMFromTable } from './modules/bom/bom.service';
 import { register } from './core/register';
 import { parseTableText } from './utils/parseTableText';
-import { ICatalogRepository } from './modules/catalog/catalog.repository.interface';
 import { parseParent } from './modules/bom/parsers/parseParent';
 import { validateParentCode } from './modules/bom/bom.service';
 import { CatalogHelper } from './modules/catalog/catalog.helper';
@@ -84,45 +83,3 @@ register({
   testProductionRequirement,
   testProductReport,
 });
-// import { onOpen } from './main';
-// import { openForm, openFormTable } from './ui/openForm';
-// import { buildBOMFromText } from './modules/bom/bom.service';
-// import { testBOM } from './dev/test-bom';
-// import { register } from './core/register';
-
-// register({
-//   onOpen,
-//   openForm,
-//   openFormTable,
-//   buildBOMFromText,
-//   testBOM,
-// });
-
-// import { onOpen } from './main';
-// import { openForm } from './ui/openForm';
-// import { buildBOMFromText } from './modules/bom/bom.service';
-
-// import { testBOM } from './dev/test-bom';
-// import { register } from './core/register';
-
-// register({
-//   testBOM,
-// });
-// // 🔥 експортуємо в глобал
-// (globalThis as any).onOpen = onOpen;
-// (globalThis as any).openForm = openForm;
-// (globalThis as any).buildBOMFromText = buildBOMFromText;
-
-// import { onOpen } from './main';
-// import { openForm } from './ui/openForm';
-
-// // 🔥 просто виклик, без globalThis
-// onOpen;
-// openForm;
-//==========
-
-// import { onOpen } from './main';
-// import { openForm } from './ui/openForm';
-
-// (globalThis as any).onOpen = onOpen;
-// (globalThis as any).openForm = openForm;

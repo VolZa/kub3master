@@ -11,7 +11,6 @@ import { sheetProvider } from '../../../app/factories/infrastructure.factory';
 export function testProductionRequirement() {
   const elementRepo = new GoogleSheetsElementRepository();
 
-  // const materialDS = new GoogleSheetsMaterialDataSource();
   const materialDS = new GoogleSheetsMaterialDataSource(sheetProvider);
   const materialRepo = new MaterialRepository(materialDS.getRows());
 

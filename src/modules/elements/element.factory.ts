@@ -2,7 +2,6 @@ import { ParsedSpec } from '../bom/model/parsed-spec.model';
 import { ElementRepository } from './element.repository';
 import { ElementShort, ElementFull, ElementRow } from './element.model';
 import { buildByKind } from './builders/builder.dispatcher';
-// import { buildElementRow } from './element.mapper';
 import { generateIdByType } from '../../utils/id';
 import {
   addElementToCache,
@@ -10,20 +9,10 @@ import {
 } from '../../services/cache.service';
 import { toShort } from './element.mapper';
 import { BuiltElement, BuiltElementExtended } from './element.builder';
-import { getOrCreateMaterialFromPart } from '../../domain/materials/material.service';
-import {
-  ELEMENT_TYPES,
-  ElementType,
-  MaterialCategory,
-} from '../../config/config';
-import { CatalogService } from '../catalog/catalog.service';
-import { getOrCreateMaterialFromCode } from './material.service';
+
 import { MaterialRepository } from '../../domain/materials/material.repository';
-import { ICatalogRepository } from '../catalog/catalog.repository.interface';
 import { MaterialBatchRepository } from '../../domain/materials/material-batch.repository';
 import { CatalogHelper } from '../catalog/catalog.helper';
-import { normalizeMaterialCode } from './utils/code.util';
-import { normalizeClassName } from 'utils/normalize';
 import { MaterialResolver } from 'domain/materials/material.resolver';
 
 export function getOrCreateElementFromBuilt(

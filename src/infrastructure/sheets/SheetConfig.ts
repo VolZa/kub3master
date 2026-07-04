@@ -18,4 +18,9 @@ export const SheetConfig: Record<SheetKey, SheetDefinition> = {
     spreadsheet: SpreadsheetKey.MASTER,
     name: '05_Materials',
   },
+  PLACEMENT: {
+    key: SheetKey.PLACEMENT,
+    spreadsheet: SpreadsheetKey.MASTER,
+    name: '13_Placement',
+  },
 };

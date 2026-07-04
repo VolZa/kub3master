@@ -14,17 +14,3 @@ export class GoogleSheetsMaterialBatchRepository extends MaterialBatchRepository
     super(rows);
   }
 }
-
-// import { SheetProvider } from '../SheetProvider';
-// import { SheetKey } from '../SheetKey';
-
-// export class MaterialBatchRepository {
-//   constructor(private readonly sheetProvider: SheetProvider) {}
-
-//   getRows(): unknown[][] {
-//     return this.sheetProvider
-//       .get(SheetKey.MATERIAL_BATCHES)
-//       .getDataRange()
-//       .getValues();
-//   }
-// }
