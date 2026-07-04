@@ -1,15 +1,17 @@
 import { CatalogInMemoryRepository } from '../../modules/catalog/catalog.repository';
+// import { CatalogRepository } from '../../infrastructure/sheets/catalog/GoogleSheetsCatalogDataSource';
 import { GoogleSheetsCatalogDataSource } from '../../infrastructure/sheets/catalog/GoogleSheetsCatalogDataSource';
 
-let instance: CatalogInMemoryRepository | null = null;
+import { sheetProvider } from './infrastructure.factory';
+
+let repository: CatalogInMemoryRepository | null = null;
 
 export function getCatalogRepository(): CatalogInMemoryRepository {
-  if (!instance) {
-    const ds = new GoogleSheetsCatalogDataSource();
-    const rows = ds.getRows();
+  if (!repository) {
+    const dataSource = new GoogleSheetsCatalogDataSource(sheetProvider);
 
-    instance = new CatalogInMemoryRepository(rows);
+    repository = new CatalogInMemoryRepository(dataSource.getRows());
   }
 
-  return instance;
+  return repository;
 }

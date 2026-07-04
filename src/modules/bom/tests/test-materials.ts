@@ -1,17 +1,18 @@
 import { GoogleSheetsElementRepository } from '../../elements/element.repository';
 
-import { GoogleSheetsMaterialDataSource } from '../../../domain/materials/googleSheetsMaterial.datasource';
+import { GoogleSheetsMaterialDataSource } from '../../../infrastructure/sheets/materials/GoogleSheetsMaterialDataSource';
 
 import { MaterialRepository } from '../../../domain/materials/material.repository';
 
 import { BOMExplorerService } from '../services/bom-explorer.service';
 
 import { BOMMaterialsService } from '../services/bom-materials.service';
+import { sheetProvider } from 'app/factories/infrastructure.factory';
 
 export function testMaterials() {
   const elementRepo = new GoogleSheetsElementRepository();
 
-  const materialDS = new GoogleSheetsMaterialDataSource();
+  const materialDS = new GoogleSheetsMaterialDataSource(sheetProvider);
 
   const materialRepo = new MaterialRepository(materialDS.getRows());
 

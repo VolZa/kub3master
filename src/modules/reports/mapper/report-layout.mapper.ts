@@ -1,7 +1,7 @@
 import { normalizeCode } from '../../../utils/normalize';
 import { ReportLayoutColumn } from '../model/report-layout-column.model';
 
-export function mapRowsToReportColumns(rows: any[][]): ReportLayoutColumn[] {
+export function mapRowsToReportLayout(rows: any[][]): ReportLayoutColumn[] {
   const headers = rows[0];
   const data = rows.slice(1);
 

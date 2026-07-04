@@ -13,14 +13,14 @@ import { buildByKind } from '../../modules/elements/builders/builder.dispatcher'
 import { parseParent } from './parsers/parseParent';
 import { getOrCreateAssemblyWithName } from '../elements/assembly.service';
 import { CatalogInMemoryRepository } from '../catalog/catalog.repository';
-import { GoogleSheetsCatalogDataSource } from '../../infrastructure/sheets/catalog/GoogleSheetsCatalogDataSource';
+// import { CatalogRepository } from '../../infrastructure/sheets/catalog/CatalogRepository';
 
 import { MaterialRepository } from '../../domain/materials/material.repository';
 import { MaterialBatchRepository } from '../../domain/materials/material-batch.repository';
 import { getOrCreateElementFromBuilt } from '../elements/element.factory';
 import { CatalogHelper } from '../catalog/catalog.helper';
-import { GoogleSheetsMaterialBatchDataSource } from '../../domain/materials/googleSheetsMaterialBatch.datasource';
-import { GoogleSheetsMaterialDataSource } from '../../domain/materials/googleSheetsMaterial.datasource';
+// import { MaterialBatchRepository } from '../../infrastructure/sheets/materials/MaterialBatchRepository';
+// import { GoogleSheetsMaterialDataSource } from '../../domain/materials/googleSheetsMaterial.datasource';
 import { buildAssemblyName } from 'modules/elements/builders/name.builder';
 
 export function buildBOMRow(
@@ -231,47 +231,83 @@ function detectParentTypeFromInput(lines: string[]): 'product' | 'assembly' {
     ? 'product'
     : 'assembly';
 }
+import {
+  getCatalogRepository,
+  getElementRepository,
+  getMaterialBatchRepository,
+  getMaterialRepository,
+} from '../../app/factories';
 
 export function buildBOMFromText(data: Input) {
   console.log('🔥 START buildBOMFromText');
 
-  const repo = new GoogleSheetsElementRepository();
+  const elementRepo = getElementRepository();
 
-  const ds = new GoogleSheetsCatalogDataSource();
-  const rowsCatalog = ds.getRows();
-
-  const catalogRepo = new CatalogInMemoryRepository(rowsCatalog);
-
-  // 🔥 новий шар
+  const catalogRepo = getCatalogRepository();
   const catalogHelper = new CatalogHelper(catalogRepo);
+
+  const materialRepo = getMaterialRepository();
+
+  const materialBatchRepo = getMaterialBatchRepository();
 
   // 🔹 Parent
   const parsedParent = parseParent(data.parentCode);
   validateParentCode(parsedParent.code);
 
+  // 🔹 Table
   const tableRows = parseTableText(data.specification);
 
   console.log('TABLE ROWS:', JSON.stringify(tableRows, null, 2));
 
-  // 🔥 передаємо service, а не repo
-
-  const materialDS = new GoogleSheetsMaterialDataSource();
-  const materialRepo = new MaterialRepository(materialDS.getRows());
-
-  const materialBatchDS = new GoogleSheetsMaterialBatchDataSource();
-  const materialBatchRepo = new MaterialBatchRepository(
-    materialBatchDS.getRows(),
-  );
   return buildBOMFromTable(
     parsedParent,
     tableRows,
-    repo,
-    catalogHelper, // ✔
-    materialRepo, // ✔
-    materialBatchRepo, // ✔
+    elementRepo,
+    catalogHelper,
+    materialRepo,
+    materialBatchRepo,
   );
-  // return buildBOMFromTable(parsedParent, tableRows, repo, catalogService);
 }
+// export function buildBOMFromText(data: Input) {
+//   console.log('🔥 START buildBOMFromText');
+
+//   const repo = new GoogleSheetsElementRepository();
+
+//   const ds = new CatalogRepository();
+//   const rowsCatalog = ds.getRows();
+
+//   const catalogRepo = new CatalogInMemoryRepository(rowsCatalog);
+
+//   // 🔥 новий шар
+//   const catalogHelper = new CatalogHelper(catalogRepo);
+
+//   // 🔹 Parent
+//   const parsedParent = parseParent(data.parentCode);
+//   validateParentCode(parsedParent.code);
+
+//   const tableRows = parseTableText(data.specification);
+
+//   console.log('TABLE ROWS:', JSON.stringify(tableRows, null, 2));
+
+//   // 🔥 передаємо service, а не repo
+
+//   const materialDS = new GoogleSheetsMaterialDataSource();
+//   const materialRepo = new MaterialRepository(materialDS.getRows());
+
+//   const materialBatchDS = new MaterialBatchRepository();
+//   const materialBatchRepo = new MaterialBatchRepository(
+//     materialBatchDS.getRows(),
+//   );
+//   return buildBOMFromTable(
+//     parsedParent,
+//     tableRows,
+//     repo,
+//     catalogHelper, // ✔
+//     materialRepo, // ✔
+//     materialBatchRepo, // ✔
+//   );
+//   // return buildBOMFromTable(parsedParent, tableRows, repo, catalogService);
+// }
 
 export function aggregateBOMRows(rows: any[][]): any[][] {
   const map = new Map<string, any[]>();

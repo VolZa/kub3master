@@ -1,24 +1,12 @@
 import { onOpen } from './main';
 import { openForm, openFormTable } from './ui/openForm';
 import { buildBOMFromText, buildBOMFromTable } from './modules/bom/bom.service';
-
 import { register } from './core/register';
-
-import { GoogleSheetsElementRepository } from './modules/elements/element.repository';
 import { parseTableText } from './utils/parseTableText';
-
-import { GoogleSheetsCatalogDataSource } from './infrastructure/sheets/catalog/GoogleSheetsCatalogDataSource';
-import { CatalogInMemoryRepository } from './modules/catalog/catalog.repository';
-
+import { ICatalogRepository } from './modules/catalog/catalog.repository.interface';
 import { parseParent } from './modules/bom/parsers/parseParent';
 import { validateParentCode } from './modules/bom/bom.service';
-import { GoogleSheetsMaterialBatchRepository } from './domain/materials/googleSheetsMaterialBatch.repository';
-import { MaterialRepository } from './domain/materials/material.repository';
-import { MaterialBatchRepository } from './domain/materials/material-batch.repository';
-import { GoogleSheetsMaterialDataSource } from './domain/materials/googleSheetsMaterial.datasource';
-import { GoogleSheetsMaterialBatchDataSource } from './domain/materials/googleSheetsMaterialBatch.datasource';
 import { CatalogHelper } from './modules/catalog/catalog.helper';
-import { onEditProductionJournal } from 'modules/productionJournal/productionJournal.trigger';
 import {
   handleProductionEdit_,
   handleKrabsEdit_,
@@ -27,29 +15,20 @@ import { testBOMExplorer } from './modules/bom/tests/test.bom-explorer';
 import { testBOMTree } from './modules/bom/tests/testBOMTree';
 import { testMaterials } from './modules/bom/tests/test-materials';
 import { testProductionRequirement } from './modules/bom/tests/test-production';
-import { testProductMatrix } from './modules/reports/tests/testProductMatrix';
+import { testProductReport } from './modules/reports/tests/testProductReport';
+import { getElementRepository } from './app/factories/element.factory';
+import { getCatalogRepository } from './app/factories/catalog.factory';
+import { getMaterialRepository } from './app/factories/material.factory';
+import { getMaterialBatchRepository } from './app/factories/materialBatch.factory';
 
 function runTableParser(parentCode: string, text: string) {
-  // 🔹 Elements
-  const elementRepo = new GoogleSheetsElementRepository();
+  const elementRepo = getElementRepository();
 
-  // 🔹 Catalog
-  const catalogDS = new GoogleSheetsCatalogDataSource();
-  const catalogRows = catalogDS.getRows();
+  const catalogRepo = getCatalogRepository();
 
-  const catalogRepo = new CatalogInMemoryRepository(catalogRows);
+  const materialRepo = getMaterialRepository();
 
-  // 🔹 Materials (05_Materials)
-  const materialDS = new GoogleSheetsMaterialDataSource();
-  const materialRows = materialDS.getRows();
-
-  const materialRepo = new MaterialRepository(materialRows);
-
-  // 🔹 Material Batches
-  const materialBatchDS = new GoogleSheetsMaterialBatchDataSource();
-  const materialBatchRows = materialBatchDS.getRows();
-
-  const materialBatchRepo = new MaterialBatchRepository(materialBatchRows);
+  const materialBatchRepo = getMaterialBatchRepository();
 
   // 🔹 Parent
   const parsedParent = parseParent(parentCode);
@@ -103,7 +82,7 @@ register({
   testMaterials,
   runTableParser,
   testProductionRequirement,
-  testProductMatrix,
+  testProductReport,
 });
 // import { onOpen } from './main';
 // import { openForm, openFormTable } from './ui/openForm';

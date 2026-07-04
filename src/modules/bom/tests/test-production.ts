@@ -4,13 +4,15 @@ import { BOMExplorerService } from '../services/bom-explorer.service';
 import { BOMMaterialsService } from '../services/bom-materials.service';
 import { ProductionRequirementService } from '../services/production-requirement.service';
 
-import { GoogleSheetsMaterialDataSource } from '../../../domain/materials/googleSheetsMaterial.datasource';
+import { GoogleSheetsMaterialDataSource } from '../../../infrastructure/sheets/materials/GoogleSheetsMaterialDataSource';
 import { MaterialRepository } from '../../../domain/materials/material.repository';
+import { sheetProvider } from '../../../app/factories/infrastructure.factory';
 
 export function testProductionRequirement() {
   const elementRepo = new GoogleSheetsElementRepository();
 
-  const materialDS = new GoogleSheetsMaterialDataSource();
+  // const materialDS = new GoogleSheetsMaterialDataSource();
+  const materialDS = new GoogleSheetsMaterialDataSource(sheetProvider);
   const materialRepo = new MaterialRepository(materialDS.getRows());
 
   const bomExplorer = new BOMExplorerService(elementRepo);

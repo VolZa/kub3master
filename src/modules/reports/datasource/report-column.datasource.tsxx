@@ -1,4 +1,4 @@
-import { getSheetByNameSafe } from '../../utils/sheets';
+import { getSheetByNameSafe } from '../../../utils/sheets';
 
 export class GoogleSheetsReportColumnDataSource {
   getRows(): any[][] {
