@@ -7,6 +7,7 @@ function normalizeBoolean(v: any): boolean {
 }
 
 export function mapRowsToMaterials(rows: any[][]): Material[] {
+  console.log('HEADERS:', JSON.stringify(rows[0]));
   const headers = rows[0];
   const data = rows.slice(1);
 
