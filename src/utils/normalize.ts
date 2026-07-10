@@ -127,3 +127,15 @@ export function normalizeClassName(value: string): string {
     .replace(/\s+/g, '')
     .trim();
 }
+
+export function normalizeProductCode(value: string): string {
+  const normalized = normalizeToLatin(value).replace(/\s+/g, '');
+
+  const match = normalized.match(/^П[-.]?(\d+)(?:[.-]?(\d+))?$/);
+
+  if (!match) {
+    return normalized;
+  }
+
+  return match[2] ? `П-${match[1]}.${match[2]}` : `П-${match[1]}`;
+}

@@ -11,16 +11,22 @@ export abstract class GoogleSheetsDataSource {
     return this.sheetProvider.get(this.sheetKey).getDataRange().getValues();
   }
 
-  replaceRows(rows: unknown[][]): void {
+  replaceRows(rows: unknown[][], startRow = 2): void {
     const sheet = this.sheetProvider.get(this.sheetKey);
 
-    sheet.clearContents();
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow >= startRow) {
+      sheet
+        .getRange(startRow, 1, lastRow - startRow + 1, sheet.getLastColumn())
+        .clearContent();
+    }
 
     if (!rows.length) {
       return;
     }
 
-    sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+    sheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
   }
 
   appendRow(row: unknown[]): void {

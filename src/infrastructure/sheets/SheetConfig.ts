@@ -23,4 +23,20 @@ export const SheetConfig: Record<SheetKey, SheetDefinition> = {
     spreadsheet: SpreadsheetKey.MASTER,
     name: '13_Placement',
   },
+  SHIFT_PLANS: {
+    key: SheetKey.SHIFT_PLANS,
+    spreadsheet: SpreadsheetKey.MASTER,
+    name: '14_ShiftPlans',
+  },
+  SHIFT_PLAN_ITEMS: {
+    key: SheetKey.SHIFT_PLAN_ITEMS,
+    spreadsheet: SpreadsheetKey.MASTER,
+    name: '15_ShiftPlanItems',
+  },
+
+  PRODUCTION: {
+    key: SheetKey.PRODUCTION,
+    spreadsheet: SpreadsheetKey.OPERATIONAL,
+    name: '01_Виготовлення',
+  },
 };

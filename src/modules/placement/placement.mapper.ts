@@ -56,41 +56,6 @@ export function mapSheetRowToPlacement(
   };
 }
 
-// export function mapSheetRowToPlacement(
-//   row: readonly unknown[],
-//   headerMap: Record<string, number>,
-// ): Placement {
-//   const value = (column: keyof PlacementRow): unknown => row[headerMap[column]];
-
-//   return {
-//     id: Number(value('PlacementId')),
-
-//     houseId: String(value('HouseId') ?? ''),
-
-//     productCode: String(value('ProductCode') ?? ''),
-
-//     location: {
-//       section: String(value('Section') ?? ''),
-//       floor: Number(value('Floor') ?? 0),
-//       axis: String(value('Axis') ?? ''),
-//     },
-
-//     status: toStatus(value('Status')),
-
-//     priority: Number(value('Priority') ?? 0),
-
-//     scheduledDate: toDate(value('ScheduledDate')),
-//     scheduledShift: toNumber(value('ScheduledShift')),
-
-//     producedDate: toDate(value('ProducedDate')),
-//     producedShift: toNumber(value('ProducedShift')),
-
-//     shippedDate: toDate(value('ShippedDate')),
-
-//     comment: String(value('Comment') ?? ''),
-//   };
-// }
-
 /**
  * Перетворює Placement у PlacementRow.
  */
@@ -133,6 +98,35 @@ export function mapPlacementsToRows(
 
 /* -------------------------------------------------------------------------- */
 
+export function mapPlacementToSheetRow(
+  placement: Placement,
+): (string | number | Date)[] {
+  return [
+    placement.id,
+    placement.houseId,
+
+    placement.location.section,
+    placement.location.floor,
+    placement.location.axis,
+
+    placement.productCode,
+
+    placement.status,
+
+    placement.priority,
+
+    placement.scheduledDate ?? '',
+    placement.scheduledShift ?? '',
+
+    placement.producedDate ?? '',
+    placement.producedShift ?? '',
+
+    placement.shippedDate ?? '',
+
+    placement.comment ?? '',
+  ];
+}
+
 function toStatus(value: unknown): PlacementStatus {
   if (value === '' || value == null) {
     return PlacementStatus.NONE;
@@ -152,81 +146,3 @@ function toNumber(value: unknown): number | undefined {
 
   return Number(value);
 }
-// import { Placement, PlacementLocation } from './placement.model';
-// import { PlacementStatus } from './placement.status';
-
-// import { PlacementRow } from './placement.row';
-
-// /**
-//  * Google Sheets Row -> Domain
-//  */
-// export function mapRowToPlacement(row: PlacementRow): Placement {
-//   const location: PlacementLocation = {
-//     section: row.Section,
-//     floor: row.Floor,
-//     axis: row.Axis,
-//   };
-
-//   return {
-//     id: row.PlacementId,
-
-//     houseId: row.HouseId,
-
-//     productCode: row.ProductCode,
-
-//     location,
-
-//     status: toStatus(row.Status),
-
-//     priority: row.Priority ?? 0,
-
-//     scheduledDate: row.ScheduledDate,
-//     scheduledShift: row.ScheduledShift,
-
-//     producedDate: row.ProducedDate,
-//     producedShift: row.ProducedShift,
-
-//     shippedDate: row.ShippedDate,
-
-//     comment: row.Comment,
-//   };
-// }
-
-// function toStatus(value: unknown): PlacementStatus {
-//   if (!value) {
-//     return PlacementStatus.NONE;
-//   }
-
-//   return value as PlacementStatus;
-// }
-
-// /**
-//  * Domain -> Google Sheets Row
-//  */
-// export function mapPlacementToRow(item: Placement): PlacementRow {
-//   return {
-//     PlacementId: item.id,
-
-//     HouseId: item.houseId,
-
-//     Section: item.location.section,
-//     Floor: item.location.floor,
-//     Axis: item.location.axis,
-
-//     ProductCode: item.productCode,
-
-//     Status: item.status,
-
-//     Priority: item.priority,
-
-//     ScheduledDate: item.scheduledDate,
-//     ScheduledShift: item.scheduledShift,
-
-//     ProducedDate: item.producedDate,
-//     ProducedShift: item.producedShift,
-
-//     ShippedDate: item.shippedDate,
-
-//     Comment: item.comment,
-//   };
-// }

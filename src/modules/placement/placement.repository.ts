@@ -1,11 +1,16 @@
 import { Placement } from './placement.model';
 import { PlacementStatus } from './placement.status';
 import { IPlacementRepository } from './placement.repository.interface';
+import { mapPlacementToSheetRow } from './placement.mapper';
+import { IPlacementDataSource } from 'infrastructure/sheets/placement/placement-data-source.interface';
 
 export class PlacementInMemoryRepository implements IPlacementRepository {
   private readonly items: Placement[];
 
-  constructor(items: Placement[]) {
+  constructor(
+    items: Placement[],
+    private readonly dataSource: IPlacementDataSource,
+  ) {
     this.items = [...items];
   }
 
@@ -27,10 +32,16 @@ export class PlacementInMemoryRepository implements IPlacementRepository {
     this.items[index] = item;
   }
 
-  saveAll(items: Placement[]): void {
-    this.items.length = 0;
-    this.items.push(...items);
+  save(): void {
+    const rows = this.items.map(mapPlacementToSheetRow);
+
+    this.dataSource.saveRows(rows);
   }
+
+  // saveAll(items: Placement[]): void {
+  //   this.items.length = 0;
+  //   this.items.push(...items);
+  // }
 
   findNextForProduction(productCode: string): Placement | null {
     return (

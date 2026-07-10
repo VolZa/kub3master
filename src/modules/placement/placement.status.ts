@@ -8,4 +8,6 @@ export enum PlacementStatus {
   SHIPPED = 'SHIPPED',
 
   INSTALLED = 'INSTALLED',
+
+  REJECTED = 'REJECTED',
 }

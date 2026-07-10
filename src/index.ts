@@ -1,5 +1,5 @@
 import { onOpen } from './main';
-import { openForm, openFormTable } from './ui/openForm';
+import { openFormTable } from './ui/openForm';
 import { buildBOMFromText, buildBOMFromTable } from './modules/bom/bom.service';
 import { register } from './core/register';
 import { parseTableText } from './utils/parseTableText';
@@ -19,6 +19,9 @@ import { getElementRepository } from './app/factories/element.factory';
 import { getCatalogRepository } from './app/factories/catalog.factory';
 import { getMaterialRepository } from './app/factories/material.factory';
 import { getMaterialBatchRepository } from './app/factories/materialBatch.factory';
+import { previewProductionSynchronization } from './debug/production-synchronization.debug';
+import { productionSynchronizationSmokeTest } from './debug/production-synchronization.smoke';
+import { analyzeProduction, executeProduction } from './menu/production.menu';
 
 function runTableParser(parentCode: string, text: string) {
   const elementRepo = getElementRepository();
@@ -72,8 +75,9 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit) {
 
 // 🔥 РЕЄСТРАЦІЯ ВСЬОГО
 register({
+  analyzeProduction,
+  executeProduction,
   onOpen,
-  openForm,
   openFormTable,
   buildBOMFromText,
   testBOMExplorer,
@@ -82,4 +86,6 @@ register({
   runTableParser,
   testProductionRequirement,
   testProductReport,
+  previewProductionSynchronization,
+  productionSynchronizationSmokeTest,
 });

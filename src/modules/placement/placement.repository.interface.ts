@@ -4,7 +4,9 @@ import { PlacementStatus } from './placement.status';
 export interface IPlacementRepository {
   getAll(): Placement[];
 
-  saveAll(items: Placement[]): void;
+  save(): void;
+
+  // saveAll(items: Placement[]): void;
 
   findById(id: number): Placement | null;
 
@@ -18,14 +20,3 @@ export interface IPlacementRepository {
 
   update(item: Placement): void;
 }
-// export interface IPlacementRepository {
-//   getAll(): Placement[];
-
-//   saveAll(items: Placement[]): void;
-
-//   findById(id: number): Placement | null;
-
-//   findNextForProduction(productCode: string): Placement | null;
-
-//   update(item: Placement): void;
-// }
