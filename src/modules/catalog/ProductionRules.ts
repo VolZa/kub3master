@@ -1,3 +1,4 @@
+//src/modules/catalog/ProductionRules.ts
 // 🔥 ProductionRules.ts
 
 import { ElementType } from '../../config/config';

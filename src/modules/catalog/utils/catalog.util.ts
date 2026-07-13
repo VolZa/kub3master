@@ -1,3 +1,4 @@
+//src\modules\catalog\utils\catalog.util.ts
 import { CatalogItem } from '../../catalog/catalog.model';
 import { ICatalogRepository } from '../catalog.repository.interface';
 

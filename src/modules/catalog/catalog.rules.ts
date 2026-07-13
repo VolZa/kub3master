@@ -1,3 +1,4 @@
+//src/modules/catalog/catalog.rules.ts
 import { ELEMENT_TYPES, PRODUCTION_TYPES } from '../../config/config';
 import { CatalogItem } from './catalog.model';
 

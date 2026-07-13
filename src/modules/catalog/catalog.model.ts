@@ -1,3 +1,4 @@
+//src/modules/catalog/catalog.model.ts
 import {
   ElementType,
   ProfileType,
