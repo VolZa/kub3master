@@ -1,3 +1,5 @@
+// src\modules\elements\assembly.service.ts
+
 import { ElementRepository } from './element.repository';
 import { ElementShort } from './element.model';
 import { buildAssemblyRow } from './element.mapper';

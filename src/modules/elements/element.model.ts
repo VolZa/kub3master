@@ -1,3 +1,5 @@
+// src\modules\elements\element.model.ts
+
 import { ElementType } from '../../config/config';
 
 export interface ElementRow {
@@ -6,10 +8,11 @@ export interface ElementRow {
   PrefixName: string;
   Name: string;
   Type: ElementType;
+  ProjectDocumentID?: string;
+  ParentMaterialID?: string;
   Category: string;
   BaseUnit: string;
   ProfileType?: string;
-  ParentMaterialID?: string;
   Diameter?: number;
   Class?: string;
   Width?: number;
@@ -27,28 +30,6 @@ export interface ElementShort {
   baseUnit: string;
   type: ElementType;
 }
-
-// export interface ElementFull {
-//   id: string;
-//   code: string;
-//   prefixName: string;
-//   name: string;
-
-//   type: ElementType;
-//   category: string;
-//   profileType?: string;
-
-//   baseUnit: string;
-
-//   parentMaterialID?: string;
-
-//   diameter?: number;
-//   className?: string;
-//   width?: number;
-//   length?: number;
-
-//   isActive: boolean;
-// }
 
 export interface ElementFull {
   id: string;

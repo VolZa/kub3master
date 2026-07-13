@@ -1,13 +1,16 @@
+// src\modules\elements\element.schema.ts
+
 export const ELEMENT_HEADERS = [
   'ID',
   'Code',
   'PrefixName',
   'Name',
   'Type',
+  'ProjectDocumentID',
+  'ParentMaterialID',
   'Category',
   'BaseUnit',
   'ProfileType',
-  'ParentMaterialID',
   'Diameter',
   'Class',
   'Width',

@@ -1,3 +1,4 @@
+// src\modules\elements\element.mapper.ts
 import { getValue } from '../../utils/getValue';
 import { ElementRow, ElementFull, ElementShort } from './element.model';
 
@@ -11,10 +12,11 @@ export function mapSheetRowToElementRow(
     PrefixName: getValue(row, map, 'PrefixName')!,
     Name: getValue(row, map, 'Name')!,
     Type: getValue(row, map, 'Type')!,
+    ProjectDocumentID: getValue(row, map, 'ProjectDocumentID'),
+    ParentMaterialID: getValue(row, map, 'ParentMaterialID'),
     Category: getValue(row, map, 'Category')!,
     BaseUnit: getValue(row, map, 'BaseUnit')!,
     ProfileType: getValue(row, map, 'ProfileType'),
-    ParentMaterialID: getValue(row, map, 'ParentMaterialID'),
     Diameter: getValue(row, map, 'Diameter'),
     Class: getValue(row, map, 'Class'),
     Width: getValue(row, map, 'Width'),
@@ -36,12 +38,12 @@ export function mapElementRowToDomain(row: ElementRow): ElementFull {
     name: row.Name,
 
     type: row.Type as any,
+
+    parentMaterialID: row.ParentMaterialID,
     category: row.Category,
     profileType: row.ProfileType,
 
     baseUnit: row.BaseUnit,
-
-    parentMaterialID: row.ParentMaterialID,
 
     diameter: row.Diameter,
     className: row.Class,
@@ -100,11 +102,10 @@ export function mapRowToFull(row: any[], headers: string[]) {
     prefixName: get('PrefixName'),
     name: get('Name'),
     type: get('Type'),
+    projectDocumentID: get('ProjectDocumentID'),
+    parentMaterialID: get('ParentMaterialID'),
     category: get('Category'),
     baseUnit: get('BaseUnit'),
-
-    parentMaterialID: get('ParentMaterialID'),
-
     diameter: Number(get('Diameter')) || undefined,
     className: get('Class'),
     length: Number(get('Length')) || undefined,

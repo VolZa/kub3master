@@ -1,3 +1,5 @@
+// src\modules\elements\element.factory.ts
+
 import { ParsedSpec } from '../bom/model/parsed-spec.model';
 import { ElementRepository } from './element.repository';
 import { ElementShort, ElementFull, ElementRow } from './element.model';
@@ -78,6 +80,7 @@ export function getOrCreateElementFromBuilt(
     Name: built.name,
 
     Type: type,
+
     Category: category,
     ProfileType: profileType,
     BaseUnit: baseUnit,

@@ -1,4 +1,5 @@
-import { ElementType } from '../../config/config';
+// src\modules\elements\element.builder.ts
+
 import { ParsedSpec } from '../bom/model/parsed-spec.model';
 
 export type BuiltElement = {
@@ -18,39 +19,11 @@ export type BuiltElement = {
 
   profileType?: string; // 🔥 ДОДАТИ
 };
-// export interface BuiltElement {
-//   code: string;
-//   prefixName: string;
-//   name: string;
-//   type: ElementType;
-//   category: string;
-//   baseUnit: string;
-
-//   // optional
-//   profileType?: string;
-//   className?: string;
-//   // geometry
-//   diameter?: number;
-//   length?: number;
-//   width?: number;
-//   height?: number;
-//   thickness?: number;
-
-// }
 
 export type BuiltElementExtended = BuiltElement & {
   parentMaterialId?: string;
 };
 
-// ===== Code =====
-
-// export function buildElementCode(parsed: ParsedSpec): string {
-//   if (parsed.kind === 'rebar') {
-//     return `${parsed.diameter}_${parsed.className}_${parsed.length}`;
-//   }
-
-//   return parsed.kind; // fallback
-// }
 export function buildElementCode(parsed: ParsedSpec): string {
   throw new Error('❌ DO NOT USE buildElementCode(parsed)');
 }
