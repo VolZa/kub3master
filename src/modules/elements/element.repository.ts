@@ -89,7 +89,13 @@ export class GoogleSheetsElementRepository implements ElementRepository {
     return row ? mapElementRowToDomain(row) : null;
   }
 
-  findByCode(code: string): ElementFull | null {
+  // TODO (ADR-010):
+  // Якщо projectDocumentID задано,
+  // пошук assembly/product виконувати
+  // за (ProjectDocumentID, Code).
+  // Поки система працює в режимі одного проєкту,
+  // використовується лише Code.
+  findByCode(code: string, projectDocumentID?: string): ElementFull | null {
     const row = this.rows.find((r) => r.Code === code);
     return row ? mapElementRowToDomain(row) : null;
   }
