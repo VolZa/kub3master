@@ -21,6 +21,7 @@ export type BuiltElement = {
 };
 
 export type BuiltElementExtended = BuiltElement & {
+  projectDocumentID?: string; // 🔥 ДОДАВ
   parentMaterialId?: string;
 };
 

@@ -22,6 +22,7 @@ export function getOrCreateElementFromBuilt(
   elementRepo: ElementRepository,
   catalogHelper: CatalogHelper,
   materialRepo: MaterialRepository,
+  projectDocumentID?: string,
   // materialBatchRepo: MaterialBatchRepository,
 ): ElementFull {
   console.log('getOrCreateElementFromBuilt with built:', built);
@@ -80,13 +81,17 @@ export function getOrCreateElementFromBuilt(
     Name: built.name,
 
     Type: type,
-
+    ProjectDocumentID: projectDocumentID,
+    // type === 'assembly' || type === 'product'
+    //   ? built.projectDocumentID
+    //   : undefined,
+    ParentMaterialID: type === 'part' ? material.id : undefined,
     Category: category,
     ProfileType: profileType,
     BaseUnit: baseUnit,
 
     // ParentMaterialID: material?.id || '',
-    ParentMaterialID: material.id,
+    // ParentMaterialID: material.id,
 
     Diameter: built.diameter,
     Class: built.className,

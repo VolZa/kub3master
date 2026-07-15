@@ -58,11 +58,12 @@ export class GoogleSheetsElementRepository implements ElementRepository {
       row.PrefixName, // 🔥 ДОДАТИ СЮДИ
       row.Name,
       row.Type,
+      row.ProjectDocumentID ? forceText(row.ProjectDocumentID) : '',
+      row.ParentMaterialID ? forceText(row.ParentMaterialID) : '',
       row.Category,
       row.BaseUnit,
 
       row.ProfileType ?? '',
-      row.ParentMaterialID ? forceText(row.ParentMaterialID) : '',
 
       row.Diameter ?? '',
       row.Class ?? '',
