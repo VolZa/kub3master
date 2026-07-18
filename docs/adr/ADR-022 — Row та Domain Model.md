@@ -6,6 +6,7 @@ docs\adr\ADR-022 — Row та Domain Model.md
 
 Row — структура рядка Google Sheets.
 Domain Model — модель предметної області.
+
 Google Sheets
 │
 ▼

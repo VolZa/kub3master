@@ -1,8 +1,9 @@
-/** src\domain\projects\project.mapper.ts
+/**
  * ==========================================================
  * ERP КУБ
  * Module: Projects
  * File: project.mapper.ts
+ * Path: src/domain/projects/project.mapper.ts
  * ==========================================================
  */
 

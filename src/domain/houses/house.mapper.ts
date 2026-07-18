@@ -12,6 +12,17 @@
 import { House, HouseRow } from './house.model';
 
 export function toHouse(row: HouseRow): House {
+  let createdAt: Date;
+
+  if (row.CreatedAt instanceof Date) {
+    createdAt = row.CreatedAt;
+  } else if (typeof row.CreatedAt === 'string') {
+    createdAt = new Date(row.CreatedAt);
+  } else if (typeof row.CreatedAt === 'number') {
+    createdAt = new Date(row.CreatedAt);
+  } else {
+    throw new Error('Invalid CreatedAt value');
+  }
   return {
     id: row.ID,
     code: row.Code,
@@ -21,7 +32,7 @@ export function toHouse(row: HouseRow): House {
     customer: row.Customer,
     address: row.Address,
     comment: row.Comment,
-    createdAt:
-      row.CreatedAt instanceof Date ? row.CreatedAt : new Date(row.CreatedAt),
+    createdAt: createdAt,
+    //   row.CreatedAt instanceof Date ? row.CreatedAt : new Date(row.CreatedAt),
   };
 }

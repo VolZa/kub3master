@@ -6,7 +6,27 @@
 
 - roadmap.md — етапи розвитку ERP.
 - glossary.md — словник термінів.
-- adr/ — журнал архітектурних рішень (Architecture Decision Records).
+
+docs/
+│
+├── README.md
+│
+├── adr/ ← журнал архітектурних рішень (Architecture Decision Records).
+│ ├── ADR-000 ...
+│ ├── ADR-001 ...
+│ ├── ...
+│ ├── ADR-018 UI Pattern.md
+│ └── ADR-019 Google Sheets as Administration Interface.md
+│
+├── architecture/ ← загальна архітектура ERP
+│
+├── domain/ ← предметна модель
+│
+├── ui/ ← інтерфейс користувача
+│ ├── UI-001 Import Project Document.md
+│ └── ...
+│
+└── refactoring/
 
 ## Основні принципи
 

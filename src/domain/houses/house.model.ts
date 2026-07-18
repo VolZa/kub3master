@@ -19,7 +19,8 @@ export interface HouseRow {
   Customer: string;
   Address: string;
   Comment: string;
-  CreatedAt: string | Date;
+  //   CreatedAt: string | Date;
+  CreatedAt: unknown;
 }
 
 export interface House {

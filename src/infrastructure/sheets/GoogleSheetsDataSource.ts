@@ -1,17 +1,35 @@
+/**
+ * ==========================================================
+ * ERP КУБ
+ * Module: Infrastructure
+ * File: GoogleSheetsDataSource.ts
+ * Path: src/infrastructure/sheets/GoogleSheetsDataSource.ts
+ *
+ * Базовий DataSource для роботи з Google Sheets.
+ * ==========================================================
+ */
 import { SheetKey } from './SheetKey';
 import { SheetProvider } from './SheetProvider';
-
-export abstract class GoogleSheetsDataSource {
+export abstract class GoogleSheetsDataSource<T = unknown[]> {
   constructor(
     protected readonly sheetProvider: SheetProvider,
     protected readonly sheetKey: SheetKey,
   ) {}
 
-  getRows() {
-    return this.sheetProvider.get(this.sheetKey).getDataRange().getValues();
+  /**
+   * Зчитати всі рядки таблиці.
+   */
+  public getRows(): T[] {
+    return this.sheetProvider
+      .get(this.sheetKey)
+      .getDataRange()
+      .getValues() as T[];
   }
 
-  replaceRows(rows: unknown[][], startRow = 2): void {
+  /**
+   * Повністю замінити дані таблиці.
+   */
+  public replaceRows(rows: T[], startRow = 2): void {
     const sheet = this.sheetProvider.get(this.sheetKey);
 
     const lastRow = sheet.getLastRow();
@@ -26,10 +44,15 @@ export abstract class GoogleSheetsDataSource {
       return;
     }
 
-    sheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
+    sheet
+      .getRange(startRow, 1, rows.length, (rows[0] as unknown[]).length)
+      .setValues(rows as unknown[][]);
   }
 
-  appendRow(row: unknown[]): void {
-    this.sheetProvider.get(this.sheetKey).appendRow(row);
+  /**
+   * Додати один рядок.
+   */
+  public appendRow(row: T): void {
+    this.sheetProvider.get(this.sheetKey).appendRow(row as unknown[]);
   }
 }

@@ -52,7 +52,16 @@ ProjectDocument
 DTO (ElementRow).
 Mapper.
 DataSource.
-Repository.
+Repository:
+✅ IProjectRepository
+✅ ProjectInMemoryRepository
+
+✅ IProjectDocumentRepository
+✅ ProjectDocumentInMemoryRepository
+✅ IHouseRepository
+✅ HouseInMemoryRepository
+🚀 ProjectContextService
+
 Factory.
 І лише після цього — логіка пошуку за ProjectDocumentID, коли вона дійсно знадобиться.
 
@@ -86,3 +95,75 @@ Production Planning
 Лише після цього переходити до MaterialConsumptionService.
 
 Таким чином ми завершимо багатопроєктну основу і повернемося до головної мети цього чату — цифрового двійника матеріальних потоків, який спирається на вже перевірену модель виробів. Це буде природне продовження виконаної роботи без стрибків між різними частинами системи.
+
+Тому я пропоную трохи скоригувати наш план
+Крок 1
+
+✅ Models
+
+Крок 2
+
+✅ Mapper
+
+Крок 3
+GoogleSheetsProjectDataSource
+GoogleSheetsProjectDocumentDataSource
+GoogleSheetsHouseDataSource
+Крок 4
+
+Repository
+
+Крок 5
+
+Factory
+
+Крок 6
+
+ProjectContextService
+
+=======================================================
+
+✅ Етап 1. Projects
+✔ Project.model
+✔ Project.mapper
+✔ IProjectRepository
+⬜ ProjectInMemoryRepository
+⬜ ProjectFactory
+✅ Етап 2. ProjectDocuments
+✔ Model
+✔ Mapper
+⬜ Repository
+⬜ Factory
+
+✅ Етап 3. Houses
+✔ Model
+✔ Mapper
+⬜ Repository
+⬜ Factory
+✅ Етап 4.
+
+Те, заради чого все починалося:
+
+ProjectContextService
+✅ Етап 5.
+
+Перший тест
+
+H001
+
+↓
+
+Д-05/2020
+
+↓
+
+КР.9
+
+↓
+
+Import
+
+↓
+
+00_Elements
+(ProjectDocumentID = 9)

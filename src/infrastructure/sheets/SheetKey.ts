@@ -6,6 +6,9 @@ export const SheetKey = {
   SHIFT_PLANS: 'SHIFT_PLANS',
   SHIFT_PLAN_ITEMS: 'SHIFT_PLAN_ITEMS',
   PRODUCTION: 'PRODUCTION',
+  PROJECTS: 'PROJECTS',
+  PROJECT_DOCUMENTS: 'PROJECT_DOCUMENTS', //'19_ProjectDocuments',
+  HOUSES: 'HOUSES', //'20_Houses',
 } as const;
 
 export type SheetKey = (typeof SheetKey)[keyof typeof SheetKey];

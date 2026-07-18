@@ -11,3 +11,4 @@ export * from './production-planning.factory';
 export * from './shift-plan-item.factory';
 export * from './shift-plan-service.factory';
 export * from './shift-plan.factory';
+export * from './project.factory';

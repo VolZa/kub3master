@@ -34,6 +34,21 @@ export const SheetConfig: Record<SheetKey, SheetDefinition> = {
     name: '15_ShiftPlanItems',
   },
 
+  PROJECTS: {
+    key: SheetKey.PROJECTS,
+    spreadsheet: SpreadsheetKey.MASTER,
+    name: '18_Projects',
+  },
+  PROJECT_DOCUMENTS: {
+    key: SheetKey.PROJECT_DOCUMENTS,
+    spreadsheet: SpreadsheetKey.MASTER,
+    name: '19_ProjectDocuments',
+  },
+  HOUSES: {
+    key: SheetKey.HOUSES,
+    spreadsheet: SpreadsheetKey.MASTER,
+    name: '20_Houses',
+  },
   PRODUCTION: {
     key: SheetKey.PRODUCTION,
     spreadsheet: SpreadsheetKey.OPERATIONAL,
