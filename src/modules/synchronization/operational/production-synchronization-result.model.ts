@@ -1,6 +1,6 @@
 // src/modules/synchronization/operational/production-synchronization-result.model.ts
 
-import { Placement } from '../../placement/placement.model';
+import { Placement } from '../../../domain/placement/placement.model';
 import { ProductionRecord } from '../../productionImport/production-record.model';
 import { ProductionSynchronizationStatus } from './production-synchronization.status';
 

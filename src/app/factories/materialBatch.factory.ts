@@ -1,5 +1,5 @@
 import { MaterialBatchRepository } from '../../domain/materials/material-batch.repository';
-import { GoogleSheetsMaterialBatchDataSource } from '../../infrastructure/sheets/materials/GoogleSheetsMaterialBatchDataSource';
+import { GoogleSheetsMaterialBatchDataSource } from '../../infrastructure/sheets/material-batch/GoogleSheetsMaterialBatchDataSource';
 
 import { sheetProvider } from './infrastructure.factory';
 

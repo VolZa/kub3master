@@ -30,7 +30,8 @@ export function classifyRow(row: TableRowInput): {
     return {
       type: 'part',
       category: 'R_part',
-      profileType: PROFILE_TYPES.REBAR,
+      // profileType: PROFILE_TYPES.REBAR,
+      profileType: PROFILE_TYPES.ROUND,
       baseUnit: 'шт',
     };
   }
@@ -40,7 +41,8 @@ export function classifyRow(row: TableRowInput): {
     return {
       type: 'part',
       category: 'R_part',
-      profileType: PROFILE_TYPES.REBAR,
+      // profileType: PROFILE_TYPES.REBAR,
+      profileType: PROFILE_TYPES.ROUND,
       baseUnit: 'шт',
     };
   }
@@ -50,7 +52,8 @@ export function classifyRow(row: TableRowInput): {
     return {
       type: 'part',
       category: 'R_part',
-      profileType: PROFILE_TYPES.REBAR,
+      // profileType: PROFILE_TYPES.REBAR,
+      profileType: PROFILE_TYPES.ROUND,
       baseUnit: 'шт',
     };
   }
@@ -60,7 +63,8 @@ export function classifyRow(row: TableRowInput): {
     return {
       type: 'assembly',
       category: 'R_assembly',
-      profileType: PROFILE_TYPES.REBAR,
+      // profileType: PROFILE_TYPES.REBAR,
+      profileType: PROFILE_TYPES.ROUND,
       baseUnit: 'шт',
     };
   }

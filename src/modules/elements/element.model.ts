@@ -27,6 +27,7 @@ export interface ElementRow {
 export interface ElementShort {
   id: string;
   code: string;
+  projectDocumentID?: string;
   baseUnit: string;
   type: ElementType;
 }
@@ -45,6 +46,7 @@ export interface ElementFull {
 
   baseUnit: string;
 
+  projectDocumentID?: string;
   parentMaterialID?: string;
 
   diameter?: number;

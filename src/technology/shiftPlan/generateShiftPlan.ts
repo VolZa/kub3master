@@ -1,6 +1,6 @@
 // src/technology/shiftPlan/generateShiftPlan.ts
 
-import { getPlacement } from 'domain/placement';
+import { getPlacementReference } from 'domain/placement';
 import { getProductConfigs } from 'technology/productConfig';
 import { resolveCombTemplate } from 'technology/combs';
 import { getShiftPlan, saveShiftPlan } from 'technology/shiftPlan';
@@ -24,7 +24,7 @@ export function generateShiftPlan(
   shift: number,
   limit: number = 20,
 ) {
-  const placement = getPlacement();
+  const placement = getPlacementReference();
   const existingPlan = getShiftPlan();
 
   const busyForms = getBusyForms(existingPlan, date, shift);
@@ -35,12 +35,12 @@ export function generateShiftPlan(
   const produced = getProducedPlacementIds();
 
   for (const p of placement) {
-    if (produced.has(p.Id)) continue; // 🔥 головна логіка
+    if (produced.has(p.id)) continue; // 🔥 головна логіка
     // if (p.Status === 'done') continue; // 🔥 головна логіка
 
     if (result.length >= limit) break;
 
-    const configs = getProductConfigs(p.ProductCode);
+    const configs = getProductConfigs(p.productCode);
 
     for (const config of configs) {
       // 1. перевірка форми
@@ -59,7 +59,7 @@ export function generateShiftPlan(
         Id: generateId(),
         Date: date,
         Shift: shift,
-        PlacementId: p.Id,
+        PlacementId: p.id,
         FormId: config.FormId,
         CombSet: combSet,
         CrabId: config.CrabId,

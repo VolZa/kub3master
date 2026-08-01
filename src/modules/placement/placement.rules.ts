@@ -1,7 +1,6 @@
 // src/modules/placement/placement.rules.ts
 
-import { Placement } from './placement.model';
-import { PlacementStatus } from './placement.status';
+import { Placement, PlacementStatus } from '../../domain/placement';
 
 export function canBeScheduled(placement: Placement): boolean {
   return (

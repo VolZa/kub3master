@@ -1,5 +1,5 @@
 import { MaterialRepository } from '../../domain/materials/material.repository';
-import { GoogleSheetsMaterialDataSource } from '../../infrastructure/sheets/materials/GoogleSheetsMaterialDataSource';
+import { GoogleSheetsMaterialDataSource } from '../../infrastructure/sheets/material/GoogleSheetsMaterialDataSource';
 
 import { sheetProvider } from './infrastructure.factory';
 

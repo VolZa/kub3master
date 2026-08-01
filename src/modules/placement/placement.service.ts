@@ -1,6 +1,6 @@
 import { IPlacementRepository } from './placement.repository.interface';
-import { Placement } from './placement.model';
-import { PlacementStatus } from './placement.status';
+import { Placement } from '../../domain/placement';
+import { PlacementStatus } from '../../domain/placement/placement.status';
 export class PlacementService {
   constructor(private readonly repository: IPlacementRepository) {}
 

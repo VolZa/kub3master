@@ -9,7 +9,7 @@
  * ==========================================================
  */
 
-import { GoogleSheetsProjectDocumentDataSource } from 'infrastructure/sheets/project-documents/GoogleSheetsProjectDocumentDataSource';
+import { GoogleSheetsProjectDocumentDataSource } from '../../infrastructure/sheets/project-document/GoogleSheetsProjectDocumentDataSource';
 import { sheetProvider } from './infrastructure.factory';
 import { ProjectDocumentInMemoryRepository } from 'domain/project-documents/project-document-inmemory.repository';
 

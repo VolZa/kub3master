@@ -3,12 +3,12 @@
 import { normalizeClassName, normalizeCode } from 'utils/normalize';
 import { mapRowsToMaterials } from './material.mapper';
 import { Material } from './material.model';
-
+import { MaterialRow } from '../../modules/material/material.row';
 export class MaterialRepository {
   private materials: Material[] = [];
 
-  constructor(rows: any[][] = []) {
-    this.materials = rows.length ? mapRowsToMaterials(rows) : [];
+  constructor(rows: readonly MaterialRow[]) {
+    this.materials = mapRowsToMaterials(rows);
   }
 
   setData(materials: Material[]) {
@@ -25,7 +25,7 @@ export class MaterialRepository {
   findRebar(diameter: number, rebarClass: string): Material | null {
     const m = this.materials.find(
       (m) =>
-        m.profileType === 'rebar' &&
+        m.profileType === 'round' &&
         m.diameter === diameter &&
         m.class === rebarClass,
     );
@@ -89,7 +89,7 @@ export class MaterialRepository {
     height?: number;
     thickness?: number;
   }): Material | null {
-    console.log('findBySpec:', JSON.stringify(spec));
+    // console.log('findBySpec:', JSON.stringify(spec));
     switch (spec.category) {
       case 'rebar': {
         if (spec.diameter == null || spec.class == null) {

@@ -1,6 +1,6 @@
 import { IPlacementRepository } from '../placement/placement.repository.interface';
 
-import { Placement } from '../placement/placement.model';
+import { Placement } from '../../domain/placement';
 
 import { canBeScheduled } from '../placement/placement.rules';
 

@@ -1,63 +1,35 @@
 // src/domain/materials/material.mapper.ts
 
 import { Material } from './material.model';
+import { MaterialRow } from '../../modules/material/material.row';
 
-function normalizeBoolean(v: any): boolean {
+function normalizeBoolean(v: unknown): boolean {
   return v === true || v === 'TRUE' || v === 1;
 }
 
-export function mapRowsToMaterials(rows: any[][]): Material[] {
-  console.log('HEADERS:', JSON.stringify(rows[0]));
-  const headers = rows[0];
-  const data = rows.slice(1);
+export function mapRowsToMaterials(rows: readonly MaterialRow[]): Material[] {
+  // console.log('HEADERS:', JSON.stringify(rows[0]));
 
-  const col = (name: string) => {
-    const i = headers.indexOf(name);
-    if (i === -1) throw new Error(`Column not found: ${name}`);
-    return i;
-  };
+  return rows.map((row) => ({
+    id: String(row.MaterialID).trim(), //Чи без .trim()
+    code: String(row.Code).trim(),
+    name: String(row.Name).trim(),
 
-  const idx = {
-    id: col('MaterialID'),
-    code: col('Code'),
-    name: col('Name'),
-    category: col('Category'),
-    profileType: col('ProfileType'),
-    diameter: col('Diameter'),
-    class: col('Class'),
-    width: col('Width'),
-    height: col('Height'),
-    thickness: col('Thickness'),
-    density: col('Density'),
-    weightPerMeter: col('WeightPerMeter'),
-    baseUnit: col('BaseUnit'),
-    isActive: col('IsActive'),
-    comment: col('Comment'),
-  };
+    category: row.Category,
+    profileType: row.ProfileType,
 
-  return data.map((row) => ({
-    id: String(row[0]),
-    materialId: String(row[0]),
-    code: String(row[idx.code]).trim(),
-    name: String(row[idx.name] || '').trim(),
+    diameter: row.Diameter ? Number(row.Diameter) : undefined,
+    class: row.Class || undefined,
 
-    category: row[idx.category],
-    profileType: row[idx.profileType],
+    width: row.Width ? Number(row.Width) : undefined,
+    height: row.Height ? Number(row.Height) : undefined,
+    thickness: row.Thickness ? Number(row.Thickness) : undefined,
+    density: row.Density ? Number(row.Density) : undefined,
+    weightPerMeter: row.WeightPerMeter ? Number(row.WeightPerMeter) : undefined,
 
-    diameter: row[idx.diameter] ? Number(row[idx.diameter]) : undefined,
-    class: row[idx.class] || undefined,
+    baseUnit: row.BaseUnit || 'кг',
+    isActive: normalizeBoolean(row.IsActive),
 
-    width: row[idx.width] ? Number(row[idx.width]) : undefined,
-    height: row[idx.height] ? Number(row[idx.height]) : undefined,
-    thickness: row[idx.thickness] ? Number(row[idx.thickness]) : undefined,
-    density: row[idx.density] ? Number(row[idx.density]) : undefined,
-    weightPerMeter: row[idx.weightPerMeter]
-      ? Number(row[idx.weightPerMeter])
-      : undefined,
-
-    baseUnit: row[idx.baseUnit] || 'кг',
-    isActive: normalizeBoolean(row[idx.isActive]),
-
-    comment: row[idx.comment] || undefined,
+    comment: row.Comment || undefined,
   }));
 }

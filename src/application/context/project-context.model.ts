@@ -1,12 +1,21 @@
-// src/application/context/project-context.model.ts
+/**
+ * ==========================================================
+ * ERP КУБ
+ * Module: Context
+ * File: project-context.model.ts
+ * Path: src/application/context/project-context.model.ts
+ *
+ * Робочий контекст ERP.
+ * ==========================================================
+ */
+
+import { ProjectDocument } from 'domain/project-documents/project-document.model';
+import { Project } from 'domain/projects/project.model';
+import { House } from 'domain/houses/house.model';
 
 export interface ProjectContext {
-  houseID: string;
-  houseCode: string;
+  readonly house: Readonly<House>;
+  readonly project: Readonly<Project>;
 
-  projectID: string;
-  projectCode: string;
-
-  projectDocumentID: string;
-  projectDocumentCode: string;
+  readonly projectDocuments: ReadonlyMap<string, Readonly<ProjectDocument>>;
 }

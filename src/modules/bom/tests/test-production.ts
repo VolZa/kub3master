@@ -4,7 +4,7 @@ import { BOMExplorerService } from '../services/bom-explorer.service';
 import { BOMMaterialsService } from '../services/bom-materials.service';
 import { ProductionRequirementService } from '../services/production-requirement.service';
 
-import { GoogleSheetsMaterialDataSource } from '../../../infrastructure/sheets/materials/GoogleSheetsMaterialDataSource';
+import { GoogleSheetsMaterialDataSource } from '../../../infrastructure/sheets/material/GoogleSheetsMaterialDataSource';
 import { MaterialRepository } from '../../../domain/materials/material.repository';
 import { sheetProvider } from '../../../app/factories/infrastructure.factory';
 

@@ -9,14 +9,15 @@
  * ==========================================================
  */
 
-import { Project, ProjectRow } from './project.model';
+import { Project } from './project.model';
 import { toProject } from './project.mapper';
 import { IProjectRepository } from './project.repository';
+import { ProjectRow } from '../../modules/project/project.row';
 
 export class ProjectInMemoryRepository implements IProjectRepository {
-  private readonly projects: Project[];
+  private projects: Project[];
 
-  constructor(rows: ProjectRow[] = []) {
+  constructor(rows: readonly ProjectRow[] = []) {
     this.projects = rows.map(toProject);
   }
 

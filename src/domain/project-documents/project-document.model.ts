@@ -10,16 +10,9 @@
  * ==========================================================
  */
 
-export interface ProjectDocumentRow {
-  ID: string;
-  ProjectID: string;
-  Code: string;
-  Name: string;
-}
-
 export interface ProjectDocument {
   id: string;
-  code: string;
+  documentCode: string;
   name: string;
   projectID: string;
 }

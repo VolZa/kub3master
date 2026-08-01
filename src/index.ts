@@ -22,6 +22,7 @@ import { getMaterialBatchRepository } from './app/factories/materialBatch.factor
 import { previewProductionSynchronization } from './debug/production-synchronization.debug';
 import { productionSynchronizationSmokeTest } from './debug/production-synchronization.smoke';
 import { analyzeProduction, executeProduction } from './menu/production.menu';
+import { debugProjectContext } from './debug/debug-project-context';
 
 function runTableParser(parentCode: string, text: string) {
   const elementRepo = getElementRepository();
@@ -88,4 +89,5 @@ register({
   testProductReport,
   previewProductionSynchronization,
   productionSynchronizationSmokeTest,
+  debugProjectContext,
 });

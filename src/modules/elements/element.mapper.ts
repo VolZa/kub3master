@@ -39,6 +39,7 @@ export function mapElementRowToDomain(row: ElementRow): ElementFull {
 
     type: row.Type as any,
 
+    projectDocumentID: row.ProjectDocumentID,
     parentMaterialID: row.ParentMaterialID,
     category: row.Category,
     profileType: row.ProfileType,

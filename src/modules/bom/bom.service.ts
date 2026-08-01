@@ -34,7 +34,7 @@ export function buildBOMRow(
   }
   // console.log('🔥 buildBOMRow with row:', row, 'parent:', parent);
   // 🔥 1. EXISTING
-  const existingElement = repo.findByCode(row.code);
+  const existingElement = repo.findByCode(row.code, parent.projectDocumentID);
 
   console.log('Existing element for code', row.code, existingElement);
   // 🔹 Якщо елемент вже існує, просто повертаємо зв'язок Parent → Child
@@ -59,7 +59,7 @@ export function buildBOMRow(
     return [
       [
         parentId,
-        material.materialId,
+        material.id,
         qty,
         material.baseUnit,
         now,
@@ -130,7 +130,7 @@ export function buildBOMRow(
       baseRow,
       [
         element.id,
-        material.materialId,
+        material.id,
         materialQty,
         'кг',
         now,
@@ -160,7 +160,12 @@ export function validateParentCode(code: string) {
 }
 
 export function buildBOMFromTable(
-  parent: { code: string; prefix: string; name: string },
+  parent: {
+    code: string;
+    prefix: string;
+    name: string;
+    projectDocumentID?: string;
+  },
   rows: TableRowInput[],
   elementRepo: ElementRepository,
   catalogHelper: CatalogHelper,
@@ -171,6 +176,7 @@ export function buildBOMFromTable(
 
   const root = getOrCreateAssemblyWithName(
     parent.code,
+    parent.projectDocumentID || '', // 🔥
     parent.prefix,
     buildAssemblyName(parent.prefix, parent.code),
     elementRepo,

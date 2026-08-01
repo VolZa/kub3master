@@ -1,8 +1,7 @@
-import { Placement } from './placement.model';
+import { Placement, PlacementStatus } from '../../domain/placement';
 import { IPlacementRepository } from './placement.repository.interface';
 
 import { canBeScheduled } from './placement.rules';
-import { PlacementStatus } from './placement.status';
 
 export class PlacementSelectionService {
   constructor(private readonly repository: IPlacementRepository) {}

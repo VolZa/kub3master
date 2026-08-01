@@ -9,7 +9,7 @@
  * ==========================================================
  */
 
-import { GoogleSheetsHouseDataSource } from '../../infrastructure/sheets/houses/GoogleSheetsHouseDataSource';
+import { GoogleSheetsHouseDataSource } from '../../infrastructure/sheets/house/GoogleSheetsHouseDataSource';
 import { HouseInMemoryRepository } from '../../domain/houses/house-inmemory.repository';
 import { sheetProvider } from './infrastructure.factory';
 

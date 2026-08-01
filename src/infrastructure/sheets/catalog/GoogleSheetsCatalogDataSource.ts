@@ -3,14 +3,12 @@
 import { GoogleSheetsDataSource } from '../GoogleSheetsDataSource';
 import { SheetKey } from '../SheetKey';
 import { SheetProvider } from '../SheetProvider';
-export class GoogleSheetsCatalogDataSource extends GoogleSheetsDataSource {
+
+import { CatalogRow } from '../../../modules/catalog/catalog.row';
+import { CATALOG_HEADERS } from '../../../modules/catalog/catalog.headers';
+
+export class GoogleSheetsCatalogDataSource extends GoogleSheetsDataSource<CatalogRow> {
   constructor(sheetProvider: SheetProvider) {
-    super(sheetProvider, SheetKey.CATALOG);
+    super(sheetProvider, SheetKey.CATALOG, CATALOG_HEADERS);
   }
 }
-
-// export class GoogleSheetsCatalogDataSource extends GoogleSheetsDataSource {
-//   constructor(sheetProvider: SheetProvider) {
-//     super(sheetProvider, SheetKey.CATALOG);
-//   }
-// }

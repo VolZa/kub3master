@@ -1,17 +1,18 @@
+// src\domain\placement\getPlacement.ts
 import { getSheetByNameSafe } from 'utils/sheets';
 
-export type Placement = {
-  Id: number;
-  ProductCode: string;
-};
+export interface PlacementReference {
+  id: number;
+  productCode: string;
+}
 
-export function getPlacement(): Placement[] {
+export function getPlacementReference(): PlacementReference[] {
   const sheet = getSheetByNameSafe('13_Placement');
 
   const values = sheet.getDataRange().getValues();
 
   return values.slice(1).map((row) => ({
-    Id: Number(row[0]),
-    ProductCode: row[5],
+    id: Number(row[0]),
+    productCode: row[5],
   }));
 }

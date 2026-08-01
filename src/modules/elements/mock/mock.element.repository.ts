@@ -21,20 +21,31 @@ export class MockElementRepository implements ElementRepository {
   // ------------------------
   // FIND BY CODE
   // ------------------------
-  findByCode(code: string): ElementFull | null {
-    const row = this.rows.find((r) => r.Code === code);
+  findByCode(code: string, projectDocumentID?: string): ElementFull | null {
+    const row = this.rows.find(
+      (r) =>
+        r.Code === code &&
+        (projectDocumentID ? r.ProjectDocumentID === projectDocumentID : true),
+    );
     return row ? mapElementRowToDomain(row) : null;
   }
 
   // ------------------------
   // 🔥 NORMALIZED SEARCH
   // ------------------------
-  findByCodeNormalized(code: string): ElementFull | null {
+  findByCodeNormalized(
+    code: string,
+    projectDocumentID?: string,
+  ): ElementFull | null {
     const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 
     const target = norm(code);
 
-    const row = this.rows.find((r) => norm(r.Code) === target);
+    const row = this.rows.find(
+      (r) =>
+        norm(r.Code) === target &&
+        (projectDocumentID ? r.ProjectDocumentID === projectDocumentID : true),
+    );
 
     return row ? mapElementRowToDomain(row) : null;
   }

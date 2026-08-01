@@ -6,10 +6,10 @@ export function testBOMTree() {
 
   const service = new BOMExplorerService(elementRepo);
 
-  const product = elementRepo.findByCode('П-1.1');
+  const product = elementRepo.findByCode('П-1.1', '6'); // Specify the projectDocumentID if needed
 
   if (!product) {
-    throw new Error('П-1.1 not found');
+    throw new Error('П-1.1  6  not found');
   }
 
   const tree = service.getTree(product.id);

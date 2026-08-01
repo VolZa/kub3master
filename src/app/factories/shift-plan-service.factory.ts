@@ -1,4 +1,4 @@
-import { ShiftPlanService } from '../../modules/shiftPlan/shift-plan.service';
+import { ShiftPlanService } from '../../modules/shift-plan/shift-plan.service';
 
 import { getPlacementRepository } from './placement.factory';
 import { getShiftPlanRepository } from './shift-plan.factory';

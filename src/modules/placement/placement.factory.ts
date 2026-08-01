@@ -1,7 +1,7 @@
 // src/modules/placement/placement.factory.ts
 //Для майбутнього використання, якщо знадобиться створювати Placement з DTO
-import { Placement } from './placement.model';
-import { PlacementStatus } from './placement.status';
+import { Placement } from '../../domain/placement/placement.model';
+import { PlacementStatus } from '../../domain/placement/placement.status';
 
 export interface CreatePlacementDto {
   id: number;

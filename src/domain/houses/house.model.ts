@@ -10,19 +10,6 @@
  * ==========================================================
  */
 
-export interface HouseRow {
-  ID: string;
-  Code: string;
-  Name: string;
-  ProjectID: string;
-  Status: string;
-  Customer: string;
-  Address: string;
-  Comment: string;
-  //   CreatedAt: string | Date;
-  CreatedAt: unknown;
-}
-
 export interface House {
   id: string;
   code: string;

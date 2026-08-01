@@ -23,7 +23,12 @@ export interface IProjectDocumentRepository {
   findById(id: string): Readonly<ProjectDocument> | undefined;
 
   /**
-   * Знайти документ проекту за кодом.
+   * Знайти документ проекту за бізнес-кодом.
    */
-  findByCode(code: string): Readonly<ProjectDocument> | undefined;
+  findByProjectAndCode(
+    projectID: string,
+    documentCode: string,
+  ): Readonly<ProjectDocument> | undefined;
+
+  findByProjectID(projectID: string): readonly Readonly<ProjectDocument>[];
 }

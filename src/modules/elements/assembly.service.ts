@@ -11,10 +11,11 @@ import { ELEMENT_TYPES } from '../../config/config';
 
 export function getOrCreateAssembly(
   code: string,
+  projectDocumentID: string,
   repo: ElementRepository,
 ): ElementShort {
   // 🔍 1. шукаємо
-  const existing = repo.findByCode(code);
+  const existing = repo.findByCode(code, projectDocumentID);
 
   if (existing) {
     const short: ElementShort = {
@@ -51,11 +52,12 @@ export function getOrCreateAssembly(
 
 export function getOrCreateAssemblyWithName(
   code: string,
+  projectDocumentID: string,
   prefixName: string,
   name: string,
   repo: ElementRepository,
 ) {
-  let existing = repo.findByCode(code);
+  let existing = repo.findByCode(code, projectDocumentID);
 
   if (existing) return existing;
 
@@ -64,6 +66,7 @@ export function getOrCreateAssemblyWithName(
   repo.insert({
     ID: id,
     Code: code,
+    ProjectDocumentID: projectDocumentID,
     PrefixName: prefixName,
     Name: name || code,
     Type: ELEMENT_TYPES.ASSEMBLY,

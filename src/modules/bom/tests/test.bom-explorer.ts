@@ -8,10 +8,10 @@ export function testBOMExplorer() {
 
   const service = new BOMExplorerService(elementRepo);
 
-  const product = elementRepo.findByCode('П-1.1');
+  const product = elementRepo.findByCode('П-1.1', '6'); // Specify the projectDocumentID if needed
 
   if (!product) {
-    throw new Error('П-1.1 not found');
+    throw new Error('П-1.1  6  not found');
   }
 
   const result = service.getChildren(product.id);
@@ -27,22 +27,3 @@ export function testBOMExplorer() {
 
   return result.length;
 }
-
-// import { GoogleSheetsElementRepository } from '../../elements/element.repository';
-// import { BOMExplorerService } from '../services/bom-explorer.service';
-
-// export function testBOMExplorer() {
-//   const elementRepo = new GoogleSheetsElementRepository();
-
-//   const service = new BOMExplorerService(elementRepo);
-
-//   const product = elementRepo.findByCode('П-1.1');
-
-//   if (!product) {
-//     throw new Error('П-1.1 not found');
-//   }
-
-//   const result = service.getChildren(product.id);
-
-//   console.log(JSON.stringify(result, null, 2));
-// }

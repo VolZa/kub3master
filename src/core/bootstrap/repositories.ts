@@ -4,7 +4,7 @@ import { Repositories } from './repositories.model';
 
 import { GoogleSheetsElementRepository } from '../../modules/elements/element.repository';
 
-import { GoogleSheetsMaterialDataSource } from '../../infrastructure/sheets/materials/GoogleSheetsMaterialDataSource';
+import { GoogleSheetsMaterialDataSource } from '../../infrastructure/sheets/material/GoogleSheetsMaterialDataSource';
 import { MaterialRepository } from '../../domain/materials/material.repository';
 
 import { GoogleSheetsReportLayoutDataSource } from '../../modules/reports/datasource/google-sheets-report-layout.datasource';

@@ -9,10 +9,17 @@
  * ==========================================================
  */
 
-import { House, HouseRow } from './house.model';
+import { House } from './house.model';
+import { HouseRow } from '../../modules/house/house.row';
 
 export function toHouse(row: HouseRow): House {
   let createdAt: Date;
+  Logger.log('=== HouseRow ===');
+  Logger.log(JSON.stringify(row));
+
+  Logger.log(`CreatedAt value: ${JSON.stringify(row.CreatedAt)}`);
+  Logger.log(`typeof: ${typeof row.CreatedAt}`);
+  Logger.log(`instanceof Date: ${row.CreatedAt instanceof Date}`);
 
   if (row.CreatedAt instanceof Date) {
     createdAt = row.CreatedAt;

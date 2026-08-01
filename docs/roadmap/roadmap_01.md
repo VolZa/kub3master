@@ -13,7 +13,7 @@
 , потім
 project-inmemory.repository.ts ✅
 
-project.factory.ts ← ✅
+project.factory.ts ←
 Нагадаю його місце в архітектурі:
 
 ' SheetProvider

@@ -20,8 +20,11 @@ export type ElementType = (typeof ELEMENT_TYPES)[keyof typeof ELEMENT_TYPES];
 
 export const MATERIAL_CATEGORIES = {
   REBAR: 'rebar',
-  CONCRETE: 'concrete',
+  WIRE: 'wire',
   STEEL: 'steel',
+  CONCRETE: 'concrete_mix',
+  CEMENT: 'cement',
+  OTHER: 'other',
 } as const;
 
 export type MaterialCategory =
@@ -30,7 +33,7 @@ export type MaterialCategory =
 // ------------------ PROFILE ------------------
 
 export const PROFILE_TYPES = {
-  REBAR: 'rebar',
+  ROUND: 'round',
   PLATE: 'plate',
   ANGLE: 'angle',
   CHANNEL: 'channel',

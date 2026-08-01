@@ -2,7 +2,7 @@ import { ProductionImportService } from '../../productionImport/production-impor
 import { ProductionSynchronizationResult } from './production-synchronization-result.model';
 import { PlacementSelectionService } from '../../placement/placement-selection.service';
 import { IPlacementRepository } from '../../placement/placement.repository.interface';
-import { PlacementStatus } from '../../placement/placement.status';
+import { PlacementStatus } from '../../../domain/placement/placement.status';
 import { ProductionSynchronizationStatus } from './production-synchronization.status';
 
 export class OperationalSynchronizationService {

@@ -1,8 +1,9 @@
 import { ProductionPlanningService } from '../../modules/planning/production-planning.service';
-import { ShiftPlanService } from '../../modules/shiftPlan/shift-plan.service';
-
-import { ShiftPlan } from '../../modules/shiftPlan/shift-plan.model';
-import { ShiftPlanItem } from '../../modules/shiftPlan/shift-plan-item.model';
+import {
+  ShiftPlanService,
+  ShiftPlan,
+  ShiftPlanItem,
+} from '../../modules/shift-plan';
 
 export class PlanningController {
   constructor(

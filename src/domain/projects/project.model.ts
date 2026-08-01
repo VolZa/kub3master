@@ -9,12 +9,6 @@
  * ==========================================================
  */
 
-export interface ProjectRow {
-  ID: string;
-  Code: string;
-  Name: string;
-}
-
 export interface Project {
   id: string;
   code: string;

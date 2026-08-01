@@ -1,5 +1,4 @@
-import { Placement } from './placement.model';
-import { PlacementStatus } from './placement.status';
+import { Placement, PlacementStatus } from '../../domain/placement/';
 
 export interface IPlacementRepository {
   getAll(): Placement[];

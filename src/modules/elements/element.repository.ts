@@ -13,8 +13,11 @@ import { forceText } from '../../utils/sheets.utils';
 
 export interface ElementRepository {
   findById(id: string): ElementFull | null;
-  findByCode(code: string): ElementFull | null;
-  findByCodeNormalized(code: string): ElementFull | null;
+  findByCode(code: string, projectDocumentID?: string): ElementFull | null;
+  findByCodeNormalized(
+    code: string,
+    projectDocumentID?: string,
+  ): ElementFull | null;
   insert(row: ElementRow): void;
   updateType(id: string, type: string): void;
 }
@@ -96,16 +99,24 @@ export class GoogleSheetsElementRepository implements ElementRepository {
   // Поки система працює в режимі одного проєкту,
   // використовується лише Code.
   findByCode(code: string, projectDocumentID?: string): ElementFull | null {
-    const row = this.rows.find((r) => r.Code === code);
+    const row = this.rows.find(
+      (r) => r.Code === code && r.ProjectDocumentID === projectDocumentID,
+    );
     return row ? mapElementRowToDomain(row) : null;
   }
 
-  findByCodeNormalized(code: string): ElementFull | null {
+  findByCodeNormalized(
+    code: string,
+    projectDocumentID?: string,
+  ): ElementFull | null {
     const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 
     const target = norm(code);
 
-    const row = this.rows.find((r) => norm(r.Code) === target);
+    const row = this.rows.find(
+      (r) =>
+        norm(r.Code) === target && r.ProjectDocumentID === projectDocumentID,
+    );
 
     return row ? mapElementRowToDomain(row) : null;
   }

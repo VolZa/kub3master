@@ -1,12 +1,10 @@
 // src/domain/materials/material.model.ts
 
 import { ProfileType } from '../../config/config';
-
-export type MaterialCategory = 'rebar' | 'concrete' | 'steel' | 'other';
+import { MaterialCategory } from '../../config/config';
 
 export interface Material {
   id: string;
-  materialId: string;
   code: string;
   name: string;
 

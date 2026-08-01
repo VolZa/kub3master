@@ -7,7 +7,8 @@
  * ==========================================================
  */
 
-import { Project, ProjectRow } from './project.model';
+import { Project } from './project.model';
+import { ProjectRow } from '../../modules/project/project.row';
 
 export function toProject(row: ProjectRow): Project {
   return {

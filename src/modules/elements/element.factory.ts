@@ -27,7 +27,7 @@ export function getOrCreateElementFromBuilt(
 ): ElementFull {
   console.log('getOrCreateElementFromBuilt with built:', built);
   // 🔹 1. вже існує?
-  let existing = elementRepo.findByCode(built.code);
+  let existing = elementRepo.findByCode(built.code, projectDocumentID);
   if (existing) return existing;
 
   // 🔥 2. Catalog через helper
@@ -108,7 +108,7 @@ export function getOrCreateElementFromBuilt(
   console.log('FINAL CODE BEFORE INSERT:', built.code);
   elementRepo.insert(row);
 
-  const created = elementRepo.findByCode(built.code);
+  const created = elementRepo.findByCode(built.code, projectDocumentID);
 
   if (!created) {
     throw new Error(`Failed to create element: ${built.code}`);
@@ -122,7 +122,8 @@ export function getOrCreateElement(
   repo: ElementRepository,
   catalogHelper: CatalogHelper,
   materialRepo: MaterialRepository,
-  materialBatchRepo: MaterialBatchRepository,
+  // materialBatchRepo: MaterialBatchRepository,
+  projectDocumentID?: string,
 ): ElementShort {
   // 🔹 1. build
   const built = buildByKind(parsed);
@@ -135,7 +136,7 @@ export function getOrCreateElement(
   if (cached) return cached;
 
   // 🔹 3. існує?
-  const existing = repo.findByCode(built.code);
+  const existing = repo.findByCode(built.code, projectDocumentID);
   if (existing) {
     const short = toShort(existing);
     addElementToCache(short);
@@ -148,12 +149,14 @@ export function getOrCreateElement(
     repo,
     catalogHelper,
     materialRepo,
+    projectDocumentID,
     // materialBatchRepo,
   );
 
   const short: ElementShort = {
     id: element.id,
     code: element.code,
+    projectDocumentID: element.projectDocumentID,
     baseUnit: element.baseUnit,
     type: element.type,
   };

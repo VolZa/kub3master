@@ -1,6 +1,6 @@
 import { GoogleSheetsElementRepository } from '../../elements/element.repository';
 
-import { GoogleSheetsMaterialDataSource } from '../../../infrastructure/sheets/materials/GoogleSheetsMaterialDataSource';
+import { GoogleSheetsMaterialDataSource } from '../../../infrastructure/sheets/material/GoogleSheetsMaterialDataSource';
 
 import { MaterialRepository } from '../../../domain/materials/material.repository';
 

@@ -1,6 +1,6 @@
-import { ShiftPlanItemRepository } from '../../modules/shiftPlan/shift-plan-item.repository';
+import { ShiftPlanItemRepository } from '../../modules/shift-plan/shift-plan-item.repository';
 
-import { GoogleSheetsShiftPlanItemDataSource } from '../../infrastructure/sheets/shiftPlan/GoogleSheetsShiftPlanItemDataSource';
+import { GoogleSheetsShiftPlanItemDataSource } from '../../infrastructure/sheets/shift-plan-item/GoogleSheetsShiftPlanItemDataSource';
 
 import { sheetProvider } from './infrastructure.factory';
 

@@ -23,16 +23,6 @@ export interface CatalogItem {
   comment?: string;
 }
 
-//Додано для роботи з Google Sheets ПЕРЕВІРИТИ
-export interface CatalogRow {
-  ID: string;
-  TypeCode: string;
-  Name: string;
-  Type: string;
-  Category: string;
-  ProfileType?: string;
-}
-
 export interface Catalog {
   id: string;
   code: string;

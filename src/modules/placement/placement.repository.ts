@@ -1,7 +1,12 @@
-import { Placement } from './placement.model';
-import { PlacementStatus } from './placement.status';
+// src\modules\placement\placement.repository.ts
+import {
+  Placement,
+  PlacementStatus,
+  // mapPlacementsToRows,
+} from '../../domain/placement';
+import { mapPlacementsToRows } from '../../domain/placement';
+
 import { IPlacementRepository } from './placement.repository.interface';
-import { mapPlacementToSheetRow } from './placement.mapper';
 import { IPlacementDataSource } from 'infrastructure/sheets/placement/placement-data-source.interface';
 
 export class PlacementInMemoryRepository implements IPlacementRepository {
@@ -33,7 +38,7 @@ export class PlacementInMemoryRepository implements IPlacementRepository {
   }
 
   save(): void {
-    const rows = this.items.map(mapPlacementToSheetRow);
+    const rows = mapPlacementsToRows(this.items);
 
     this.dataSource.saveRows(rows);
   }

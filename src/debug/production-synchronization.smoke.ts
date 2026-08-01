@@ -1,6 +1,6 @@
 import { getOperationalSynchronizationService } from 'app/factories/operational-synchronization.factory';
 import { DEFAULT_HOUSE_ID } from 'config/config';
-import { PlacementStatus } from 'modules/placement/placement.status';
+import { PlacementStatus } from '../domain/placement';
 
 export function productionSynchronizationSmokeTest(): void {
   Logger.log('');

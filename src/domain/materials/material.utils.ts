@@ -1,9 +1,11 @@
-import { MaterialCategory } from './material.model';
+import { MaterialCategory } from '../../config/config';
 
 const UNIT_BY_CATEGORY: Record<MaterialCategory, string> = {
   rebar: 'кг',
+  wire: 'кг',
   steel: 'кг',
-  concrete: 'л',
+  concrete_mix: 'л',
+  cement: 'кг',
   other: 'кг',
 };
 

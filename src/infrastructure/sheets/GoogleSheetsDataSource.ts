@@ -8,51 +8,78 @@
  * Базовий DataSource для роботи з Google Sheets.
  * ==========================================================
  */
+import { GoogleSheetsReader } from './GoogleSheetsReader';
+import { GoogleSheetsWriter } from './GoogleSheetsWriter';
+import { HeaderSchema } from './mapping/HeaderSchema';
+import { TableMapper } from './mapping/TableMapper';
 import { SheetKey } from './SheetKey';
 import { SheetProvider } from './SheetProvider';
-export abstract class GoogleSheetsDataSource<T = unknown[]> {
-  constructor(
-    protected readonly sheetProvider: SheetProvider,
-    protected readonly sheetKey: SheetKey,
-  ) {}
 
-  /**
-   * Зчитати всі рядки таблиці.
-   */
-  public getRows(): T[] {
-    return this.sheetProvider
-      .get(this.sheetKey)
-      .getDataRange()
-      .getValues() as T[];
+export abstract class GoogleSheetsDataSource<T extends object> {
+  private readonly reader: GoogleSheetsReader;
+  private readonly writer: GoogleSheetsWriter;
+
+  protected constructor(
+    sheetProvider: SheetProvider,
+    private readonly sheetKey: SheetKey,
+    private readonly expectedHeaders: readonly string[],
+  ) {
+    this.reader = new GoogleSheetsReader(sheetProvider);
+    this.writer = new GoogleSheetsWriter(sheetProvider);
+  }
+
+  public getRows(): readonly T[] {
+    const matrix = this.reader.read(this.sheetKey);
+
+    if (matrix.length === 0) {
+      return [];
+    }
+
+    const headers = matrix[0].map(String);
+    const data = matrix.slice(1);
+
+    HeaderSchema.validate(headers, this.expectedHeaders);
+
+    return TableMapper.matrixToRows<T>(headers, data);
   }
 
   /**
    * Повністю замінити дані таблиці.
    */
-  public replaceRows(rows: T[], startRow = 2): void {
-    const sheet = this.sheetProvider.get(this.sheetKey);
+  public replaceRows(rows: readonly T[]): void {
+    const matrix = TableMapper.rowsToMatrix<T>(this.expectedHeaders, rows);
 
-    const lastRow = sheet.getLastRow();
-
-    if (lastRow >= startRow) {
-      sheet
-        .getRange(startRow, 1, lastRow - startRow + 1, sheet.getLastColumn())
-        .clearContent();
-    }
-
-    if (!rows.length) {
-      return;
-    }
-
-    sheet
-      .getRange(startRow, 1, rows.length, (rows[0] as unknown[]).length)
-      .setValues(rows as unknown[][]);
+    this.writer.replace(this.sheetKey, matrix);
   }
-
+  /**
+   * Зберегти всі рядки таблиці.(Те саме що replaceRows)
+   */
+  public saveRows(rows: readonly T[]): void {
+    this.replaceRows(rows);
+  }
   /**
    * Додати один рядок.
    */
   public appendRow(row: T): void {
-    this.sheetProvider.get(this.sheetKey).appendRow(row as unknown[]);
+    const matrix = TableMapper.rowsToMatrix<T>(this.expectedHeaders, [row]);
+
+    if (matrix.length === 0) {
+      return;
+    }
+
+    this.writer.append(this.sheetKey, matrix[0]);
   }
 }
+
+/** 
+Після завершення GoogleSheetsWriter можна зробити GoogleSheetsDataSource таким:
+
+const matrix = reader.read(sheetKey);
+
+const headers = matrix[0].map(String);
+const data = matrix.slice(1);
+
+HeaderSchema.validate(headers, HOUSE_HEADERS);
+
+return mapper.matrixToRows(headers, data);
+ */

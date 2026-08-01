@@ -1,5 +1,7 @@
-export interface IPlacementDataSource {
-  getRows(): unknown[][];
+import { PlacementRow } from '../../../modules/placement/placement.row';
 
-  saveRows(rows: unknown[][]): void;
+export interface IPlacementDataSource {
+  getRows(): readonly PlacementRow[];
+
+  saveRows(rows: readonly PlacementRow[]): void;
 }

@@ -1,11 +1,9 @@
-import {
-  createHeaderMap,
-  mapSheetRowToProductionRecord,
-} from './production-import.mapper';
+import { mapRowToProductionRecord } from './production-import.mapper';
 
 import { GoogleSheetsProductionDataSource } from '../../infrastructure/sheets/production/GoogleSheetsProductionDataSource';
 
 import { ProductionRecord } from './production-record.model';
+import { ProductionRow } from '../production/production.row';
 
 export class ProductionImportService {
   constructor(private readonly dataSource: GoogleSheetsProductionDataSource) {}
@@ -13,47 +11,16 @@ export class ProductionImportService {
   import(): ProductionRecord[] {
     const rows = this.dataSource.getRows();
 
-    if (rows.length <= 1) {
+    if (rows.length === 0) {
       return [];
     }
 
-    const headerMap = createHeaderMap(rows[0]);
-
-    return rows
-      .slice(1)
-      .filter(isNotEmptyRow)
-      .map((row) => mapSheetRowToProductionRecord(row, headerMap));
+    return rows.filter(isNotEmptyRow).map(mapRowToProductionRecord);
   }
 }
 
 /* -------------------------------------------------------------------------- */
 
-function isNotEmptyRow(row: readonly unknown[]): boolean {
-  return row.some((cell) => String(cell ?? '').trim() !== '');
+function isNotEmptyRow(row: ProductionRow): boolean {
+  return Object.values(row).some((value) => String(value ?? '').trim() !== '');
 }
-// export class ProductionImportService {
-//   constructor(private readonly dataSource: GoogleSheetsProductionDataSource) {}
-
-//   import(): ProductionRecord[] {
-//     const rows = this.dataSource.getRows();
-
-//     if (rows.length <= 1) {
-//       return [];
-//     }
-
-//     const headerMap = createHeaderMap(rows[0]);
-
-//     return rows
-//       .slice(1)
-//       .filter(isNotEmptyRow)
-//       .map((row) => mapSheetRowToProductionRecord(row, headerMap));
-//   }
-// }
-
-// export class ProductionImportService {
-//   constructor(private readonly dataSource: IProductionDataSource) {}
-
-//   import(): ProductionRecord[] {
-//     return this.dataSource.getRecords();
-//   }
-// }

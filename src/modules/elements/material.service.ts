@@ -10,6 +10,7 @@ type MaterialRepository = Pick<ElementRepository, 'findByCode' | 'insert'>;
 
 export function getOrCreateMaterialFromCode(
   code: string,
+  // projectDocumentID: string,
   repo: MaterialRepository,
 ): ElementFull {
   const materialCode = code.split('_L')[0].trim().toUpperCase();
@@ -43,6 +44,7 @@ export function getOrCreateMaterialFromCode(
     Category: 'rebar',
     BaseUnit: 'кг',
     ProfileType: 'round',
+    // ProjectDocumentID: projectDocumentID,
     ParentMaterialID: '',
     Diameter: diameter,
     Class: className,

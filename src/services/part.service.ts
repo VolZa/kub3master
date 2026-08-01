@@ -12,7 +12,7 @@ export function getOrCreateRebarPart(
 ): ElementShort {
   const code = `R_${diameter}_${className}, L=${length}`;
 
-  const existing = repo.findByCode(code);
+  const existing = repo.findByCode(code, undefined);
   if (existing) return toShort(existing);
 
   const id = generateIdByType(ELEMENT_TYPES.PART);
