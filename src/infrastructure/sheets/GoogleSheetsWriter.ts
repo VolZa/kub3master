@@ -11,6 +11,7 @@
 
 import { SheetProvider } from './SheetProvider';
 import { SheetKey } from './SheetKey';
+import { SheetMatrix, SheetRow } from './types/sheet.types';
 
 export class GoogleSheetsWriter {
   private readonly DATA_START_ROW = 2;
@@ -21,7 +22,7 @@ export class GoogleSheetsWriter {
    * Дані записуються починаючи із зазначеного рядка.
    * За замовчуванням заголовок (1-й рядок) не змінюється.
    */
-  public replace(sheetKey: SheetKey, matrix: readonly unknown[][]): void {
+  public replace(sheetKey: SheetKey, matrix: SheetMatrix): void {
     const sheet = this.sheetProvider.get(sheetKey);
 
     const lastRow = sheet.getLastRow();
@@ -43,13 +44,13 @@ export class GoogleSheetsWriter {
 
     sheet
       .getRange(this.DATA_START_ROW, 1, matrix.length, matrix[0].length)
-      .setValues(matrix as unknown[][]);
+      .setValues(matrix.map((row) => [...row]));
   }
 
   /**
    * Додати один рядок у кінець таблиці.
    */
-  public append(sheetKey: SheetKey, row: readonly unknown[]): void {
+  public append(sheetKey: SheetKey, row: SheetRow): void {
     const sheet = this.sheetProvider.get(sheetKey);
 
     sheet.appendRow([...row]);

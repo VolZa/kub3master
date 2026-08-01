@@ -11,6 +11,7 @@
 
 import { SheetKey } from './SheetKey';
 import { SheetProvider } from './SheetProvider';
+import { SheetMatrix } from './types/sheet.types';
 
 export class GoogleSheetsReader {
   constructor(private readonly sheetProvider: SheetProvider) {}
@@ -18,14 +19,17 @@ export class GoogleSheetsReader {
   /**
    * Прочитати всю таблицю разом із заголовком.
    */
-  public read(sheetKey: SheetKey): unknown[][] {
+  // public read(sheetKey: SheetKey): unknown[][] {
+  //   return this.sheetProvider.get(sheetKey).getDataRange().getValues();
+  // }
+  public read(sheetKey: SheetKey): SheetMatrix {
     return this.sheetProvider.get(sheetKey).getDataRange().getValues();
   }
 
   /**
    * Прочитати лише заголовок таблиці.
    */
-  public readHeader(sheetKey: SheetKey): string[] {
+  public readHeader(sheetKey: SheetKey): readonly string[] {
     const matrix = this.read(sheetKey);
 
     if (matrix.length === 0) {
@@ -38,9 +42,7 @@ export class GoogleSheetsReader {
   /**
    * Прочитати таблицю без заголовка.
    */
-  public readData(sheetKey: SheetKey): unknown[][] {
-    const matrix = this.read(sheetKey);
-
-    return matrix.slice(1);
+  public readData(sheetKey: SheetKey): SheetMatrix {
+    return this.read(sheetKey).slice(1);
   }
 }

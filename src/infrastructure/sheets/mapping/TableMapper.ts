@@ -9,13 +9,19 @@
  * ==========================================================
  */
 
+import { SheetMatrix } from '../types/sheet.types';
+
 export class TableMapper {
   /**
    * Перетворити табличні дані у Row-об'єкти.
    */
-  public static matrixToRows<T extends object>(
+  // public static matrixToRows<T extends object>(
+  //   headers: readonly string[],
+  //   rows: readonly unknown[][],
+  // ): T[]
+  public static matrixToRows<T>(
     headers: readonly string[],
-    rows: readonly unknown[][],
+    rows: SheetMatrix,
   ): T[] {
     return rows.map((values) => {
       const row = {} as Record<string, unknown>;
@@ -34,7 +40,7 @@ export class TableMapper {
   public static rowsToMatrix<T extends object>(
     headers: readonly string[],
     rows: readonly T[],
-  ): unknown[][] {
+  ): SheetMatrix {
     return rows.map((row) =>
       headers.map((header) => (row as Record<string, unknown>)[header]),
     );
