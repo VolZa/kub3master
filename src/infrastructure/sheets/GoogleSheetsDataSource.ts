@@ -38,6 +38,12 @@ export abstract class GoogleSheetsDataSource<T extends object> {
     const headers = matrix[0].map(String);
     const data = matrix.slice(1);
 
+    console.log({
+      sheet: this.sheetKey,
+      actual: headers,
+      expected: this.expectedHeaders,
+    });
+
     HeaderSchema.validate(headers, this.expectedHeaders);
 
     return TableMapper.matrixToRows<T>(headers, data);

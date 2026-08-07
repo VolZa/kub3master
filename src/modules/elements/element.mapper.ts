@@ -53,8 +53,23 @@ export function mapElementRowToDomain(row: ElementRow): ElementFull {
     length: row.Length,
 
     isActive: row.IsActive ?? true,
+    comment: row.Comment,
+    createdAt: row.CreatedAt,
   };
 }
+
+// export function mapElementToRow(el: ElementFull): ElementRow {
+//   return {
+//     ID: el.id,
+//     Code: el.code,
+//     PrefixName: el.prefixName,
+//     Name: el.name,
+//     Type: el.type,
+//     Category: el.category || '',
+//     BaseUnit: el.baseUnit,
+//     CreatedAt: new Date(),
+//   };
+// }
 
 export function mapElementToRow(el: ElementFull): ElementRow {
   return {
@@ -63,8 +78,25 @@ export function mapElementToRow(el: ElementFull): ElementRow {
     PrefixName: el.prefixName,
     Name: el.name,
     Type: el.type,
-    Category: el.category || '',
+
+    ProjectDocumentID: el.projectDocumentID,
+    ParentMaterialID: el.parentMaterialID,
+
+    Category: el.category,
     BaseUnit: el.baseUnit,
+
+    ProfileType: el.profileType,
+    Diameter: el.diameter,
+    Class: el.className,
+
+    Width: el.width,
+    Height: el.height,
+    Length: el.length,
+    Thickness: el.thickness,
+
+    IsActive: el.isActive,
+    Comment: el.comment,
+
     CreatedAt: new Date(),
   };
 }

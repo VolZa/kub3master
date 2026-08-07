@@ -32,10 +32,13 @@ export function buildBOMRow(
   if (!parent) {
     throw new Error(`Parent not found: ${parentId}`);
   }
-  // console.log('🔥 buildBOMRow with row:', row, 'parent:', parent);
+  console.log('🔥 buildBOMRow with row:', row, 'parent:', parent);
   // 🔥 1. EXISTING
   const existingElement = repo.findByCode(row.code, parent.projectDocumentID);
-
+  console.log({
+    code: row.code,
+    projectDocumentID: parent.projectDocumentID,
+  });
   console.log('Existing element for code', row.code, existingElement);
   // 🔹 Якщо елемент вже існує, просто повертаємо зв'язок Parent → Child
   if (existingElement) {
@@ -87,6 +90,7 @@ export function buildBOMRow(
     repo,
     catalogHelper,
     materialRepo,
+    parent.projectDocumentID,
   );
   console.log('Built element:', element);
 
@@ -173,7 +177,7 @@ export function buildBOMFromTable(
   materialBatchRepo: MaterialBatchRepository,
 ) {
   console.log('👉 START buildBOMFromTable');
-
+  console.log('INPUT PARENT:', parent);
   const root = getOrCreateAssemblyWithName(
     parent.code,
     parent.projectDocumentID || '', // 🔥
@@ -181,7 +185,7 @@ export function buildBOMFromTable(
     buildAssemblyName(parent.prefix, parent.code),
     elementRepo,
   );
-
+  console.log('ROOT:', root.code, 'ProjectDocumentID:', root.projectDocumentID);
   const parentId = root.id;
 
   deleteBOMTree(parentId);

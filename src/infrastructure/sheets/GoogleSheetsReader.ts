@@ -19,9 +19,6 @@ export class GoogleSheetsReader {
   /**
    * Прочитати всю таблицю разом із заголовком.
    */
-  // public read(sheetKey: SheetKey): unknown[][] {
-  //   return this.sheetProvider.get(sheetKey).getDataRange().getValues();
-  // }
   public read(sheetKey: SheetKey): SheetMatrix {
     return this.sheetProvider.get(sheetKey).getDataRange().getValues();
   }

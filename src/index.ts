@@ -24,7 +24,11 @@ import { productionSynchronizationSmokeTest } from './debug/production-synchroni
 import { analyzeProduction, executeProduction } from './menu/production.menu';
 import { debugProjectContext } from './debug/debug-project-context';
 
-function runTableParser(parentCode: string, text: string) {
+function runTableParser(
+  projectDocumentID: string,
+  parentCode: string,
+  text: string,
+) {
   const elementRepo = getElementRepository();
 
   const catalogRepo = getCatalogRepository();
@@ -34,7 +38,10 @@ function runTableParser(parentCode: string, text: string) {
   const materialBatchRepo = getMaterialBatchRepository();
 
   // 🔹 Parent
-  const parsedParent = parseParent(parentCode);
+  const parsedParent = {
+    ...parseParent(parentCode),
+    projectDocumentID,
+  };
   validateParentCode(parsedParent.code);
 
   // 🔹 Table rows

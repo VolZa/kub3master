@@ -1,3 +1,4 @@
+//legacy\delete-module\elements.service.ts
 import { generateIdByType } from '../../src/utils/id';
 import {
   ElementType,
@@ -177,7 +178,11 @@ export function getOrCreatePart(parsed: ParsedPart): ElementResult {
 
 // ================= ASSEMBLY =================
 
-export function getOrCreateAssembly(code: string): string {
+export function getOrCreateAssembly(
+  code: string,
+  projectDocumentID: string,
+): string {
+  // const existing = findElementByCode(code, projectDocumentID);
   const existing = findElementByCode(code);
   if (existing) return existing.id;
 
@@ -187,6 +192,7 @@ export function getOrCreateAssembly(code: string): string {
     name: 'Виріб ' + code,
     category: 'Виріб',
     baseUnit: 'шт',
+    // projectDocumentID,
   });
 }
 

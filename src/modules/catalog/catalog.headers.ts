@@ -1,28 +1,17 @@
 /**
- * Заголовки таблиці 00_Elements
+ * Заголовки таблиці 04_Catalog
  *
  * Порядок елементів визначає порядок колонок під час запису.
  */
 export const CATALOG_HEADERS = [
   'ID',
-  'Code',
-  'PrefixName',
+  'TypeCode',
   'Name',
   'Type',
   'Category',
-  'BaseUnit',
   'ProfileType',
-  'ParentMaterialID',
-  'Diameter',
-  'Class',
-  'Width',
-  'Height',
-  'Length',
-  'Thickness',
-  'IsActive',
-  'ParentType',
-  'Weight',
-  'Density',
+  'HasBOM',
+  'ProductionType',
+  'SupportsLength',
   'Comment',
-  'CreatedAt',
 ] as const;

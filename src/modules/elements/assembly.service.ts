@@ -34,7 +34,7 @@ export function getOrCreateAssembly(
   const id = generateIdByType('assembly');
 
   const row = buildAssemblyRow(id, code);
-
+  console.log('getOrCreateAssembly - Creating new assembly row:', row);
   repo.insert(row);
 
   // 🔁 3. формуємо domain → short

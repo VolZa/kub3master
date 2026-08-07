@@ -99,9 +99,26 @@ export class GoogleSheetsElementRepository implements ElementRepository {
   // Поки система працює в режимі одного проєкту,
   // використовується лише Code.
   findByCode(code: string, projectDocumentID?: string): ElementFull | null {
+    console.log(
+      '🔍 findByCode:',
+      code,
+      'projectDocumentID:',
+      projectDocumentID,
+    );
+    this.rows
+      .filter((r) => r.Code === code)
+      .forEach((r) =>
+        console.log(
+          'Candidate:',
+          r.Code,
+          'ProjectDocumentID:',
+          r.ProjectDocumentID,
+        ),
+      );
     const row = this.rows.find(
       (r) => r.Code === code && r.ProjectDocumentID === projectDocumentID,
     );
+    console.log('🔍 findByCode result:', row);
     return row ? mapElementRowToDomain(row) : null;
   }
 

@@ -16,33 +16,34 @@
   </head>
   <body>
     <h3>Створити BOM (Table Parser V1)</h3>
+    <label>Project Document ID:</label>
+    <input id="projectDocumentId" value="9" />
 
     <label>Parent Code:</label>
-    <input id="parentCode" value="Плита надколонна; П-1.1" />
+    <input id="parentCode" value="Каркас плоский; КР1-1-119" />
 
     <label>Table Input:</label>
     <textarea id="tableInput">
-Виріб закладний; МК-1; 1 
-Каркас просторовий; КП-1; 6 
-Сітка; ВСП-П-1.1; (верхня); 1 
-Сітка; СП-П-1.1; (нижня) ; 1
-Стержень гнутий; ГС-0 ; 4
-Стержень гнутий; ГС-2 ; 24
-Стержень гнутий; ГС-3 ; 8
-Бетон; С 20/25, м3; 1.341 
-
+Арматура; ø6 А500С; L=145; 6
+Арматура; ø6 А500С; L=880 ; 1
+Стержень гнутий; ГСк-1 ; 1 
+Арматура; ø14 А500С; L=860; 1
     </textarea>
 
     <button onclick="submit()">Створити BOM</button>
 
     <script>
       function submit() {
+        const projectDocumentId =
+          document.getElementById('projectDocumentId').value;
+
         const parentCode = document.getElementById('parentCode').value;
+
         const text = document.getElementById('tableInput').value;
 
         google.script.run
           .withSuccessHandler((res) => alert('OK: ' + res))
-          .runTableParser(parentCode, text);
+          .runTableParser(projectDocumentId, parentCode, text);
       }
     </script>
   </body>

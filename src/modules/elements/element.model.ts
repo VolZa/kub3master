@@ -58,6 +58,8 @@ export interface ElementFull {
   length?: number;
 
   isActive: boolean;
+  comment?: string;
+  createdAt: Date;
 }
 export interface CreateElementDto {
   code: string;
