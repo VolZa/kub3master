@@ -16,6 +16,10 @@ import { getOrCreateElementFromBuilt } from '../elements/element.factory';
 import { CatalogHelper } from '../catalog/catalog.helper';
 import { buildAssemblyName } from 'modules/elements/builders/name.builder';
 
+import { getProjectDocumentDependencyRepository } from '../../app/factories/project-document-dependency.factory';
+
+import { ProjectDocumentResolver } from '../../domain/project-document-dependencies';
+
 export function buildBOMRow(
   parentId: string,
   row: TableRowInput,
@@ -23,6 +27,7 @@ export function buildBOMRow(
   repo: ElementRepository,
   catalogHelper: CatalogHelper,
   materialRepo: MaterialRepository,
+  searchProjectDocumentIDs: readonly string[],
 ): any[][] {
   const prefix = row.prefix;
   const qty = row.qty ?? 1;
@@ -34,7 +39,13 @@ export function buildBOMRow(
   }
   console.log('🔥 buildBOMRow with row:', row, 'parent:', parent);
   // 🔥 1. EXISTING
-  const existingElement = repo.findByCode(row.code, parent.projectDocumentID);
+  // const existingElement = repo.findByCode(row.code, parent.projectDocumentID);
+  // const searchProjectDocumentIDs = resolver.resolve(parent.projectDocumentID);
+
+  const existingElement = repo.findByCodeInDocuments(
+    row.code,
+    searchProjectDocumentIDs,
+  );
   console.log({
     code: row.code,
     projectDocumentID: parent.projectDocumentID,
@@ -178,6 +189,20 @@ export function buildBOMFromTable(
 ) {
   console.log('👉 START buildBOMFromTable');
   console.log('INPUT PARENT:', parent);
+
+  const dependencyRepo = getProjectDocumentDependencyRepository();
+
+  const resolver = new ProjectDocumentResolver(dependencyRepo);
+
+  // const searchProjectDocumentIDs = resolver.resolve(
+  //   parent.projectDocumentID ?? '',
+  // );
+  const searchProjectDocumentIDs = resolver.resolve(
+    parent.projectDocumentID ?? '',
+  );
+
+  console.log('Resolved documents:', searchProjectDocumentIDs);
+
   const root = getOrCreateAssemblyWithName(
     parent.code,
     parent.projectDocumentID || '', // 🔥
@@ -204,6 +229,7 @@ export function buildBOMFromTable(
         elementRepo, // ✔ виправлено
         catalogHelper,
         materialRepo,
+        searchProjectDocumentIDs,
         // materialBatchRepo,
       );
 

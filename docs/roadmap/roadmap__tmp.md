@@ -82,20 +82,6 @@ modules/
 ✅ додав material/;
 ✅ додав material-batch/.
 
-✅ □ GoogleSheetsHouseDataSource
-✅ □ GoogleSheetsProjectDataSource
-✅ □ GoogleSheetsProjectDocumentDataSource
-
-□ GoogleSheetsMaterialDataSource✅
-□ GoogleSheetsMaterialBatchDataSource✅
-
-□ GoogleSheetsPlacementDataSource
-
-□ GoogleSheetsProductionDataSource
-
-□ GoogleSheetsShiftPlanDataSource
-□ GoogleSheetsShiftPlanItemDataSource
-
 <!--
 src/
 ├── modules/
@@ -130,3 +116,6 @@ modules/
     ├── project-document.headers.ts
     ├── project-document.repository.ts
     └── ... -->
+
+швидко привести до ладу ShiftPlan, ProjectDocument, House та інші модулі. Це дозволить отримати єдину й послідовну архітектуру для всієї ERP-системи.
+переходити до MaterialFactory, Bootstrap

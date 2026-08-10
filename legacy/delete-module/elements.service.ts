@@ -170,7 +170,7 @@ export function getOrCreatePart(parsed: ParsedPart): ElementResult {
     diameter: parsed.diameter,
     class: parsed.class,
     length: parsed.length,
-    weightPerUnit: parsed.weightPerUnit,
+    // weightPerUnit: parsed.weightPerUnit,
   });
 
   return { id, code: parsed.code };

@@ -54,4 +54,9 @@ export const SheetConfig: Record<SheetKey, SheetDefinition> = {
     spreadsheet: SpreadsheetKey.OPERATIONAL,
     name: '01_Виготовлення',
   },
+  PROJECT_DOCUMENT_DEPENDENCIES: {
+    key: SheetKey.PROJECT_DOCUMENT_DEPENDENCIES,
+    spreadsheet: SpreadsheetKey.MASTER,
+    name: '21_ProjectDocumentDependencies',
+  },
 };

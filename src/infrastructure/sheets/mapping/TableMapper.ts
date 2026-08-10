@@ -15,10 +15,7 @@ export class TableMapper {
   /**
    * Перетворити табличні дані у Row-об'єкти.
    */
-  // public static matrixToRows<T extends object>(
-  //   headers: readonly string[],
-  //   rows: readonly unknown[][],
-  // ): T[]
+
   public static matrixToRows<T>(
     headers: readonly string[],
     rows: SheetMatrix,

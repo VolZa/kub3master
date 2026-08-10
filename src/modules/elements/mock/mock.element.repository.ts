@@ -68,4 +68,22 @@ export class MockElementRepository implements ElementRepository {
   getAll(): ElementFull[] {
     return this.rows.map((r) => mapElementRowToDomain(r));
   }
+
+  // ------------------------
+  // 🔥 FIND BY CODE IN DOCUMENTS
+  // ------------------------
+  findByCodeInDocuments(
+    code: string,
+    projectDocumentIDs: readonly string[],
+  ): ElementFull | null {
+    for (const projectDocumentID of projectDocumentIDs) {
+      const found = this.findByCode(code, projectDocumentID);
+
+      if (found) {
+        return found;
+      }
+    }
+
+    return null;
+  }
 }

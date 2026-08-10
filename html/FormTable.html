@@ -17,17 +17,24 @@
   <body>
     <h3>Створити BOM (Table Parser V1)</h3>
     <label>Project Document ID:</label>
-    <input id="projectDocumentId" value="9" />
+    <input id="projectDocumentId" value="7" />
 
     <label>Parent Code:</label>
-    <input id="parentCode" value="Каркас плоский; КР1-1-119" />
+    <input id="parentCode" value="Плита міжколонна; П-2.7" />
 
     <label>Table Input:</label>
     <textarea id="tableInput">
-Арматура; ø6 А500С; L=145; 6
-Арматура; ø6 А500С; L=880 ; 1
-Стержень гнутий; ГСк-1 ; 1 
-Арматура; ø14 А500С; L=860; 1
+Каркас просторовий; КП-1; 7
+Сітка; ВСП-П-2.7; (верхня); 1
+Сітка; СП-П-2.7; (нижня);  1
+Стержень гнутий; ГС-0; 4
+Стержень гнутий; ГС-2; 32
+Стержень гнутий; ГС-2.3; 2
+Стержень гнутий; ГС-3; 8
+Стержень гнутий; ОС-1; 12
+Закладна деталь; ЗД-1; 4
+Бетон; С 20/25, м3;  1,365 
+
     </textarea>
 
     <button onclick="submit()">Створити BOM</button>

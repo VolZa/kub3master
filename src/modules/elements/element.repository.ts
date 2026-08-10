@@ -20,6 +20,10 @@ export interface ElementRepository {
   ): ElementFull | null;
   insert(row: ElementRow): void;
   updateType(id: string, type: string): void;
+  findByCodeInDocuments(
+    code: string,
+    projectDocumentIDs: readonly string[],
+  ): ElementFull | null;
 }
 
 export class GoogleSheetsElementRepository implements ElementRepository {
@@ -120,6 +124,32 @@ export class GoogleSheetsElementRepository implements ElementRepository {
     );
     console.log('🔍 findByCode result:', row);
     return row ? mapElementRowToDomain(row) : null;
+  }
+
+  findByCodeInDocuments(
+    code: string,
+    projectDocumentIDs: readonly string[],
+  ): ElementFull | null {
+    console.log(
+      '🔍 findByCodeInDocuments:',
+      code,
+      'documents:',
+      projectDocumentIDs,
+    );
+
+    for (const documentId of projectDocumentIDs) {
+      const found = this.findByCode(code, documentId);
+
+      if (found) {
+        console.log('✅ found in ProjectDocument:', documentId);
+
+        return found;
+      }
+    }
+
+    console.log('❌ not found');
+
+    return null;
   }
 
   findByCodeNormalized(
