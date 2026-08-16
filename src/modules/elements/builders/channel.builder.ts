@@ -1,5 +1,5 @@
 import { ParsedSpec } from '../../bom/model/parsed-spec.model';
-import { BuiltElement } from '../element.builder';
+import { BuiltElement } from '../../../domain/elements/built-element.model';
 
 export function buildChannel(parsed: ParsedSpec): BuiltElement {
   if (parsed.kind !== 'channel') {
@@ -21,7 +21,7 @@ export function buildChannel(parsed: ParsedSpec): BuiltElement {
     // type: 'part',
     // category: 'channel',
     // baseUnit: 'шт',
-    category: 'steel',
+    category: 'channel',
     profileType: 'channel',
 
     height: parsed.height,

@@ -1,4 +1,4 @@
-import { BuiltElement } from '../element.builder';
+import { BuiltElement } from '../../../domain/elements/built-element.model';
 import { ELEMENT_TYPES } from '../../../config/config';
 import { ParsedSpec } from '../../bom/model/parsed-spec.model';
 // export function buildConcrete(parsed: {
@@ -15,7 +15,7 @@ import { ParsedSpec } from '../../bom/model/parsed-spec.model';
 //   };
 // }
 
-export function buildConcrete(parsed: ParsedSpec) {
+export function buildConcrete(parsed: ParsedSpec): BuiltElement {
   if (parsed.kind !== 'concrete') {
     throw new Error('Invalid spec for concrete builder');
   }
@@ -32,6 +32,6 @@ export function buildConcrete(parsed: ParsedSpec) {
     profileType: '',
     category: 'concrete_mix',
 
-    baseUnit: 'м3',
+    // baseUnit: 'м3',
   };
 }

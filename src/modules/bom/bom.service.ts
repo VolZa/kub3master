@@ -8,13 +8,13 @@ import { ElementRepository } from '../elements/element.repository';
 import { buildByKind } from '../../modules/elements/builders/builder.dispatcher';
 
 import { parseParent } from './parsers/parseParent';
-import { getOrCreateAssemblyWithName } from '../elements/assembly.service';
+import { getOrCreateRootElement } from '../elements/root-element.service';
 
 import { MaterialRepository } from '../../domain/materials/material.repository';
 import { MaterialBatchRepository } from '../../domain/materials/material-batch.repository';
 import { getOrCreateElementFromBuilt } from '../elements/element.factory';
 import { CatalogHelper } from '../catalog/catalog.helper';
-import { buildAssemblyName } from 'modules/elements/builders/name.builder';
+import { buildElementName } from 'modules/elements/builders/name.builder';
 
 import { getProjectDocumentDependencyRepository } from '../../app/factories/project-document-dependency.factory';
 
@@ -203,12 +203,13 @@ export function buildBOMFromTable(
 
   console.log('Resolved documents:', searchProjectDocumentIDs);
 
-  const root = getOrCreateAssemblyWithName(
+  const root = getOrCreateRootElement(
     parent.code,
     parent.projectDocumentID || '', // 🔥
     parent.prefix,
-    buildAssemblyName(parent.prefix, parent.code),
+    buildElementName(parent.prefix, parent.code),
     elementRepo,
+    catalogHelper,
   );
   console.log('ROOT:', root.code, 'ProjectDocumentID:', root.projectDocumentID);
   const parentId = root.id;

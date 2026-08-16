@@ -119,9 +119,20 @@ export class GoogleSheetsElementRepository implements ElementRepository {
           r.ProjectDocumentID,
         ),
       );
-    const row = this.rows.find(
+    // const row = this.rows.find(
+    //   (r) => r.Code === code && r.ProjectDocumentID === projectDocumentID,
+    // );
+    let row = this.rows.find(
       (r) => r.Code === code && r.ProjectDocumentID === projectDocumentID,
     );
+
+    if (!row && projectDocumentID) {
+      row = this.rows.find(
+        (r) =>
+          r.Code === code &&
+          (!r.ProjectDocumentID || r.ProjectDocumentID === ''),
+      );
+    }
     console.log('🔍 findByCode result:', row);
     return row ? mapElementRowToDomain(row) : null;
   }
@@ -137,16 +148,13 @@ export class GoogleSheetsElementRepository implements ElementRepository {
       projectDocumentIDs,
     );
 
-    for (const documentId of projectDocumentIDs) {
-      const found = this.findByCode(code, documentId);
+    for (const doc of projectDocumentIDs) {
+      const found = this.findByCode(code, doc);
 
       if (found) {
-        console.log('✅ found in ProjectDocument:', documentId);
-
         return found;
       }
     }
-
     console.log('❌ not found');
 
     return null;

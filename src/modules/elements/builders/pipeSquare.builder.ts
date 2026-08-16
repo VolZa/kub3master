@@ -1,5 +1,5 @@
 import { ParsedSpec } from '../../bom/model/parsed-spec.model';
-import { BuiltElement } from '../element.builder';
+import { BuiltElement } from '../../../domain/elements/built-element.model';
 
 export function buildPipeSquare(parsed: ParsedSpec): BuiltElement {
   if (parsed.kind !== 'pipe_square') {
@@ -21,7 +21,7 @@ export function buildPipeSquare(parsed: ParsedSpec): BuiltElement {
     // baseUnit: 'шт',
 
     // type: 'material',
-    category: 'steel',
+    category: 'pipe',
     profileType: 'pipe_square',
 
     width,

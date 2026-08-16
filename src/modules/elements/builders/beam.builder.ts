@@ -1,5 +1,5 @@
 import { ParsedSpec } from '../../bom/model/parsed-spec.model';
-import { BuiltElement } from '../element.builder';
+import { BuiltElement } from '../../../domain/elements/built-element.model';
 
 export function buildBeam(parsed: ParsedSpec): BuiltElement {
   if (parsed.kind !== 'beam') {
@@ -19,9 +19,9 @@ export function buildBeam(parsed: ParsedSpec): BuiltElement {
     prefixName: 'двутавр', // 🔥 для Catalog
     name,
     // type: 'part',
-    // category: 'beam',
+    category: 'beam',
     // baseUnit: 'шт',
-    category: 'steel',
+    // category: 'steel',
     profileType: 'beam',
 
     height: parsed.height,

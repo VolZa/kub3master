@@ -1,5 +1,5 @@
 import { ParsedSpec } from '../../bom/model/parsed-spec.model';
-import { BuiltElement } from '../element.builder';
+import { BuiltElement } from '../../../domain/elements/built-element.model';
 
 import { buildRebar } from './rebar.builder';
 import { buildAngle } from './angle.builder';
@@ -44,7 +44,7 @@ export function buildByKind(parsed: ParsedSpec): BuiltElement {
     case 'assembly':
       return {
         code: parsed.name,
-        prefixName: 'що передати сюди',
+        prefixName: parsed.kind,
         name: parsed.name,
       };
 

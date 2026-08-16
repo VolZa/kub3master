@@ -1,7 +1,8 @@
+import { BuiltElement } from 'domain/elements/built-element.model';
 import { ELEMENT_TYPES } from '../../../config/config';
 import { ParsedSpec } from '../../bom/model/parsed-spec.model';
 
-export function buildAngle(parsed: ParsedSpec) {
+export function buildAngle(parsed: ParsedSpec): BuiltElement {
   if (parsed.kind !== 'angle') {
     throw new Error('Invalid spec for angle');
   }
@@ -21,9 +22,9 @@ export function buildAngle(parsed: ParsedSpec) {
     prefixName: 'кутник', // 🔥 для Catalog
     name,
     // type: ELEMENT_TYPES.PART,
-    // category: 'angle',
+    category: 'angle',
     // baseUnit: 'шт',
-    category: 'steel',
+    // category: 'steel',
     profileType: 'angle',
 
     width: parsed.width,

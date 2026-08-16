@@ -1,7 +1,8 @@
+import { BuiltElement } from 'domain/elements/built-element.model';
 import { ELEMENT_TYPES } from '../../../config/config';
 import { ParsedSpec } from '../../bom/model/parsed-spec.model';
 
-export function buildPlate(parsed: ParsedSpec) {
+export function buildPlate(parsed: ParsedSpec): BuiltElement {
   if (parsed.kind !== 'plate') {
     throw new Error('Invalid spec for plate builder');
   }
@@ -12,8 +13,8 @@ export function buildPlate(parsed: ParsedSpec) {
     name: `Полоса ${parsed.width}x${parsed.thickness} L=${parsed.length}`,
     // type: ELEMENT_TYPES.PART,
     profileType: 'plate',
-    category: 'steel',
-    baseUnit: 'шт',
+    category: 'plate',
+    // baseUnit: 'шт',
 
     width: parsed.width,
     thickness: parsed.thickness,

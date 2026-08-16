@@ -2,7 +2,7 @@ import { ElementRepository } from '../../modules/elements/element.repository';
 import { ElementShort } from '../../modules/elements/element.model';
 import { generateIdByType } from '../../utils/id';
 import { addElementToCache } from '../../services/cache.service';
-import { BuiltElement } from '../../modules/elements/element.builder';
+import { BuiltElement } from '../elements/built-element.model';
 
 import { CatalogHelper } from '../../modules/catalog/catalog.helper';
 import { getOrCreateElementFromBuilt } from '../../modules/elements/element.factory';

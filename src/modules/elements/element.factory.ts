@@ -10,12 +10,16 @@ import {
   getElementFromCache,
 } from '../../services/cache.service';
 import { toShort } from './element.mapper';
-import { BuiltElement, BuiltElementExtended } from './element.builder';
+import {
+  BuiltElement,
+  BuiltElementExtended,
+} from '../../domain/elements/built-element.model';
 
 import { MaterialRepository } from '../../domain/materials/material.repository';
 import { MaterialBatchRepository } from '../../domain/materials/material-batch.repository';
 import { CatalogHelper } from '../catalog/catalog.helper';
 import { MaterialResolver } from 'domain/materials/material.resolver';
+import { resolveElementType } from './element-type.resolver';
 
 export function getOrCreateElementFromBuilt(
   built: BuiltElement,
@@ -23,92 +27,92 @@ export function getOrCreateElementFromBuilt(
   catalogHelper: CatalogHelper,
   materialRepo: MaterialRepository,
   projectDocumentID?: string,
-  // materialBatchRepo: MaterialBatchRepository,
 ): ElementFull {
   console.log('getOrCreateElementFromBuilt with built:', built);
-  // 🔹 1. вже існує?
-  let existing = elementRepo.findByCode(built.code, projectDocumentID);
-  if (existing) return existing;
 
-  // 🔥 2. Catalog через helper
-  const catalog = catalogHelper.get(built.prefixName);
-
-  const catalogType = catalog.type;
-  const category = catalog.category;
-  const profileType = catalog.profileType || '';
-  console.log(
-    'getOrCreateElementFromBuilt 🔥 catalogType:',
-    catalogType,
-    'category:',
-    category,
-    'profileType:',
-    profileType,
-  );
-  // 🔥 визначення типу
-  let type = catalogType;
-  if (catalogType === 'material' && built.length !== undefined) {
-    type = 'part';
+  // 🔹 1. Перевірка існування
+  const existing = elementRepo.findByCode(built.code, projectDocumentID);
+  if (existing) {
+    return existing;
   }
 
-  // 🔥 material
+  // 🔹 2. Отримуємо шаблон
+  const template = catalogHelper.resolveTemplate(built.prefixName);
+
+  console.log('Resolved template:', template);
+
+  // 🔹 3. Визначаємо кінцевий тип елемента
+  const type = resolveElementType(template, built.length);
+
+  console.log('Resolved element type:', type);
+
+  // 🔹 4. Пошук матеріалу
   let material;
 
-  if (type === 'material') {
-    material = materialRepo.findByCode(built.code);
+  switch (type) {
+    case 'material':
+      material = materialRepo.findByCode(built.code);
+      break;
+
+    case 'part': {
+      const resolver = new MaterialResolver(materialRepo);
+      material = resolver.resolve(built);
+      console.log('Resolved material:', material, 'for', built.code);
+      break;
+    }
   }
 
-  if (type === 'part') {
-    const resolver = new MaterialResolver(materialRepo);
+  // 🔹 5. Базова одиниця виміру
+  const baseUnit = type === 'material' ? (material?.baseUnit ?? 'кг') : 'шт';
 
-    material = resolver.resolve(built);
-    console.log('Resolved material:', material, 'for', built.code);
-  }
-
-  // 🔥 base unit
-  const baseUnit = type === 'material' ? material?.baseUnit || 'кг' : 'шт';
-  // 🔹 5. ID
+  // 🔹 6. Генеруємо ID
   const id = generateIdByType(type);
 
-  // 🔥 6. створення
-  if (!material) {
+  // 🔹 7. Для material/part матеріал обов'язковий
+  if ((type === 'material' || type === 'part') && !material) {
     throw new Error(`Material not found for element: ${built.code}`);
   }
 
+  // 🔹 8. Власник елемента
+  const ownerProjectDocumentID =
+    type === 'assembly' || type === 'product' ? projectDocumentID : '';
+
+  // 🔹 9. Створення рядка
   const row: ElementRow = {
     ID: id,
     Code: built.code,
+
     PrefixName: built.prefixName,
     Name: built.name,
 
     Type: type,
-    ProjectDocumentID: projectDocumentID,
-    // type === 'assembly' || type === 'product'
-    //   ? built.projectDocumentID
-    //   : undefined,
-    ParentMaterialID: type === 'part' ? material.id : undefined,
-    Category: category,
-    ProfileType: profileType,
-    BaseUnit: baseUnit,
+    ProjectDocumentID: ownerProjectDocumentID,
 
-    // ParentMaterialID: material?.id || '',
-    // ParentMaterialID: material.id,
+    ParentMaterialID: type === 'part' ? material?.id : undefined,
+
+    Category: template.category,
+    ProfileType: template.profileType ?? '',
+
+    BaseUnit: baseUnit,
 
     Diameter: built.diameter,
     Class: built.className,
-    Length: built.length,
 
     Width: built.width,
     Height: built.height,
+    Length: built.length,
     Thickness: built.thickness,
 
     IsActive: true,
     Comment: '',
     CreatedAt: new Date(),
   };
+
   console.log('FINAL CODE BEFORE INSERT:', built.code);
+
   elementRepo.insert(row);
 
-  const created = elementRepo.findByCode(built.code, projectDocumentID);
+  const created = elementRepo.findByCode(built.code, ownerProjectDocumentID);
 
   if (!created) {
     throw new Error(`Failed to create element: ${built.code}`);

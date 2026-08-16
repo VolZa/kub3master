@@ -1,4 +1,4 @@
-import { BuiltElement } from '../../elements/element.builder';
+import { BuiltElement } from '../../../domain/elements/built-element.model';
 import { TableRowInput } from '../model/table-row-input.model';
 import { generateCodeFromSpec } from '../../elements/utils/code.util';
 

@@ -1,3 +1,4 @@
+// src\config\config.ts
 export const STEEL_DENSITY = 7850;
 // ======================================================
 // ERP
@@ -18,13 +19,29 @@ export type ElementType = (typeof ELEMENT_TYPES)[keyof typeof ELEMENT_TYPES];
 
 // ------------------ MATERIAL ------------------
 
+// export const MATERIAL_CATEGORIES = {
+//   REBAR: 'rebar',
+//   WIRE: 'wire',
+//   STEEL: 'steel',
+//   CONCRETE: 'concrete_mix',
+//   CEMENT: 'cement',
+//   OTHER: 'other',
+// } as const;
+
+// export type MaterialCategory =
+//   (typeof MATERIAL_CATEGORIES)[keyof typeof MATERIAL_CATEGORIES];
 export const MATERIAL_CATEGORIES = {
-  REBAR: 'rebar',
   WIRE: 'wire',
-  STEEL: 'steel',
-  CONCRETE: 'concrete_mix',
+  REBAR: 'rebar',
+
+  PLATE: 'plate',
+  ANGLE: 'angle',
+  PIPE: 'pipe',
+  BEAM: 'beam',
+  CHANNEL: 'channel',
+
   CEMENT: 'cement',
-  OTHER: 'other',
+  CONCRETE_MIX: 'concrete_mix',
 } as const;
 
 export type MaterialCategory =

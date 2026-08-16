@@ -1,13 +1,15 @@
-// src\modules\elements\assembly.service.ts
+// src\modules\elements\root-element.service.ts
 
 import { ElementRepository } from './element.repository';
-import { ElementShort } from './element.model';
+import { ElementShort, ElementFull } from './element.model';
 import { buildAssemblyRow } from './element.mapper';
 import { generateIdByType } from '../../utils/id';
 import { addElementToCache } from '../../services/cache.service';
 
 import { getSheetByNameSafe } from '../../utils/sheets';
 import { ELEMENT_TYPES } from '../../config/config';
+import { CatalogHelper } from 'modules/catalog/catalog.helper';
+import { resolveElementType } from './element-type.resolver';
 
 export function getOrCreateAssembly(
   code: string,
@@ -50,37 +52,59 @@ export function getOrCreateAssembly(
   return short;
 }
 
-export function getOrCreateAssemblyWithName(
+export function getOrCreateRootElement(
   code: string,
   projectDocumentID: string,
   prefixName: string,
   name: string,
   repo: ElementRepository,
-) {
-  let existing = repo.findByCode(code, projectDocumentID);
+  catalogHelper: CatalogHelper,
+): ElementFull {
+  // 🔹 1. Вже існує?
+  const existing = repo.findByCode(code, projectDocumentID);
 
-  if (existing) return existing;
+  if (existing) {
+    return existing;
+  }
 
-  const id = generateIdByType(ELEMENT_TYPES.ASSEMBLY);
+  // 🔹 2. Визначаємо шаблон
+  const template = catalogHelper.resolveTemplate(prefixName);
 
+  // 🔹 3. Визначаємо тип
+  const type = resolveElementType(template);
+
+  // 🔹 4. Генеруємо ID
+  const id = generateIdByType(type);
+
+  // 🔹 5. Створюємо елемент
   repo.insert({
     ID: id,
     Code: code,
+
     ProjectDocumentID: projectDocumentID,
+
     PrefixName: prefixName,
     Name: name || code,
-    Type: ELEMENT_TYPES.ASSEMBLY,
-    Category: 'steel component',
+
+    Type: type,
+
+    Category: template.category,
+    ProfileType: template.profileType ?? '',
+
     BaseUnit: 'шт',
+
+    IsActive: true,
+    Comment: '',
     CreatedAt: new Date(),
   });
 
-  const el = repo.findById(id);
-  if (!el) {
-    throw new Error('Failed to create assembly: ' + code);
+  const created = repo.findById(id);
+
+  if (!created) {
+    throw new Error(`Failed to create ${type}: ${code}`);
   }
 
-  return el;
+  return created;
 }
 
 export function calcAssemblyWeight(

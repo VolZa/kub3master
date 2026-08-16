@@ -3,10 +3,13 @@ import { MaterialCategory } from '../../config/config';
 const UNIT_BY_CATEGORY: Record<MaterialCategory, string> = {
   rebar: 'кг',
   wire: 'кг',
-  steel: 'кг',
+  plate: 'кг',
+  angle: 'кг',
+  pipe: 'кг',
+  beam: 'кг',
+  channel: 'кг',
   concrete_mix: 'л',
   cement: 'кг',
-  other: 'кг',
 };
 
 export function getMaterialUnit(category: MaterialCategory): string {

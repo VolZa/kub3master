@@ -1,6 +1,6 @@
 import { Material } from './material.model';
 import { MaterialRepository } from './material.repository';
-import { BuiltElement } from '../../modules/elements/element.builder';
+import { BuiltElement } from '../elements/built-element.model';
 import { normalizeClassName } from '../../utils/normalize';
 
 export class MaterialResolver {

@@ -1,5 +1,5 @@
 import { ParsedSpec } from '../../bom/model/parsed-spec.model';
-import { BuiltElement } from '../element.builder';
+import { BuiltElement } from '../../../domain/elements/built-element.model';
 
 export function buildPipeRound(parsed: ParsedSpec): BuiltElement {
   if (parsed.kind !== 'pipe_round') {
@@ -21,7 +21,7 @@ export function buildPipeRound(parsed: ParsedSpec): BuiltElement {
     // type: 'part',
     // category: 'pipe_round',
     // baseUnit: 'шт',
-    category: 'steel',
+    category: 'pipe',
     profileType: 'pipe_round',
 
     diameter: parsed.diameter,

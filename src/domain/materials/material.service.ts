@@ -6,7 +6,7 @@ import {
   getElementFromCache,
 } from '../../services/cache.service';
 import { generateIdByType } from '../../utils/id';
-import { BuiltElement } from '../../modules/elements/element.builder';
+import { BuiltElement } from '../elements/built-element.model';
 import { toShort } from '../../modules/elements/element.mapper';
 import { MaterialRepository } from './material.repository';
 import { getMaterialUnit } from './material.utils';

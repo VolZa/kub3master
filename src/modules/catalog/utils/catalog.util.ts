@@ -6,7 +6,7 @@ export function getCatalogByPrefix(
   prefixName: string,
   catalogRepo: ICatalogRepository,
 ): CatalogItem {
-  return catalogRepo.requireByCode(prefixName.toLowerCase().trim());
+  return catalogRepo.requireByTypeCode(prefixName.toLowerCase().trim());
 }
 export function getCategoryByPrefix(
   prefixName: string,

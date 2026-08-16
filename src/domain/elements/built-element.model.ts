@@ -1,13 +1,14 @@
-// src\modules\elements\element.builder.ts
+// src\domain\elements\built-element.model.ts
 
-import { ParsedSpec } from '../bom/model/parsed-spec.model';
+import { MaterialCategory } from 'config/config';
+import { ParsedSpec } from '../../modules/bom/model/parsed-spec.model';
 
 export type BuiltElement = {
   code: string;
   prefixName: string;
   name: string;
   // 🔥 ДОДАТИ
-  category?: string; // rebar, plate, angle...
+  category?: MaterialCategory; // rebar, plate, angle...
   // 🔹 геометрія (опційно)
   diameter?: number;
   length?: number;
@@ -25,19 +26,25 @@ export type BuiltElementExtended = BuiltElement & {
   parentMaterialId?: string;
 };
 
-export function buildElementCode(parsed: ParsedSpec): string {
-  throw new Error('❌ DO NOT USE buildElementCode(parsed)');
-}
+// export function buildElementCode(parsed: ParsedSpec): string {
+//   throw new Error('❌ DO NOT USE buildElementCode(parsed)');
+// }
 
-export function buildElementCodeFromParsed(parsed: ParsedSpec): string {
-  if (parsed.kind === 'rebar') {
-    const base = `R_${parsed.diameter}_${parsed.className}`;
+//Після рефакторингу, функція buildElementCodeFromParsed має зникнути.
+// Його місце займуть
 
-    return parsed.length ? `${base}, L=${parsed.length}` : base;
-  }
+// MaterialCodeBuilder
 
-  return parsed.kind;
-}
+// PartCodeBuilder
+// export function buildElementCodeFromParsed(parsed: ParsedSpec): string {
+//   if (parsed.kind === 'rebar') {
+//     const base = `R_${parsed.diameter}_${parsed.className}`;
+
+//     return parsed.length ? `${base}, L=${parsed.length}` : base;
+//   }
+
+//   return parsed.kind;
+// }
 
 // ===== Name =====
 

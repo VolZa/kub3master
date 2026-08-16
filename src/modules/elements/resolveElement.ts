@@ -1,8 +1,6 @@
 import { ElementRepository } from './element.repository';
 import { ElementShort } from './element.model';
-// import { getOrCreatePart } from '../../domain/parts/part.service';
-// import { getOrCreateMaterialFromPart } from '../../domain/materials/material.service';
-// import { getOrCreateAssembly } from './assembly.service';
+
 import { buildByKind } from './builders/builder.dispatcher';
 import { ParsedSpec } from '../bom/model/parsed-spec.model';
 import { ICatalogRepository } from '../../modules/catalog/catalog.repository.interface';

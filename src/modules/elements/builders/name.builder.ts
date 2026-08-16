@@ -18,6 +18,6 @@ export function buildName(
 
 // name.builder.ts
 
-export function buildAssemblyName(prefix?: string, code?: string): string {
+export function buildElementName(prefix?: string, code?: string): string {
   return [prefix?.trim(), code?.trim()].filter(Boolean).join(' ');
 }

@@ -11,7 +11,7 @@ export class CatalogService {
   // -------------------------------
 
   getByCode(code: string): CatalogItem | null {
-    return this.repo.getByCode(code);
+    return this.repo.getByTypeCode(code);
   }
 
   // findByTypeCode(typeCode: string): CatalogItem | null {
@@ -23,7 +23,7 @@ export class CatalogService {
   // }
   requireByTypeCode(typeCode: string): CatalogItem {
     // const item = this.findByTypeCode(typeCode);
-    const item = this.repo.getByCode(typeCode);
+    const item = this.repo.getByTypeCode(typeCode);
 
     if (!item) {
       throw new Error(`Catalog item not found: ${typeCode}`);
@@ -36,7 +36,7 @@ export class CatalogService {
     return item as Required<CatalogItem>;
   }
   requireByCode(code: string): CatalogItem {
-    return this.repo.requireByCode(code);
+    return this.repo.requireByTypeCode(code);
   }
 
   // -------------------------------
@@ -58,7 +58,7 @@ export class CatalogService {
 
     const code = row.prefix.toLowerCase().trim();
 
-    const item = this.repo.getByCode(code);
+    const item = this.repo.getByTypeCode(code);
 
     if (!item) {
       throw new Error(`Catalog item not found: ${row.prefix}`);
