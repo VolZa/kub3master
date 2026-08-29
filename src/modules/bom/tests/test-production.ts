@@ -7,14 +7,16 @@ import { ProductionRequirementService } from '../services/production-requirement
 import { GoogleSheetsMaterialDataSource } from '../../../infrastructure/sheets/material/GoogleSheetsMaterialDataSource';
 import { MaterialRepository } from '../../../domain/materials/material.repository';
 import { sheetProvider } from '../../../app/factories/infrastructure.factory';
+import { GoogleSheetsBOMRepository } from '../repositories/google-sheets-bom.repository';
 
 export function testProductionRequirement() {
   const elementRepo = new GoogleSheetsElementRepository();
+  const bomRepo = new GoogleSheetsBOMRepository();
 
   const materialDS = new GoogleSheetsMaterialDataSource(sheetProvider);
   const materialRepo = new MaterialRepository(materialDS.getRows());
 
-  const bomExplorer = new BOMExplorerService(elementRepo);
+  const bomExplorer = new BOMExplorerService(elementRepo, bomRepo);
 
   const bomMaterials = new BOMMaterialsService(bomExplorer, materialRepo);
 

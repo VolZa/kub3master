@@ -2,6 +2,12 @@ import { getSheetByNameSafe } from '../../utils/sheets';
 import { forceText, insertRows } from '../../utils/sheets.utils';
 import { BOMRow } from './model/bom-row.model';
 
+// export interface BOMRepository {
+//   getChildrenRows(parentId: string): BOMRow[];
+
+//   getParentsRows(childId: string): BOMRow[];
+// }
+
 export function insertBOMRows(rows: any[][]) {
   console.log('INPUT ROWS:', JSON.stringify(rows, null, 2));
   const sheet = getSheetByNameSafe('01_BOM');

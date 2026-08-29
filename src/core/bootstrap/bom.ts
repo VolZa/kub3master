@@ -6,7 +6,10 @@ import { BOMExplorerService } from '../../modules/bom/services/bom-explorer.serv
 import { BOMMaterialsService } from '../../modules/bom/services/bom-materials.service';
 
 export function createBOMServices(repositories: Repositories) {
-  const explorer = new BOMExplorerService(repositories.elements);
+  const explorer = new BOMExplorerService(
+    repositories.elements,
+    repositories.bom,
+  );
 
   const materials = new BOMMaterialsService(explorer, repositories.materials);
 

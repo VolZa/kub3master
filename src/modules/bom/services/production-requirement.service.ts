@@ -1,7 +1,12 @@
+// src\modules\bom\services\production-requirement.service.ts
 import { MaterialRequirement } from '../model/material-requirement.model';
 import { ProductRequirement } from '../model/product-requirement.model';
 import { BOMMaterialsService } from './bom-materials.service';
 
+// BOM
+//  ├── старий ProductionRequirementService
+//  │   замінимо на новий
+//  └── новий MaterialConsumptionEngine
 export class ProductionRequirementService {
   constructor(private readonly materialsService: BOMMaterialsService) {}
 

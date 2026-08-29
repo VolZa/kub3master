@@ -1,3 +1,4 @@
+// src\domain\materials\material.utils.ts
 import { MaterialCategory } from '../../config/config';
 
 const UNIT_BY_CATEGORY: Record<MaterialCategory, string> = {
@@ -8,7 +9,7 @@ const UNIT_BY_CATEGORY: Record<MaterialCategory, string> = {
   pipe: 'кг',
   beam: 'кг',
   channel: 'кг',
-  concrete_mix: 'л',
+  concrete_mix: 'м3',
   cement: 'кг',
 };
 

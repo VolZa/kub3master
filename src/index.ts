@@ -23,6 +23,8 @@ import { previewProductionSynchronization } from './debug/production-synchroniza
 import { productionSynchronizationSmokeTest } from './debug/production-synchronization.smoke';
 import { analyzeProduction, executeProduction } from './menu/production.menu';
 import { debugProjectContext } from './debug/debug-project-context';
+import { testP1BOM } from './modules/bom/tests/testP1BOM';
+import { testP1Materials } from 'modules/bom/tests/testP1Materials';
 
 function runTableParser(
   projectDocumentID: string,
@@ -97,4 +99,6 @@ register({
   previewProductionSynchronization,
   productionSynchronizationSmokeTest,
   debugProjectContext,
+  testP1BOM,
+  testP1Materials,
 });

@@ -1,12 +1,19 @@
 // src/modules/bom/tests/testBOMExplorer.ts
 
 import { GoogleSheetsElementRepository } from '../../elements/element.repository';
+import { GoogleSheetsBOMRepository } from '../repositories/google-sheets-bom.repository';
 import { BOMExplorerService } from '../services/bom-explorer.service';
 
 export function testBOMExplorer() {
+  // const elementRepo = new GoogleSheetsElementRepository();
+
+  // const service = new BOMExplorerService(elementRepo);
+
   const elementRepo = new GoogleSheetsElementRepository();
 
-  const service = new BOMExplorerService(elementRepo);
+  const bomRepo = new GoogleSheetsBOMRepository();
+
+  const service = new BOMExplorerService(elementRepo, bomRepo);
 
   const product = elementRepo.findByCode('П-1.1', '6'); // Specify the projectDocumentID if needed
 
