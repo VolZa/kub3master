@@ -3,6 +3,11 @@ import { SheetKey } from './SheetKey';
 import { SpreadsheetKey } from '../spreadsheets/SpreadsheetKey';
 
 export const SheetConfig: Record<SheetKey, SheetDefinition> = {
+  BOM_MATRIX_COLUMNS: {
+    key: SheetKey.BOM_MATRIX_COLUMNS,
+    spreadsheet: SpreadsheetKey.MASTER,
+    name: 'BOMMatrixColumns',
+  },
   CATALOG: {
     key: SheetKey.CATALOG,
     spreadsheet: SpreadsheetKey.MASTER,
@@ -58,5 +63,15 @@ export const SheetConfig: Record<SheetKey, SheetDefinition> = {
     key: SheetKey.PROJECT_DOCUMENT_DEPENDENCIES,
     spreadsheet: SpreadsheetKey.MASTER,
     name: '21_ProjectDocumentDependencies',
+  },
+  REPORT_MATERIAL_MATRIX: {
+    key: SheetKey.REPORT_MATERIAL_MATRIX,
+    spreadsheet: SpreadsheetKey.REPORTING,
+    name: 'ВідомістьВитрат',
+  },
+  MANUFACTURING: {
+    key: SheetKey.MANUFACTURING,
+    spreadsheet: SpreadsheetKey.OPERATIONAL,
+    name: '01_Виготовлення',
   },
 };

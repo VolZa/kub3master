@@ -24,6 +24,10 @@ export interface ElementRepository {
     code: string,
     projectDocumentIDs: readonly string[],
   ): ElementFull | null;
+  findByTypeInDocuments(
+    type: ElementType,
+    projectDocumentIDs: readonly string[],
+  ): ElementFull[];
 }
 
 export class GoogleSheetsElementRepository implements ElementRepository {
@@ -174,6 +178,20 @@ export class GoogleSheetsElementRepository implements ElementRepository {
     );
 
     return row ? mapElementRowToDomain(row) : null;
+  }
+
+  findByTypeInDocuments(
+    type: ElementType,
+    projectDocumentIDs: readonly string[],
+  ): ElementFull[] {
+    const documentIds = new Set(projectDocumentIDs.map((id) => String(id)));
+
+    return this.rows
+      .filter(
+        (row) =>
+          row.Type === type && documentIds.has(String(row.ProjectDocumentID)),
+      )
+      .map((row) => mapElementRowToDomain(row));
   }
 
   findPart(part: ParsedPart) {

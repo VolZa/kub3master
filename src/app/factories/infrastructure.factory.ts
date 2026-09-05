@@ -1,3 +1,4 @@
+// src\app\factories\infrastructure.factory.ts
 import { SpreadsheetProvider } from '../../infrastructure/spreadsheets/SpreadsheetProvider';
 import { SpreadsheetRegistry } from '../../infrastructure/spreadsheets/SpreadsheetRegistry';
 import { SheetProvider } from '../../infrastructure/sheets/SheetProvider';

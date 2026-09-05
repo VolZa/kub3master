@@ -50,6 +50,13 @@ export class MockElementRepository implements ElementRepository {
     return row ? mapElementRowToDomain(row) : null;
   }
 
+  findByTypeInDocuments(
+    type: ElementType,
+    projectDocumentIDs: readonly string[],
+  ): ElementFull[] {
+    return [];
+  }
+
   // ------------------------
   // INSERT
   // ------------------------

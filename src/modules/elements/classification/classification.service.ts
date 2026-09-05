@@ -9,7 +9,7 @@ export function classifyByPrefix(prefix: string): Classification | null {
     return {
       type: 'material',
       category: 'concrete',
-      baseUnit: 'л',
+      baseUnit: 'м3',
     };
   }
 

@@ -1,4 +1,6 @@
+//src\infrastructure\sheets\SheetKey.ts
 export const SheetKey = {
+  BOM_MATRIX_COLUMNS: 'BOM_MATRIX_COLUMNS',
   CATALOG: 'CATALOG',
   MATERIAL_BATCHES: 'MATERIAL_BATCHES',
   MATERIALS: 'MATERIALS',
@@ -10,6 +12,8 @@ export const SheetKey = {
   PROJECT_DOCUMENTS: 'PROJECT_DOCUMENTS', //'19_ProjectDocuments',
   HOUSES: 'HOUSES', //'20_Houses',
   PROJECT_DOCUMENT_DEPENDENCIES: 'PROJECT_DOCUMENT_DEPENDENCIES', //'21_ProjectDocumentDependencies'
+  REPORT_MATERIAL_MATRIX: 'REPORT_MATERIAL_MATRIX',
+  MANUFACTURING: 'MANUFACTURING',
 } as const;
 
 export type SheetKey = (typeof SheetKey)[keyof typeof SheetKey];

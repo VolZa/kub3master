@@ -1,3 +1,4 @@
+// src\modules\bom\model\bom-row.model.ts
 export interface BOMRow {
   parentId: string;
   childId: string;

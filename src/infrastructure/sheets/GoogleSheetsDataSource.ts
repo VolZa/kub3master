@@ -23,6 +23,8 @@ export abstract class GoogleSheetsDataSource<T extends object> {
     sheetProvider: SheetProvider,
     private readonly sheetKey: SheetKey,
     private readonly expectedHeaders: readonly string[],
+    private readonly dataStartRow = 2,
+    private readonly columnCount?: number,
   ) {
     this.reader = new GoogleSheetsReader(sheetProvider);
     this.writer = new GoogleSheetsWriter(sheetProvider);
@@ -35,19 +37,30 @@ export abstract class GoogleSheetsDataSource<T extends object> {
       return [];
     }
 
-    const headers = matrix[0].map(String);
-    const data = matrix.slice(1);
+    const headers = matrix[0].slice(0, this.columnCount).map(String);
 
-    console.log({
-      sheet: this.sheetKey,
-      actual: headers,
-      expected: this.expectedHeaders,
-    });
+    const data = matrix
+      .slice(this.dataStartRow - 1)
+      .map((row) => row.slice(0, this.columnCount));
 
     HeaderSchema.validate(headers, this.expectedHeaders);
 
     return TableMapper.matrixToRows<T>(headers, data);
   }
+  // public getRows(): readonly T[] {
+  //   const matrix = this.reader.read(this.sheetKey);
+
+  //   if (matrix.length === 0) {
+  //     return [];
+  //   }
+
+  //   const headers = matrix[0].map(String);
+  //   const data = matrix.slice(this.dataStartRow - 1);
+
+  //   HeaderSchema.validate(headers, this.expectedHeaders);
+
+  //   return TableMapper.matrixToRows<T>(headers, data);
+  // }
 
   /**
    * Повністю замінити дані таблиці.

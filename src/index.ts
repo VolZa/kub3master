@@ -26,6 +26,20 @@ import { debugProjectContext } from './debug/debug-project-context';
 import { testP1BOM } from './modules/bom/tests/testP1BOM';
 import { testP1Materials } from 'modules/bom/tests/testP1Materials';
 
+import { generateProjectMaterialMatrixReport } from './modules/project/generateProjectMaterialMatrixReport';
+import { diagnoseProductP1 } from './modules/bom/tests/diagnose-product-bom';
+// import { testManufacturingDataSource } from './modules/bom/tests/testManufacturingDataSource';
+// import { testManufacturingMapper } from './modules/bom/tests/testManufacturingMapper';
+import { testManufacturingResolver } from './modules/manufacturing/tests/testManufacturingResolver';
+import { testManufacturingProcessor } from 'modules/manufacturing/tests/testManufacturingProcessor';
+
+function testDiagnoseProductP1(): void {
+  diagnoseProductP1();
+}
+function testGenerateProjectMaterialMatrixReport(): void {
+  generateProjectMaterialMatrixReport('1');
+}
+
 function runTableParser(
   projectDocumentID: string,
   parentCode: string,
@@ -101,4 +115,11 @@ register({
   debugProjectContext,
   testP1BOM,
   testP1Materials,
+
+  testDiagnoseProductP1,
+  testGenerateProjectMaterialMatrixReport,
+  testManufacturingResolver,
+  testManufacturingProcessor,
+  // testManufacturingDataSource,
+  // testManufacturingMapper,
 });
