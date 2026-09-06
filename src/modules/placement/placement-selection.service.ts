@@ -11,14 +11,14 @@ export class PlacementSelectionService {
    * який необхідно вважати виготовленим.
    */
   findNextForProduction(
-    houseId: string,
+    houseCode: string,
     productCode: string,
     reservedPlacementIds: Set<number>,
   ): Placement | null {
     return (
       this.repository
         .getAll()
-        .filter((placement) => placement.houseId === houseId)
+        .filter((placement) => placement.houseCode === houseCode)
         .filter((placement) => placement.productCode === productCode)
         .filter((placement) => placement.status === PlacementStatus.NONE)
         .find((placement) => !reservedPlacementIds.has(placement.id)) ?? null

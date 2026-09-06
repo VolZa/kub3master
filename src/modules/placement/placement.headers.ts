@@ -1,11 +1,11 @@
 /**
- * Заголовки таблиці 20_Houses
- * Path: src\modules\house\house.headers.ts
+ * Заголовки таблиці 13_Placement
+ * Path: src\modules\placement\placement.headers.ts
  * Порядок елементів визначає порядок колонок під час запису.
  */
 export const PLACEMENT_HEADERS = [
   'PlacementId',
-  'HouseId',
+  'HouseCode',
   'Section',
   'Floor',
   'Axis',
@@ -19,3 +19,5 @@ export const PLACEMENT_HEADERS = [
   'ShippedDate',
   'Comment',
 ] as const;
+
+// 'HouseId',

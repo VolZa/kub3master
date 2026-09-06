@@ -17,9 +17,9 @@ export class ProductionPlanningService {
   /**
    * Доступні вироби конкретного будинку.
    */
-  getAvailablePlacementsByHouse(houseId: string): Placement[] {
+  getAvailablePlacementsByHouse(houseCode: string): Placement[] {
     return this.placementRepository
-      .findByHouseId(houseId)
+      .findByHouseCode(houseCode)
       .filter(canBeScheduled);
   }
 

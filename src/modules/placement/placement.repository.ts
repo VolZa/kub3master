@@ -122,8 +122,8 @@ export class PlacementInMemoryRepository implements IPlacementRepository {
     return this.items.filter((p) => p.productCode === productCode);
   }
 
-  findByHouseId(houseId: string): Placement[] {
-    return this.items.filter((p) => p.houseId === houseId);
+  findByHouseCode(houseCode: string): Placement[] {
+    return this.items.filter((p) => p.houseCode === houseCode);
   }
 }
 

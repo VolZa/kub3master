@@ -1,6 +1,6 @@
 export interface PlacementRow {
   PlacementId: number;
-  HouseId: string;
+  HouseCode: string;
   Section: string;
   Floor: number;
   Axis: string;
@@ -14,3 +14,4 @@ export interface PlacementRow {
   ShippedDate?: Date;
   Comment?: string;
 }
+// HouseId: string;

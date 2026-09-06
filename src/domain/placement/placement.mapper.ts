@@ -8,7 +8,7 @@ export function mapRowToPlacement(row: PlacementRow): Placement {
   return {
     id: row.PlacementId,
 
-    houseId: row.HouseId,
+    houseCode: row.HouseCode,
 
     productCode: row.ProductCode,
 
@@ -47,7 +47,7 @@ export function mapPlacementToRow(placement: Placement): PlacementRow {
   return {
     PlacementId: placement.id,
 
-    HouseId: placement.houseId,
+    HouseCode: placement.houseCode,
 
     Section: placement.location.section,
     Floor: placement.location.floor,

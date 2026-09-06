@@ -11,7 +11,8 @@ export interface IPlacementRepository {
 
   findByStatus(status: PlacementStatus): Placement[];
 
-  findByHouseId(houseId: string): Placement[];
+  // findByHouseId(houseId: string): Placement[];
+  findByHouseCode(houseCode: string): Placement[];
 
   findByProductCode(productCode: string): Placement[];
 

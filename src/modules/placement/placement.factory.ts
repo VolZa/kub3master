@@ -5,7 +5,7 @@ import { PlacementStatus } from '../../domain/placement/placement.status';
 
 export interface CreatePlacementDto {
   id: number;
-  houseId: string;
+  houseCode: string;
   productCode: string;
 
   section: string;
@@ -19,7 +19,7 @@ export function createPlacement(dto: CreatePlacementDto): Placement {
   return {
     id: dto.id,
 
-    houseId: dto.houseId,
+    houseCode: dto.houseCode,
 
     productCode: dto.productCode,
 
