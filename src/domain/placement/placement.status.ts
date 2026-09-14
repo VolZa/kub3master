@@ -1,3 +1,5 @@
+// src\domain\placement\placement.status.ts
+
 export enum PlacementStatus {
   NONE = '',
 

@@ -12,7 +12,6 @@ export interface PlacementLocation {
 export interface Placement {
   id: number;
 
-  // houseId: string;
   houseCode: string;
 
   productCode: string;

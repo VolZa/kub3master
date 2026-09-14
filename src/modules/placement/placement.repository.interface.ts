@@ -1,3 +1,16 @@
+/**
+ * ==========================================================
+ * ERP КУБ
+ * Module: Placement
+ * Layer: Application / Repository Contract
+ * File: placement.repository.interface.ts
+ * Path: src/modules/placement/placement.repository.interface.ts
+ *
+ * Контракт репозиторію Placement.
+ * Визначає операції, доступні application-рівню.
+ * ==========================================================
+ */
+
 import { Placement, PlacementStatus } from '../../domain/placement/';
 
 export interface IPlacementRepository {
@@ -5,13 +18,10 @@ export interface IPlacementRepository {
 
   save(): void;
 
-  // saveAll(items: Placement[]): void;
-
   findById(id: number): Placement | null;
 
   findByStatus(status: PlacementStatus): Placement[];
 
-  // findByHouseId(houseId: string): Placement[];
   findByHouseCode(houseCode: string): Placement[];
 
   findByProductCode(productCode: string): Placement[];

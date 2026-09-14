@@ -1,6 +1,5 @@
 import { ParsedSpec } from './parsed-spec.model';
 export type BOMInput = {
-  // houseId: string;
   elements: string[];
 };
 

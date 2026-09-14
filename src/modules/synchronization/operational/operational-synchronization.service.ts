@@ -1,3 +1,5 @@
+// src\modules\synchronization\operational\operational-synchronization.service.ts
+
 import { ProductionImportService } from '../../productionImport/production-import.service';
 import { ProductionSynchronizationResult } from './production-synchronization-result.model';
 import { PlacementSelectionService } from '../../placement/placement-selection.service';
@@ -34,18 +36,20 @@ export class OperationalSynchronizationService {
    * Аналізує журнал виробництва та формує список
    * можливих змін без внесення їх у Placement.
    */
-  analyze(houseId: string): ProductionSynchronizationResult[] {
+  analyze(houseCode: string): ProductionSynchronizationResult[] {
     const results: ProductionSynchronizationResult[] = [];
     const reservedPlacementIds = new Set<number>();
     const records = this.productionImport.import();
 
     for (const record of records) {
       const placement = this.placementSelection.findNextForProduction(
-        houseId,
+        houseCode,
         record.productCode,
         reservedPlacementIds,
       );
 
+      // Якщо не знайдено відповідного Placement, то додаємо запис і це нормальна ситуація,
+      // бо можливо, що цей продукт не для Placement або Placement не створений.
       if (!placement) {
         results.push({
           record,
@@ -69,28 +73,6 @@ export class OperationalSynchronizationService {
     return results;
   }
 
-  /**
-   * Автоматично затверджує всі успішно
-   * співставлені записи.
-   *
-   * Пізніше буде замінено ручним підтвердженням
-   * через UI.
-   */
-  // approveMatched(results: ProductionSynchronizationResult[]): void {
-  //   let approved = false;
-
-  //   for (const result of results) {
-  //     if (
-  //       !approved &&
-  //       result.status === ProductionSynchronizationStatus.MATCHED
-  //     ) {
-  //       result.approved = true;
-  //       approved = true;
-  //     } else {
-  //       result.approved = false;
-  //     }
-  //   }
-  // }
   approveMatched(results: ProductionSynchronizationResult[]): void {
     for (const result of results) {
       result.approved =

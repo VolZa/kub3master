@@ -1,3 +1,5 @@
+// src\modules\manufacturing\tests\testManufacturingProcessor.ts
+
 import { getHouseRepository } from '../../../app/factories/house.factory';
 import { getProjectDocumentRepository } from '../../../app/factories/project-document.factory';
 import { getElementRepository } from '../../../app/factories/element.factory';

@@ -22,8 +22,8 @@ export class PlanningController {
    * Повертає вироби,
    * доступні для планування.
    */
-  getAvailablePlacements(houseId: string) {
-    return this.planningService.getAvailablePlacementsByHouse(houseId);
+  getAvailablePlacements(houseCode: string) {
+    return this.planningService.getAvailablePlacementsByHouse(houseCode);
   }
 
   /**

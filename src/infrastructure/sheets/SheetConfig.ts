@@ -74,4 +74,14 @@ export const SheetConfig: Record<SheetKey, SheetDefinition> = {
     spreadsheet: SpreadsheetKey.OPERATIONAL,
     name: '01_Виготовлення',
   },
+  MANUFACTURING_SYNC_STATE: {
+    key: SheetKey.MANUFACTURING_SYNC_STATE,
+    spreadsheet: SpreadsheetKey.MASTER,
+    name: 'ManufacturingSyncState',
+  },
+  TOOLING: {
+    key: SheetKey.TOOLING,
+    spreadsheet: SpreadsheetKey.OPERATIONAL,
+    name: '10_Оснастка',
+  },
 };

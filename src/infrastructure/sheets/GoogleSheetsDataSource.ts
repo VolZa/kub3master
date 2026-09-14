@@ -47,20 +47,6 @@ export abstract class GoogleSheetsDataSource<T extends object> {
 
     return TableMapper.matrixToRows<T>(headers, data);
   }
-  // public getRows(): readonly T[] {
-  //   const matrix = this.reader.read(this.sheetKey);
-
-  //   if (matrix.length === 0) {
-  //     return [];
-  //   }
-
-  //   const headers = matrix[0].map(String);
-  //   const data = matrix.slice(this.dataStartRow - 1);
-
-  //   HeaderSchema.validate(headers, this.expectedHeaders);
-
-  //   return TableMapper.matrixToRows<T>(headers, data);
-  // }
 
   /**
    * Повністю замінити дані таблиці.
@@ -68,8 +54,9 @@ export abstract class GoogleSheetsDataSource<T extends object> {
   public replaceRows(rows: readonly T[]): void {
     const matrix = TableMapper.rowsToMatrix<T>(this.expectedHeaders, rows);
 
-    this.writer.replace(this.sheetKey, matrix);
+    this.writer.replace(this.sheetKey, matrix, this.dataStartRow);
   }
+
   /**
    * Зберегти всі рядки таблиці.(Те саме що replaceRows)
    */
@@ -89,16 +76,3 @@ export abstract class GoogleSheetsDataSource<T extends object> {
     this.writer.append(this.sheetKey, matrix[0]);
   }
 }
-
-/** 
-Після завершення GoogleSheetsWriter можна зробити GoogleSheetsDataSource таким:
-
-const matrix = reader.read(sheetKey);
-
-const headers = matrix[0].map(String);
-const data = matrix.slice(1);
-
-HeaderSchema.validate(headers, HOUSE_HEADERS);
-
-return mapper.matrixToRows(headers, data);
- */

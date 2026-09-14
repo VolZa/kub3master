@@ -4,7 +4,7 @@ import { SpreadsheetInfo } from './SpreadsheetInfo';
 export const SpreadsheetConfig: Record<SpreadsheetKey, SpreadsheetInfo> = {
   MASTER: {
     key: SpreadsheetKey.MASTER,
-    id: SpreadsheetApp.getActiveSpreadsheet().getId(),
+    id: '1fKJtN1ceaJu7F1dh8rKccQ52MNofDarKeT6fOoEDJUg',
     title: 'ERP_KUB_MASTER',
   },
 

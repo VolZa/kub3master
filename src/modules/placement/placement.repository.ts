@@ -2,9 +2,8 @@
 import {
   Placement,
   PlacementStatus,
-  // mapPlacementsToRows,
+  mapPlacementsToRows,
 } from '../../domain/placement';
-import { mapPlacementsToRows } from '../../domain/placement';
 
 import { IPlacementRepository } from './placement.repository.interface';
 import { IPlacementDataSource } from 'infrastructure/sheets/placement/placement-data-source.interface';
@@ -42,11 +41,6 @@ export class PlacementInMemoryRepository implements IPlacementRepository {
 
     this.dataSource.saveRows(rows);
   }
-
-  // saveAll(items: Placement[]): void {
-  //   this.items.length = 0;
-  //   this.items.push(...items);
-  // }
 
   findNextForProduction(productCode: string): Placement | null {
     return (

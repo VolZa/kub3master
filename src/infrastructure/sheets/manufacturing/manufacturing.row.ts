@@ -1,17 +1,19 @@
-//src\infrastructure\sheets\manufacturing\manufacturing.row.ts
+// src/infrastructure/sheets/manufacturing/manufacturing.row.ts
+// Module: Manufacturing
+// Layer: Infrastructure / Sheets
+// Responsibility: Physical row model for the 01_Виготовлення sheet
+
 export interface ManufacturingRow {
+  ID: string;
   Дата: Date;
   Зміна: string;
+  Будинок: string;
   'Код виробу': string;
+  Кількість: number;
+  Позиція: number | undefined;
   Майстер: string;
   Примітка: string;
-  Будинок: string;
+  Статус: string;
+  Створено: Date;
+  Змінено: Date;
 }
-// export interface ManufacturingRow {
-//   Date: Date;
-//   Shift: string;
-//   ProductCode: string;
-//   Master: string;
-//   Comment: string;
-//   HouseCode: string;
-// }

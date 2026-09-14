@@ -1,0 +1,323 @@
+<!doctype html>
+<html>
+  <head>
+    <base target="_top" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>ERP КУБ — Виготовлення</title>
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 12px;
+        font-family: Arial, sans-serif;
+        background: #f3f4f6;
+        color: #1f2937;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 520px;
+        margin: 0 auto;
+        padding: 16px;
+        background: #ffffff;
+        border-radius: 12px;
+      }
+
+      h2 {
+        margin: 0 0 4px 0;
+        font-size: 22px;
+      }
+
+      .subtitle {
+        margin: 0 0 18px 0;
+        color: #6b7280;
+        font-size: 14px;
+      }
+
+      .field {
+        margin-bottom: 14px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      input,
+      textarea,
+      select {
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #ffffff;
+        font-size: 16px;
+      }
+
+      textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+
+      input:focus,
+      textarea:focus,
+      select:focus {
+        outline: none;
+        border-color: #2563eb;
+      }
+
+      .button {
+        width: 100%;
+        min-height: 50px;
+        margin-top: 8px;
+        border: none;
+        border-radius: 10px;
+        background: #16a34a;
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .button:active {
+        transform: scale(0.99);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <h2>ERP КУБ</h2>
+      <p class="subtitle">Виготовлення</p>
+
+      <div class="field">
+        <label for="date">Дата</label>
+        <input id="date" type="date" />
+      </div>
+
+      <div class="field">
+        <label for="shift">Зміна</label>
+        <select id="shift">
+          <option value="">Оберіть зміну</option>
+          <option value="1">1 зміна</option>
+          <option value="2">2 зміна</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="houseCode">Будинок</label>
+        <select id="houseCode" onchange="handleHouseChange()">
+          <option value="">Завантаження...</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="productCode">Код виробу</label>
+        <input id="productCode" type="text" placeholder="Наприклад, П-2.2" />
+      </div>
+
+      <div class="field">
+        <label for="quantity">Кількість</label>
+        <input id="quantity" type="number" min="1" step="1" value="1" />
+      </div>
+
+      <div class="field">
+        <label for="placementId">Позиція</label>
+        <select id="placementId">
+          <option value="">NONE — поза проектом</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="master">Майстер</label>
+        <input id="master" type="text" placeholder="Прізвище та ім'я" />
+      </div>
+
+      <div class="field">
+        <label for="comment">Примітка</label>
+        <textarea id="comment" placeholder="Необов'язково"></textarea>
+      </div>
+
+      <button class="button" type="button" onclick="acceptManufacturing()">
+        ✓ ПРИЙНЯТИ
+      </button>
+    </div>
+
+    <script>
+      function loadHouseOptions() {
+        google.script.run
+          .withSuccessHandler((options) => {
+            const select = document.getElementById('houseCode');
+
+            select.innerHTML = '';
+
+            for (const option of options) {
+              const element = document.createElement('option');
+
+              element.value = option.value;
+              element.textContent = option.label;
+
+              select.appendChild(element);
+            }
+            handleHouseChange();
+          })
+          .withFailureHandler((error) => {
+            alert('Помилка завантаження будинків: ' + error.message);
+          })
+          .getManufacturingHouseOptions();
+      }
+
+      function resetPlacement() {
+        const placementSelect = document.getElementById('placementId');
+
+        placementSelect.innerHTML = '';
+
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'NONE — поза проектом';
+
+        placementSelect.appendChild(option);
+      }
+
+      function handleHouseChange() {
+        const houseCode = document.getElementById('houseCode').value;
+
+        resetPlacement();
+
+        const currentProductElement = document.getElementById('productCode');
+
+        // --------------------------------------------------------
+        // NONE — ручний ввід ProductCode
+        // --------------------------------------------------------
+
+        if (houseCode === '') {
+          const input = document.createElement('input');
+
+          input.id = 'productCode';
+          input.type = 'text';
+          input.placeholder = 'Наприклад, П-2.2';
+
+          currentProductElement.replaceWith(input);
+
+          return;
+        }
+
+        // --------------------------------------------------------
+        // Конкретний будинок — список ProductCode
+        // --------------------------------------------------------
+
+        const select = document.createElement('select');
+
+        select.id = 'productCode';
+        select.onchange = handleProductChange;
+
+        const loadingOption = document.createElement('option');
+
+        loadingOption.value = '';
+        loadingOption.textContent = 'Завантаження виробів...';
+
+        select.appendChild(loadingOption);
+
+        currentProductElement.replaceWith(select);
+
+        google.script.run
+          .withSuccessHandler((options) => {
+            select.innerHTML = '';
+
+            const emptyOption = document.createElement('option');
+
+            emptyOption.value = '';
+            emptyOption.textContent = 'Оберіть виріб';
+
+            select.appendChild(emptyOption);
+
+            for (const option of options) {
+              const element = document.createElement('option');
+
+              element.value = option.value;
+              element.textContent = option.label;
+
+              select.appendChild(element);
+            }
+          })
+          .withFailureHandler((error) => {
+            alert('Помилка завантаження виробів: ' + error.message);
+          })
+          .getManufacturingProductOptions(houseCode);
+      }
+
+      function handleProductChange() {
+        const houseCode = document.getElementById('houseCode').value;
+        const productCode = document.getElementById('productCode').value;
+
+        resetPlacement();
+
+        if (houseCode === '' || productCode === '') {
+          return;
+        }
+
+        const placementSelect = document.getElementById('placementId');
+
+        const loadingOption = document.createElement('option');
+        loadingOption.value = '';
+        loadingOption.textContent = 'Завантаження позицій...';
+        placementSelect.appendChild(loadingOption);
+
+        google.script.run
+          .withSuccessHandler((options) => {
+            placementSelect.innerHTML = '';
+
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = 'Оберіть позицію';
+            placementSelect.appendChild(emptyOption);
+
+            for (const option of options) {
+              const element = document.createElement('option');
+              element.value = option.value;
+              element.textContent = option.label;
+              placementSelect.appendChild(element);
+            }
+          })
+          .withFailureHandler((error) => {
+            alert('Помилка завантаження позицій: ' + error.message);
+          })
+          .getManufacturingPlacementOptions(houseCode, productCode);
+      }
+
+      function acceptManufacturing() {
+        const webInput = {
+          date: document.getElementById('date').value,
+          shift: document.getElementById('shift').value,
+          houseCode: document.getElementById('houseCode').value,
+          productCode: document.getElementById('productCode').value,
+          quantity: Number(document.getElementById('quantity').value),
+          placementId:
+            document.getElementById('placementId').value === ''
+              ? undefined
+              : Number(document.getElementById('placementId').value),
+          master: document.getElementById('master').value,
+          comment: document.getElementById('comment').value,
+        };
+
+        google.script.run
+          .withSuccessHandler((manufacturingId) => {
+            alert(`Manufacturing ${manufacturingId} створений.`);
+          })
+          .withFailureHandler((error) => {
+            alert('Помилка: ' + error.message);
+          })
+          .createManufacturingFromWeb(webInput);
+      }
+      loadHouseOptions();
+    </script>
+  </body>
+</html>

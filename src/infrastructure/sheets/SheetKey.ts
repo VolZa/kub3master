@@ -14,6 +14,9 @@ export const SheetKey = {
   PROJECT_DOCUMENT_DEPENDENCIES: 'PROJECT_DOCUMENT_DEPENDENCIES', //'21_ProjectDocumentDependencies'
   REPORT_MATERIAL_MATRIX: 'REPORT_MATERIAL_MATRIX',
   MANUFACTURING: 'MANUFACTURING',
+
+  MANUFACTURING_SYNC_STATE: 'MANUFACTURING_SYNC_STATE',
+  TOOLING: 'TOOLING',
 } as const;
 
 export type SheetKey = (typeof SheetKey)[keyof typeof SheetKey];

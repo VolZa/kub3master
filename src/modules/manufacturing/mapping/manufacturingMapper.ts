@@ -5,6 +5,7 @@ import { ManufacturingInput } from '../types/manufacturingInput';
 export class ManufacturingMapper {
   public static mapRowToInput(row: ManufacturingRow): ManufacturingInput {
     return {
+      manufacturingId: String(row['ID'] ?? '').trim(),
       date: row['Дата'],
       shift: String(row['Зміна'] ?? '').trim(),
       productCode: this.normalizeProductCode(row['Код виробу']),

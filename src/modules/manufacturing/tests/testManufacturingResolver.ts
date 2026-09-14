@@ -21,10 +21,11 @@ export function testManufacturingResolver(): void {
   // -------------------------------------------------------
 
   const validInput: ManufacturingInput = {
+    manufacturingId: 'M00000001',
     date: new Date('2026-06-30'),
-    shift: '',
+    shift: '1',
     productCode: 'П-1',
-    master: '',
+    master: 'John Doe',
     comment: 'площ',
     houseCode: 'H001',
   };

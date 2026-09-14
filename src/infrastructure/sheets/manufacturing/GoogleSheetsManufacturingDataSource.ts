@@ -7,6 +7,6 @@ import { MANUFACTURING_HEADERS } from './manufacturing.headers';
 
 export class GoogleSheetsManufacturingDataSource extends GoogleSheetsDataSource<ManufacturingRow> {
   constructor(sheetProvider: SheetProvider) {
-    super(sheetProvider, SheetKey.MANUFACTURING, MANUFACTURING_HEADERS, 3, 6);
+    super(sheetProvider, SheetKey.MANUFACTURING, MANUFACTURING_HEADERS, 3, 12);
   }
 }
