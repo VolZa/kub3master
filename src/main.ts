@@ -18,8 +18,10 @@ export function onOpen(): void {
     .addSubMenu(
       ui
         .createMenu('📥 Виробництво')
-        .addItem('🔍 Аналіз журналу виробництва', 'analyzeProduction')
-        .addItem('✔ Оновити статуси виготовлення', 'executeProduction'),
+        .addItem(
+          '🔄 Повна синхронізація виробництва',
+          'rebuildManufacturingState',
+        ),
     )
 
     // ===========================

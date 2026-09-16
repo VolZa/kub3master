@@ -22,7 +22,7 @@ import { getMaterialRepository } from './app/factories/material.factory';
 import { getMaterialBatchRepository } from './app/factories/materialBatch.factory';
 import { previewProductionSynchronization } from './debug/production-synchronization.debug';
 import { productionSynchronizationSmokeTest } from './debug/production-synchronization.smoke';
-import { analyzeProduction, executeProduction } from './menu/production.menu';
+
 import { debugProjectContext } from './debug/debug-project-context';
 import { testP1BOM } from './modules/bom/tests/testP1BOM';
 import { testP1Materials } from 'modules/bom/tests/testP1Materials';
@@ -65,6 +65,7 @@ import { testManufacturingHouseOptionsService } from 'modules/manufacturing/test
 import { testManufacturingProductOptionsService } from 'modules/manufacturing/tests/manufacturing-product-options.service.test';
 import { testManufacturingPlacementOptionsService } from 'modules/manufacturing/tests/manufacturing-placement-options.service.test';
 import { testManufacturingWebOptionsApi } from 'modules/manufacturingSync/tests/manufacturing-web-options-api.test';
+import { testManufacturingPlacementRebuildExecute } from 'modules/manufacturing/tests/manufacturing-placement-rebuild.test';
 
 function testDiagnoseProductP1(): void {
   diagnoseProductP1();
@@ -132,8 +133,6 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit) {
 
 // 🔥 РЕЄСТРАЦІЯ ВСЬОГО
 register({
-  analyzeProduction,
-  executeProduction,
   onOpen,
   openFormTable,
   doGet,
@@ -192,4 +191,5 @@ register({
   testManufacturingProductOptionsService,
   testManufacturingPlacementOptionsService,
   testManufacturingWebOptionsApi,
+  testManufacturingPlacementRebuildExecute,
 });

@@ -12,9 +12,13 @@
 import { ManufacturingSyncState } from './manufacturing-sync-state.model';
 
 export interface IManufacturingSyncStateRepository {
+  getAll(): ManufacturingSyncState[];
+
   findByManufacturingId(manufacturingId: string): ManufacturingSyncState | null;
 
   upsert(state: ManufacturingSyncState): void;
+
+  replaceAll(states: ManufacturingSyncState[]): void;
 
   save(): void;
 }

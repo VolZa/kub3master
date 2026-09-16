@@ -52,6 +52,14 @@ class TestSyncStateRepository implements IManufacturingSyncStateRepository {
   getState(): ManufacturingSyncState | null {
     return this.state;
   }
+
+  public getAll(): ManufacturingSyncState[] {
+    return this.state ? [this.state] : [];
+  }
+
+  public replaceAll(states: ManufacturingSyncState[]): void {
+    this.state = states[0] ?? null;
+  }
 }
 
 class TestPlacementRepository implements IPlacementRepository {

@@ -28,7 +28,11 @@ export class ManufacturingSyncStateRepository implements IManufacturingSyncState
     );
   }
 
-  findByManufacturingId(
+  public getAll(): ManufacturingSyncState[] {
+    return [...this.entities];
+  }
+
+  public findByManufacturingId(
     manufacturingId: string,
   ): ManufacturingSyncState | null {
     return (
@@ -38,7 +42,7 @@ export class ManufacturingSyncStateRepository implements IManufacturingSyncState
     );
   }
 
-  upsert(state: ManufacturingSyncState): void {
+  public upsert(state: ManufacturingSyncState): void {
     const index = this.entities.findIndex(
       (item) => item.manufacturingId === state.manufacturingId,
     );
@@ -51,7 +55,12 @@ export class ManufacturingSyncStateRepository implements IManufacturingSyncState
     this.entities[index] = state;
   }
 
-  save(): void {
+  public replaceAll(states: ManufacturingSyncState[]): void {
+    this.entities.length = 0;
+    this.entities.push(...states);
+  }
+
+  public save(): void {
     const rows = this.entities.map(ManufacturingSyncStateMapper.mapStateToRow);
 
     this.dataSource.saveRows(rows);
