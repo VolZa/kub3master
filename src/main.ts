@@ -28,15 +28,11 @@ export function onOpen(): void {
     // Розробка
     // ===========================
     .addSeparator()
-    .addSubMenu(
-      ui
-        .createMenu('🛠 Розробка')
-        .addItem('🧪 Smoke Test', 'productionSynchronizationSmokeTest')
-        .addItem(
-          '👁 Попередній перегляд синхронізації',
-          'previewProductionSynchronization',
-        ),
-    )
+    // .addSubMenu(
+    //   ui
+    //     .createMenu('🛠 Розробка')
+    //     .addItem('🧪 Smoke Test', 'productionSynchronizationSmokeTest'),
+    // )
 
     .addToUi();
 }

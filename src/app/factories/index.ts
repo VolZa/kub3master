@@ -3,10 +3,9 @@ export * from './element.factory';
 export * from './material.factory';
 export * from './materialBatch.factory';
 export * from './infrastructure.factory';
-export * from './operational-synchronization.factory';
-export * from './placement-selection.factory';
+
 export * from './placement.factory';
-export * from './production-import.factory';
+
 export * from './production-planning.factory';
 export * from './shift-plan-item.factory';
 export * from './shift-plan-service.factory';

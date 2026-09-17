@@ -1,5 +1,4 @@
 export * from './placement.row';
-export * from './placement-selection.service';
 export * from './placement.factory';
 export * from './placement.headers';
 export * from './placement.repository.interface';

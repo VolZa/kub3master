@@ -20,8 +20,6 @@ import { getElementRepository } from './app/factories/element.factory';
 import { getCatalogRepository } from './app/factories/catalog.factory';
 import { getMaterialRepository } from './app/factories/material.factory';
 import { getMaterialBatchRepository } from './app/factories/materialBatch.factory';
-import { previewProductionSynchronization } from './debug/production-synchronization.debug';
-import { productionSynchronizationSmokeTest } from './debug/production-synchronization.smoke';
 
 import { debugProjectContext } from './debug/debug-project-context';
 import { testP1BOM } from './modules/bom/tests/testP1BOM';
@@ -29,8 +27,7 @@ import { testP1Materials } from 'modules/bom/tests/testP1Materials';
 
 import { generateProjectMaterialMatrixReport } from './modules/project/generateProjectMaterialMatrixReport';
 import { diagnoseProductP1 } from './modules/bom/tests/diagnose-product-bom';
-// import { testManufacturingDataSource } from './modules/bom/tests/testManufacturingDataSource';
-// import { testManufacturingMapper } from './modules/bom/tests/testManufacturingMapper';
+
 import { testManufacturingResolver } from './modules/manufacturing/tests/testManufacturingResolver';
 import { testManufacturingProcessor } from 'modules/manufacturing/tests/testManufacturingProcessor';
 
@@ -51,8 +48,7 @@ import { testManufacturingSynchronizationBatchRepeat } from 'modules/manufacturi
 import { testManufacturingRepositorySave } from 'modules/manufacturing/tests/manufacturing-repository-save.test';
 import { testManufacturingInputValidator } from 'modules/manufacturingSync/tests/manufacturing-input-validator.test';
 import { testManufacturingIdGenerator } from 'modules/manufacturing/tests/manufacturing-id-generator.test';
-// import { testManufacturingCreationStructure } from 'modules/manufacturing/tests/manufacturing-input-validator.test';
-// import { testManufacturingCreationFormulaDebug } from 'modules/manufacturing/tests/manufacturing-creation-formula-debug.test';
+
 import { testManufacturingCreationService } from 'modules/manufacturing/tests/manufacturing-creation-service.test';
 import { testManufacturingCreationApplicationService } from 'modules/manufacturing/tests/manufacturing-creation-application-service.test';
 import { testManufacturingInputBufferDebug } from 'modules/manufacturing/tests/manufacturing-input-buffer-debug.test';
@@ -103,7 +99,6 @@ function runTableParser(
     parsedParent,
     rows,
     elementRepo,
-    // catalogRepo, // ❗ замість catalogService
     catalogHelper, // 🔥 НОВЕ ❗ замість catalogRepo
     materialRepo, // 🔥 НОВЕ
     materialBatchRepo, // 🔥 НОВЕ
@@ -143,8 +138,6 @@ register({
   runTableParser,
   testProductionRequirement,
   testProductReport,
-  previewProductionSynchronization,
-  productionSynchronizationSmokeTest,
   debugProjectContext,
   testP1BOM,
   testP1Materials,
