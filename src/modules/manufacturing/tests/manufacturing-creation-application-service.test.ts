@@ -27,6 +27,9 @@
 import { getHouseRepository } from '../../../app/factories/house.factory';
 import { getManufacturingRepository } from '../../../app/factories/manufacturing.factory';
 import { getPlacementRepository } from '../../../app/factories/placement.factory';
+import { getManufacturingSyncStateRepository } from '../../../app/factories/manufacturing-sync-state.factory';
+
+import { ManufacturingSynchronizationApplicationService } from '../../manufacturingSync/services/manufacturing-synchronization-application.service';
 import { sheetProvider } from '../../../app/factories/infrastructure.factory';
 
 import { SheetKey } from '../../../infrastructure/sheets/SheetKey';
@@ -42,6 +45,7 @@ export function testManufacturingCreationApplicationService(): void {
   const houseRepository = getHouseRepository();
   const placementRepository = getPlacementRepository();
   const manufacturingRepository = getManufacturingRepository();
+  const syncStateRepository = getManufacturingSyncStateRepository();
 
   const validator = new ManufacturingInputValidator(
     houseRepository,
@@ -56,11 +60,17 @@ export function testManufacturingCreationApplicationService(): void {
   );
 
   const writer = new GoogleSheetsWriter(sheetProvider);
+  const synchronizationService =
+    new ManufacturingSynchronizationApplicationService(
+      syncStateRepository,
+      placementRepository,
+    );
 
   const applicationService = new ManufacturingCreationApplicationService(
     creationService,
     manufacturingRepository,
     writer,
+    synchronizationService,
   );
 
   const input: ManufacturingInput = {

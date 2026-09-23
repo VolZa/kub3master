@@ -569,6 +569,10 @@ describe('ProjectMaterialMatrixService — integration', () => {
         return null;
       },
 
+      findByIdentity(): ElementFull | null {
+        return null;
+      },
+
       findByCodeNormalized(): ElementFull | null {
         return null;
       },
@@ -586,6 +590,10 @@ describe('ProjectMaterialMatrixService — integration', () => {
             element.type === type &&
             projectDocumentIDs.includes(element.projectDocumentID ?? ''),
         );
+      },
+
+      findPartByMaterial(): ElementFull | null {
+        return null;
       },
 
       insert(): void {},

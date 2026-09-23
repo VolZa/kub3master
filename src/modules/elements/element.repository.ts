@@ -14,20 +14,35 @@ import { forceText } from '../../utils/sheets.utils';
 export interface ElementRepository {
   findById(id: string): ElementFull | null;
   findByCode(code: string, projectDocumentID?: string): ElementFull | null;
+
+  findByIdentity(
+    projectDocumentID: string | undefined,
+    type: ElementType,
+    code: string,
+  ): ElementFull | null;
+
   findByCodeNormalized(
     code: string,
     projectDocumentID?: string,
   ): ElementFull | null;
+
   insert(row: ElementRow): void;
   updateType(id: string, type: string): void;
+
   findByCodeInDocuments(
     code: string,
     projectDocumentIDs: readonly string[],
   ): ElementFull | null;
+
   findByTypeInDocuments(
     type: ElementType,
     projectDocumentIDs: readonly string[],
   ): ElementFull[];
+
+  findPartByMaterial(
+    parentMaterialID: string,
+    code: string,
+  ): ElementFull | null;
 }
 
 export class GoogleSheetsElementRepository implements ElementRepository {
@@ -123,9 +138,7 @@ export class GoogleSheetsElementRepository implements ElementRepository {
           r.ProjectDocumentID,
         ),
       );
-    // const row = this.rows.find(
-    //   (r) => r.Code === code && r.ProjectDocumentID === projectDocumentID,
-    // );
+
     let row = this.rows.find(
       (r) => r.Code === code && r.ProjectDocumentID === projectDocumentID,
     );
@@ -139,6 +152,44 @@ export class GoogleSheetsElementRepository implements ElementRepository {
     }
     console.log('🔍 findByCode result:', row);
     return row ? mapElementRowToDomain(row) : null;
+  }
+
+  findByIdentity(
+    projectDocumentID: string | undefined,
+    type: ElementType,
+    code: string,
+  ): ElementFull | null {
+    console.log(
+      '🔍 findByIdentity:',
+      'projectDocumentID=',
+      projectDocumentID,
+      'type=',
+      type,
+      'code=',
+      code,
+    );
+
+    const row = this.rows.find(
+      (r) =>
+        r.ProjectDocumentID === projectDocumentID &&
+        r.Type === type &&
+        r.Code === code,
+    );
+
+    if (!row) {
+      console.log('❌ Element not found');
+      return null;
+    }
+
+    console.log(
+      '✅ Element found:',
+      row.ID,
+      row.Type,
+      row.Code,
+      row.ProjectDocumentID,
+    );
+
+    return mapElementRowToDomain(row);
   }
 
   findByCodeInDocuments(
@@ -230,6 +281,20 @@ export class GoogleSheetsElementRepository implements ElementRepository {
     }
 
     throw new Error(`Element with id ${id} not found`);
+  }
+
+  findPartByMaterial(
+    parentMaterialID: string,
+    code: string,
+  ): ElementFull | null {
+    const row = this.rows.find(
+      (r) =>
+        r.Type === 'part' &&
+        r.ParentMaterialID === parentMaterialID &&
+        r.Code === code,
+    );
+
+    return row ? mapElementRowToDomain(row) : null;
   }
 
   private buildHeaderMap(headers: string[]): Record<string, number> {

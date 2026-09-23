@@ -30,54 +30,70 @@ export function getOrCreateElementFromBuilt(
 ): ElementFull {
   console.log('getOrCreateElementFromBuilt with built:', built);
 
-  // 🔹 1. Перевірка існування
-  const existing = elementRepo.findByCode(built.code, projectDocumentID);
-  if (existing) {
-    return existing;
-  }
-
-  // 🔹 2. Отримуємо шаблон
+  // 🔹 1. Отримуємо шаблон
   const template = catalogHelper.resolveTemplate(built.prefixName);
 
   console.log('Resolved template:', template);
 
-  // 🔹 3. Визначаємо кінцевий тип елемента
+  // 🔹 2. Визначаємо кінцевий тип елемента
   const type = resolveElementType(template, built.length);
 
   console.log('Resolved element type:', type);
 
+  // 🔹 3. Визначаємо природу part
+  const isMaterialPart = template.type === 'material' && type === 'part';
+
+  const isProjectPart = template.type === 'part' && type === 'part';
+
   // 🔹 4. Пошук матеріалу
   let material;
 
-  switch (type) {
-    case 'material':
-      material = materialRepo.findByCode(built.code);
-      break;
+  if (type === 'material') {
+    material = materialRepo.findByCode(built.code);
+  } else if (isMaterialPart) {
+    const resolver = new MaterialResolver(materialRepo);
+    material = resolver.resolve(built);
 
-    case 'part': {
-      const resolver = new MaterialResolver(materialRepo);
-      material = resolver.resolve(built);
-      console.log('Resolved material:', material, 'for', built.code);
-      break;
-    }
+    console.log('Resolved material:', material, 'for', built.code);
   }
 
-  // 🔹 5. Базова одиниця виміру
+  // 🔹 5. Перевірка існування
+  let existing: ElementFull | null = null;
+
+  if (isMaterialPart) {
+    if (material) {
+      existing = elementRepo.findPartByMaterial(material.id, built.code);
+    }
+  } else {
+    existing = elementRepo.findByIdentity(
+      type === 'material' ? '' : projectDocumentID,
+      type,
+      built.code,
+    );
+  }
+
+  if (existing) {
+    return existing;
+  }
+
+  // 🔹 6. Базова одиниця виміру
   const baseUnit = type === 'material' ? (material?.baseUnit ?? 'кг') : 'шт';
 
-  // 🔹 6. Генеруємо ID
+  // 🔹 7. Генеруємо ID
   const id = generateIdByType(type);
 
-  // 🔹 7. Для material/part матеріал обов'язковий
+  // 🔹 8. Для material/part матеріал обов'язковий
   if ((type === 'material' || type === 'part') && !material) {
     throw new Error(`Material not found for element: ${built.code}`);
   }
 
-  // 🔹 8. Власник елемента
+  // 🔹 9. Власник елемента
   const ownerProjectDocumentID =
-    type === 'assembly' || type === 'product' ? projectDocumentID : '';
+    type === 'assembly' || type === 'product' || isProjectPart
+      ? projectDocumentID
+      : '';
 
-  // 🔹 9. Створення рядка
+  // 🔹 10. Створення рядка
   const row: ElementRow = {
     ID: id,
     Code: built.code,
@@ -88,7 +104,7 @@ export function getOrCreateElementFromBuilt(
     Type: type,
     ProjectDocumentID: ownerProjectDocumentID,
 
-    ParentMaterialID: type === 'part' ? material?.id : undefined,
+    ParentMaterialID: isMaterialPart ? material?.id : undefined,
 
     Category: template.category,
     ProfileType: template.profileType ?? '',
@@ -112,7 +128,19 @@ export function getOrCreateElementFromBuilt(
 
   elementRepo.insert(row);
 
-  const created = elementRepo.findByCode(built.code, ownerProjectDocumentID);
+  let created: ElementFull | null = null;
+
+  if (isMaterialPart) {
+    if (material) {
+      created = elementRepo.findPartByMaterial(material.id, built.code);
+    }
+  } else {
+    created = elementRepo.findByIdentity(
+      ownerProjectDocumentID,
+      type,
+      built.code,
+    );
+  }
 
   if (!created) {
     throw new Error(`Failed to create element: ${built.code}`);

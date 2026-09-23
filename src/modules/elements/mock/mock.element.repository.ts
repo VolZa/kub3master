@@ -31,6 +31,24 @@ export class MockElementRepository implements ElementRepository {
   }
 
   // ------------------------
+  // FIND BY IDENTITY
+  // ------------------------
+  findByIdentity(
+    projectDocumentID: string | undefined,
+    type: ElementType,
+    code: string,
+  ): ElementFull | null {
+    const row = this.rows.find(
+      (r) =>
+        r.ProjectDocumentID === projectDocumentID &&
+        r.Type === type &&
+        r.Code === code,
+    );
+
+    return row ? mapElementRowToDomain(row) : null;
+  }
+
+  // ------------------------
   // 🔥 NORMALIZED SEARCH
   // ------------------------
   findByCodeNormalized(
@@ -92,5 +110,19 @@ export class MockElementRepository implements ElementRepository {
     }
 
     return null;
+  }
+
+  findPartByMaterial(
+    parentMaterialID: string,
+    code: string,
+  ): ElementFull | null {
+    const row = this.rows.find(
+      (r) =>
+        r.Type === 'part' &&
+        r.ParentMaterialID === parentMaterialID &&
+        r.Code === code,
+    );
+
+    return row ? mapElementRowToDomain(row) : null;
   }
 }

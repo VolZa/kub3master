@@ -447,6 +447,10 @@ describe('BOMMaterialsService — П-1', () => {
         return null;
       },
 
+      findByIdentity(): ElementFull | null {
+        return null;
+      },
+
       findByCodeNormalized(): ElementFull | null {
         return null;
       },
@@ -456,6 +460,10 @@ describe('BOMMaterialsService — П-1', () => {
       updateType(): void {},
 
       findByCodeInDocuments(): ElementFull | null {
+        return null;
+      },
+
+      findPartByMaterial(): ElementFull | null {
         return null;
       },
 

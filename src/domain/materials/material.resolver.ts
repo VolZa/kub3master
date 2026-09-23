@@ -1,3 +1,4 @@
+// src\domain\materials\material.resolver.ts
 import { Material } from './material.model';
 import { MaterialRepository } from './material.repository';
 import { BuiltElement } from '../elements/built-element.model';

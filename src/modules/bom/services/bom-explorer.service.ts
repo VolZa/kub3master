@@ -1,27 +1,4 @@
-// import { ElementRepository } from '../../elements/element.repository';
-// import { BOMNode } from '../model/bom-node.model';
-// import { getChildrenRows } from '../bom.repository';
-// import { BOMTreeNode } from '../model/bom-tree-node.model';
-
-// export class BOMExplorerService {
-//   constructor(private readonly elementRepo: ElementRepository) {}
-
-//   getChildren(parentId: string): BOMNode[] {
-//     return getChildrenRows(parentId)
-//       .map((bom) => {
-//         const element = this.elementRepo.findById(bom.childId);
-
-//         if (!element) {
-//           return null;
-//         }
-
-//         return {
-//           bom,
-//           element,
-//         };
-//       })
-//       .filter((x): x is BOMNode => x !== null);
-//   }
+//src\modules\bom\services\bom-explorer.service.ts
 import { ElementRepository } from '../../elements/element.repository';
 import { BOMNode } from '../model/bom-node.model';
 import { BOMTreeNode } from '../model/bom-tree-node.model';

@@ -18,7 +18,8 @@ export type ManufacturingPlacementRebuildMode = 'DRY_RUN' | 'EXECUTE';
 export type ManufacturingPlacementRebuildAction =
   | 'NONE'
   | 'MARK_PRODUCED'
-  | 'RESET_TO_NONE';
+  | 'RESET_TO_NONE'
+  | 'DETACH_PLACEMENT';
 
 export interface ManufacturingPlacementRebuildChange {
   placementId: number;

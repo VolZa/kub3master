@@ -54,7 +54,7 @@ export class BOMMaterialsService {
       }
     }
 
-    // ВАЖНО:
+    // ВАЖЛИВО:
     // дітей обходимо завжди, незалежно від того,
     // чи є у поточного вузла parentMaterialID.
     node.children.forEach((child) => {

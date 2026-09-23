@@ -37,10 +37,21 @@ import { ManufacturingIdGenerator } from '../services/manufacturing-id.generator
 import { ManufacturingBufferCreationApplicationService } from '../services/manufacturing-buffer-creation-application.service';
 import { ManufacturingInputValidator } from '../validation/manufacturing-input.validator';
 
+import { getManufacturingSyncStateRepository } from '../../../app/factories/manufacturing-sync-state.factory';
+
+import { ManufacturingSynchronizationApplicationService } from '../../manufacturingSync/services/manufacturing-synchronization-application.service';
+
 export function testManufacturingBufferCreationApplicationService(): void {
   const houseRepository = getHouseRepository();
   const placementRepository = getPlacementRepository();
   const manufacturingRepository = getManufacturingRepository();
+
+  const syncStateRepository = getManufacturingSyncStateRepository();
+  const synchronizationService =
+    new ManufacturingSynchronizationApplicationService(
+      syncStateRepository,
+      placementRepository,
+    );
 
   const validator = new ManufacturingInputValidator(
     houseRepository,
@@ -61,6 +72,7 @@ export function testManufacturingBufferCreationApplicationService(): void {
       creationService,
       manufacturingRepository,
       writer,
+      synchronizationService,
     );
 
   const bufferReader = new GoogleSheetsManufacturingBufferReader(sheetProvider);

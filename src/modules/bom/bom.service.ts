@@ -19,7 +19,7 @@ import { buildElementName } from 'modules/elements/builders/name.builder';
 import { getProjectDocumentDependencyRepository } from '../../app/factories/project-document-dependency.factory';
 
 import { ProjectDocumentResolver } from '../../domain/project-document-dependencies';
-
+// 24	виріб	Виріб металевий	assembly			TRUE	weld	FALSE
 export function buildBOMRow(
   parentId: string,
   row: TableRowInput,
@@ -29,7 +29,6 @@ export function buildBOMRow(
   materialRepo: MaterialRepository,
   searchProjectDocumentIDs: readonly string[],
 ): any[][] {
-  const prefix = row.prefix;
   const qty = row.qty ?? 1;
 
   const parent = repo.findById(parentId);
@@ -37,21 +36,20 @@ export function buildBOMRow(
   if (!parent) {
     throw new Error(`Parent not found: ${parentId}`);
   }
-  console.log('🔥 buildBOMRow with row:', row, 'parent:', parent);
-  // 🔥 1. EXISTING
-  // const existingElement = repo.findByCode(row.code, parent.projectDocumentID);
-  // const searchProjectDocumentIDs = resolver.resolve(parent.projectDocumentID);
 
-  const existingElement = repo.findByCodeInDocuments(
+  console.log('🔥 buildBOMRow with row:', row, 'parent:', parent);
+
+  // 1. EXISTING ELEMENT
+  const existingElement = repo.findByCode(row.code, parent.projectDocumentID);
+
+  console.log(
+    '🔍 Existing element by code:',
     row.code,
-    searchProjectDocumentIDs,
+    'ProjectDocumentID:',
+    parent.projectDocumentID,
+    existingElement,
   );
-  console.log({
-    code: row.code,
-    projectDocumentID: parent.projectDocumentID,
-  });
-  console.log('Existing element for code', row.code, existingElement);
-  // 🔹 Якщо елемент вже існує, просто повертаємо зв'язок Parent → Child
+
   if (existingElement) {
     return [
       [
@@ -66,7 +64,7 @@ export function buildBOMRow(
     ];
   }
 
-  // пошук в матеріалах
+  // 2. MATERIAL
   const material = materialRepo.findByCode(row.code);
 
   if (material) {
@@ -83,7 +81,7 @@ export function buildBOMRow(
     ];
   }
 
-  // 🔥 2. PARSE
+  // 3. Тільки тепер Catalog + parse + create
   const parsed = parseSpec(row.spec, row.prefix);
 
   if (parsed.kind === 'assembly' || parsed.kind === 'unknown') {
@@ -91,21 +89,26 @@ export function buildBOMRow(
   }
 
   const built = buildByKind(parsed);
-  console.log('buildBOMRow 🔥 2. PARSE Built element from parsed spec:', built);
+
+  console.log('buildBOMRow 🔥 Built element from parsed spec:', built);
 
   const element = getOrCreateElementFromBuilt(
     {
       ...built,
-      prefixName: prefix,
+      prefixName: row.prefix,
     },
     repo,
     catalogHelper,
     materialRepo,
     parent.projectDocumentID,
   );
+
   console.log('Built element:', element);
 
-  // 🔹 1. Parent → Child
+  // =========================================================
+  // 5. Parent → Child
+  // =========================================================
+
   const baseRow = [
     parentId,
     element.id,
@@ -116,12 +119,16 @@ export function buildBOMRow(
     element.code,
   ];
 
-  // 🔥 2. PART → MATERIAL
+  // =========================================================
+  // 6. PART → MATERIAL
+  // =========================================================
+
   if (element.type === 'part') {
     console.log(
       'PART → MATERIAL element.parentMaterialID:',
       element.parentMaterialID,
     );
+
     const material = materialRepo.findById(element.parentMaterialID || '');
 
     if (!material) {
@@ -155,7 +162,10 @@ export function buildBOMRow(
     ];
   }
 
-  // 🔥 DEFAULT (assembly / product)
+  // =========================================================
+  // 7. DEFAULT
+  // =========================================================
+
   return [baseRow];
 }
 

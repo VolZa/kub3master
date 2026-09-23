@@ -482,6 +482,10 @@ describe('BOMMaterialMatrixService — integration', () => {
         return null;
       },
 
+      findByIdentity(): ElementFull | null {
+        return null;
+      },
+
       findByCodeNormalized(): ElementFull | null {
         return null;
       },
@@ -495,6 +499,10 @@ describe('BOMMaterialMatrixService — integration', () => {
         projectDocumentIDs: readonly string[],
       ): ElementFull[] {
         return [];
+      },
+
+      findPartByMaterial(): ElementFull | null {
+        return null;
       },
 
       insert(): void {},

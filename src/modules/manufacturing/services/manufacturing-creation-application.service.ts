@@ -14,7 +14,8 @@
  * - формує Manufacturing через ManufacturingCreationService;
  * - готує фізичну структуру таблиць;
  * - передає Manufacturing до Repository;
- * - зберігає зміни.
+ * - зберігає Manufacturing;
+ * - запускає оперативну синхронізацію Manufacturing → Placement.
  *
  * Бізнес-логіка створення знаходиться
  * у ManufacturingCreationService.
@@ -31,11 +32,14 @@ import { IManufacturingCreationApplicationService } from './manufacturing-creati
 
 import { GoogleSheetsWriter } from '../../../infrastructure/sheets/GoogleSheetsWriter';
 
+import { ManufacturingSynchronizationApplicationService } from '../../manufacturingSync/services/manufacturing-synchronization-application.service';
+
 export class ManufacturingCreationApplicationService implements IManufacturingCreationApplicationService {
   constructor(
     private readonly creationService: ManufacturingCreationService,
     private readonly manufacturingRepository: IManufacturingRepository,
     private readonly writer: GoogleSheetsWriter,
+    private readonly synchronizationService: ManufacturingSynchronizationApplicationService,
   ) {}
 
   public create(input: Readonly<ManufacturingInput>): Manufacturing {
@@ -45,6 +49,10 @@ export class ManufacturingCreationApplicationService implements IManufacturingCr
 
     this.manufacturingRepository.create(manufacturing);
     this.manufacturingRepository.save();
+
+    // Після успішного запису Manufacturing
+    // виконуємо оперативну синхронізацію з Placement.
+    this.synchronizationService.synchronize(manufacturing);
 
     return manufacturing;
   }

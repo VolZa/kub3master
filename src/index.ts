@@ -62,6 +62,7 @@ import { testManufacturingProductOptionsService } from 'modules/manufacturing/te
 import { testManufacturingPlacementOptionsService } from 'modules/manufacturing/tests/manufacturing-placement-options.service.test';
 import { testManufacturingWebOptionsApi } from 'modules/manufacturingSync/tests/manufacturing-web-options-api.test';
 import { testManufacturingPlacementRebuildExecute } from 'modules/manufacturing/tests/manufacturing-placement-rebuild.test';
+import { bomMaterialRequirementsIntegrationTest } from 'modules/bom/tests/bom-material-requirements.integration.test';
 
 function testDiagnoseProductP1(): void {
   diagnoseProductP1();
@@ -185,4 +186,5 @@ register({
   testManufacturingPlacementOptionsService,
   testManufacturingWebOptionsApi,
   testManufacturingPlacementRebuildExecute,
+  bomMaterialRequirementsIntegrationTest,
 });
