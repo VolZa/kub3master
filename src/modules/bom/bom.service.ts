@@ -40,13 +40,17 @@ export function buildBOMRow(
   console.log('🔥 buildBOMRow with row:', row, 'parent:', parent);
 
   // 1. EXISTING ELEMENT
-  const existingElement = repo.findByCode(row.code, parent.projectDocumentID);
+  // const existingElement = repo.findByCode(row.code, parent.projectDocumentID);
+  const existingElement = repo.findByCodeInDocuments(
+    row.code,
+    searchProjectDocumentIDs,
+  );
 
   console.log(
-    '🔍 Existing element by code:',
+    '🔍 Existing element in documents:',
     row.code,
-    'ProjectDocumentID:',
-    parent.projectDocumentID,
+    'documents:',
+    searchProjectDocumentIDs,
     existingElement,
   );
 
