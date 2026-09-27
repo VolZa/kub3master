@@ -1,7 +1,11 @@
 //🏗️
 import { parseSpec } from './parsers/parseSpec';
 import { parseTableText } from '../../utils/parseTableText';
-import { deleteBOMTree, insertBOMRows } from './bom.repository';
+import {
+  deleteBOMTree,
+  insertBOMRows,
+  replaceBOMForParent,
+} from './bom.repository';
 import { TableRowInput } from './model/table-row-input.model';
 import { ElementRepository } from '../elements/element.repository';
 
@@ -228,7 +232,10 @@ export function buildBOMFromTable(
   console.log('ROOT:', root.code, 'ProjectDocumentID:', root.projectDocumentID);
   const parentId = root.id;
 
-  deleteBOMTree(parentId);
+  // deleteBOMTree(parentId);
+
+  // Видаляємо тільки безпосередній BOM цього ParentID.
+  // BOM дочірніх Elements не змінюємо.
 
   const now = new Date();
 
@@ -259,7 +266,9 @@ export function buildBOMFromTable(
 
   const aggregated = aggregateBOMRows(rawRows);
 
-  insertBOMRows(aggregated);
+  console.log('🔎 AGGREGATED BOM:', JSON.stringify(aggregated, null, 2));
+  // insertBOMRows(aggregated);
+  replaceBOMForParent(parentId, aggregated);
 
   return {
     added: aggregated.length,
