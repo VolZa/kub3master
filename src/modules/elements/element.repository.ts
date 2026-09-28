@@ -43,6 +43,8 @@ export interface ElementRepository {
     parentMaterialID: string,
     code: string,
   ): ElementFull | null;
+
+  findByType(type: ElementType): ElementFull[];
 }
 
 export class GoogleSheetsElementRepository implements ElementRepository {
@@ -253,6 +255,12 @@ export class GoogleSheetsElementRepository implements ElementRepository {
         r.Class === part.class &&
         r.Length === part.length,
     );
+  }
+
+  public findByType(type: ElementType): ElementFull[] {
+    return this.rows
+      .filter((row) => row.Type === type)
+      .map((row) => mapElementRowToDomain(row));
   }
 
   updateType(id: string, type: ElementType): void {

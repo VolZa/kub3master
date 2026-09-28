@@ -28,7 +28,7 @@ import {
 
 import { CatalogHelper } from '../../catalog/catalog.helper';
 import { getCatalogRepository } from '../../../app/factories/catalog.factory';
-
+import { getMaterialRepository } from '../../../app/factories/material.factory';
 class TestBOMRepository implements BOMRepository {
   constructor(private readonly rows: ReturnType<typeof getAllBOMRows>) {}
 
@@ -66,6 +66,8 @@ export function testBOMCompletenessChecker(): void {
   const elementRepository: ElementRepository =
     new GoogleSheetsElementRepository();
 
+  const materialRepository = getMaterialRepository();
+
   const bomRows = getAllBOMRows();
 
   const bomRepository = new TestBOMRepository(bomRows);
@@ -76,8 +78,9 @@ export function testBOMCompletenessChecker(): void {
   const catalogHelper = new CatalogHelper(catalogRepository);
 
   const checker = new BOMCompletenessChecker(
-    bomRepository,
     elementRepository,
+    materialRepository,
+    bomRepository,
     catalogHelper,
   );
 
@@ -118,13 +121,14 @@ export function testBOMCompletenessChecker(): void {
     rowsWithoutMaterialLink,
   );
 
-  const part4009 = elementRepository.findById('4009');
+  //   const part4009 = elementRepository.findById('4009');
 
   //   console.log('SCENARIO 2: Element 4009:', JSON.stringify(part4009, null, 2));
 
   const checkerWithoutMaterial = new BOMCompletenessChecker(
-    bomRepositoryWithoutMaterial,
     elementRepository,
+    materialRepository,
+    bomRepositoryWithoutMaterial, // ✅
     catalogHelper,
   );
 
@@ -161,8 +165,9 @@ export function testBOMCompletenessChecker(): void {
   const bomRepositoryWithoutGS0 = new TestBOMRepository(rowsWithoutGS0BOM);
 
   const checkerWithoutGS0 = new BOMCompletenessChecker(
-    bomRepositoryWithoutGS0,
     elementRepository,
+    materialRepository,
+    bomRepository,
     catalogHelper,
   );
 

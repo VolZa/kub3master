@@ -18,6 +18,7 @@ import { ElementRepository } from '../../elements/element.repository';
 import { ElementFull } from '../../elements/element.model';
 import { CatalogHelper } from '../../catalog/catalog.helper';
 import { BOMRepository } from '../../bom/bom.repository.interface';
+import { MaterialRepository } from '../../../domain/materials/material.repository';
 
 export type BOMWarningType =
   | 'ELEMENT_NOT_FOUND'
@@ -38,8 +39,9 @@ export interface BOMWarning {
 
 export class BOMCompletenessChecker {
   constructor(
-    private readonly bomRepository: BOMRepository,
     private readonly elementRepository: ElementRepository,
+    private readonly materialRepository: MaterialRepository,
+    private readonly bomRepository: BOMRepository,
     private readonly catalogHelper: CatalogHelper,
   ) {}
 
@@ -76,53 +78,48 @@ export class BOMCompletenessChecker {
     warnings: BOMWarning[],
   ): void {
     const children = this.bomRepository.getChildrenRows(element.id);
-    if (element.id === '4009') {
-      console.log(
-        '🔎 CHECK 4009:',
-        JSON.stringify(
-          {
-            id: element.id,
-            code: element.code,
-            type: element.type,
-            parentMaterialID: element.parentMaterialID,
-            visited: visited.has(element.id),
-            children,
-          },
-          null,
-          2,
-        ),
-      );
-    }
+
     // ------------------------------------------------------------
     // Локальна перевірка Part → Material
     // ------------------------------------------------------------
 
     if (element.type === 'part' && element.parentMaterialID) {
-      const materialLinkExists = children.some(
-        (row) => String(row.childId) === String(element.parentMaterialID),
-      );
+      const materialId = String(element.parentMaterialID);
 
-      if (!materialLinkExists) {
-        const material = this.elementRepository.findById(
-          element.parentMaterialID,
-        );
+      const material = this.materialRepository.findById(materialId);
 
-        const materialCode = material?.code ?? element.parentMaterialID;
-
+      if (!material) {
         warnings.push({
           type: 'PART_MATERIAL_MISSING',
           elementId: element.id,
           elementCode: element.code,
           message:
-            `Для деталі "${element.code}" відсутній BOM-зв'язок ` +
-            `з матеріалом "${materialCode}".`,
-          path: [...path, materialCode],
+            `Для деталі "${element.code}" ` +
+            `не знайдено матеріал "${materialId}" ` +
+            `у 05_Materials.`,
+          path: [...path, materialId],
         });
+      } else {
+        const materialLinkExists = children.some(
+          (row) => String(row.childId) === materialId,
+        );
+
+        if (!materialLinkExists) {
+          warnings.push({
+            type: 'PART_MATERIAL_MISSING',
+            elementId: element.id,
+            elementCode: element.code,
+            message:
+              `Для деталі "${element.code}" відсутній BOM-зв'язок ` +
+              `з матеріалом "${material.code}".`,
+            path: [...path, material.code],
+          });
+        }
       }
     }
 
     // ------------------------------------------------------------
-    // Далі visited захищає від повторного обходу піддерева
+    // visited захищає від повторного обходу піддерева
     // ------------------------------------------------------------
 
     if (visited.has(element.id)) {
@@ -137,7 +134,6 @@ export class BOMCompletenessChecker {
 
     const requiresBOM = this.elementRequiresBOM(element, path, warnings);
 
-    // Якщо BOM очікується, але його немає — warning.
     if (requiresBOM && children.length === 0) {
       warnings.push({
         type: 'ELEMENT_BOM_MISSING',
@@ -152,35 +148,158 @@ export class BOMCompletenessChecker {
       return;
     }
 
-    // Якщо BOM існує — перевіряємо його незалежно від hasBOM.
-
     // ------------------------------------------------------------
     // Рекурсивна перевірка дочірніх елементів
     // ------------------------------------------------------------
 
     for (const childRow of children) {
-      const child = this.elementRepository.findById(String(childRow.childId));
+      const childId = String(childRow.childId);
 
-      if (!child) {
-        const childCode = childRow.childCode ?? String(childRow.childId);
+      // Спочатку шукаємо Element у 00_Elements.
+      const child = this.elementRepository.findById(childId);
 
-        warnings.push({
-          type: 'ELEMENT_NOT_FOUND',
-          elementId: String(childRow.childId),
-          elementCode: childCode,
-          message:
-            `У BOM елемента "${element.code}" ` +
-            `вказано дочірній елемент "${childCode}", ` +
-            `але його немає в 00_Elements.`,
-          path: [...path, childCode],
-        });
+      if (child) {
+        this.checkElement(child, [...path, child.code], visited, warnings);
 
         continue;
       }
 
-      this.checkElement(child, [...path, child.code], visited, warnings);
+      // Якщо Element не знайдений,
+      // перевіряємо, чи є ChildID Material у 05_Materials.
+      const material = this.materialRepository.findById(childId);
+
+      if (material) {
+        // Material є leaf-об'єктом.
+        continue;
+      }
+
+      // Немає ні Element, ні Material.
+      const childCode = childRow.childCode ?? childId;
+
+      warnings.push({
+        type: 'ELEMENT_NOT_FOUND',
+        elementId: childId,
+        elementCode: childCode,
+        message:
+          `У BOM елемента "${element.code}" ` +
+          `вказано дочірній об'єкт "${childCode}", ` +
+          `але його немає ні в 00_Elements, ні в 05_Materials.`,
+        path: [...path, childCode],
+      });
     }
   }
+  //   private checkElement(
+  //     element: ElementFull,
+  //     path: readonly string[],
+  //     visited: Set<string>,
+  //     warnings: BOMWarning[],
+  //   ): void {
+  //     const children = this.bomRepository.getChildrenRows(element.id);
+  //     if (element.id === '4009') {
+  //       console.log(
+  //         '🔎 CHECK 4009:',
+  //         JSON.stringify(
+  //           {
+  //             id: element.id,
+  //             code: element.code,
+  //             type: element.type,
+  //             parentMaterialID: element.parentMaterialID,
+  //             visited: visited.has(element.id),
+  //             children,
+  //           },
+  //           null,
+  //           2,
+  //         ),
+  //       );
+  //     }
+  //     // ------------------------------------------------------------
+  //     // Локальна перевірка Part → Material
+  //     // ------------------------------------------------------------
+
+  //     if (element.type === 'part' && element.parentMaterialID) {
+  //       const materialLinkExists = children.some(
+  //         (row) => String(row.childId) === String(element.parentMaterialID),
+  //       );
+
+  //       if (!materialLinkExists) {
+  //         const material = this.elementRepository.findById(
+  //           element.parentMaterialID,
+  //         );
+
+  //         const materialCode = material?.code ?? element.parentMaterialID;
+
+  //         warnings.push({
+  //           type: 'PART_MATERIAL_MISSING',
+  //           elementId: element.id,
+  //           elementCode: element.code,
+  //           message:
+  //             `Для деталі "${element.code}" відсутній BOM-зв'язок ` +
+  //             `з матеріалом "${materialCode}".`,
+  //           path: [...path, materialCode],
+  //         });
+  //       }
+  //     }
+
+  //     // ------------------------------------------------------------
+  //     // Далі visited захищає від повторного обходу піддерева
+  //     // ------------------------------------------------------------
+
+  //     if (visited.has(element.id)) {
+  //       return;
+  //     }
+
+  //     visited.add(element.id);
+
+  //     // ------------------------------------------------------------
+  //     // Перевірка Catalog / необхідності BOM
+  //     // ------------------------------------------------------------
+
+  //     const requiresBOM = this.elementRequiresBOM(element, path, warnings);
+
+  //     // Якщо BOM очікується, але його немає — warning.
+  //     if (requiresBOM && children.length === 0) {
+  //       warnings.push({
+  //         type: 'ELEMENT_BOM_MISSING',
+  //         elementId: element.id,
+  //         elementCode: element.code,
+  //         message:
+  //           `Для елемента "${element.code}" очікується BOM, ` +
+  //           `але дочірні записи відсутні.`,
+  //         path,
+  //       });
+
+  //       return;
+  //     }
+
+  //     // Якщо BOM існує — перевіряємо його незалежно від hasBOM.
+
+  //     // ------------------------------------------------------------
+  //     // Рекурсивна перевірка дочірніх елементів
+  //     // ------------------------------------------------------------
+
+  //     for (const childRow of children) {
+  //       const child = this.elementRepository.findById(String(childRow.childId));
+
+  //       if (!child) {
+  //         const childCode = childRow.childCode ?? String(childRow.childId);
+
+  //         warnings.push({
+  //           type: 'ELEMENT_NOT_FOUND',
+  //           elementId: String(childRow.childId),
+  //           elementCode: childCode,
+  //           message:
+  //             `У BOM елемента "${element.code}" ` +
+  //             `вказано дочірній елемент "${childCode}", ` +
+  //             `але його немає в 00_Elements.`,
+  //           path: [...path, childCode],
+  //         });
+
+  //         continue;
+  //       }
+
+  //       this.checkElement(child, [...path, child.code], visited, warnings);
+  //     }
+  //   }
   /**
    * Визначає, чи повинен Element мати власний BOM.
    *

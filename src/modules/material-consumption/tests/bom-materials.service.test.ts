@@ -473,6 +473,10 @@ describe('BOMMaterialsService — П-1', () => {
       ): ElementFull[] {
         return [];
       },
+
+      findByType(): ElementFull[] {
+        return [];
+      },
     } as ElementRepository;
 
     /*

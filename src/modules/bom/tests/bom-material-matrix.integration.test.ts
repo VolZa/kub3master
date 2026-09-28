@@ -505,6 +505,10 @@ describe('BOMMaterialMatrixService — integration', () => {
         return null;
       },
 
+      findByType(): ElementFull[] {
+        return [];
+      },
+
       insert(): void {},
       updateType(): void {},
     } as ElementRepository;

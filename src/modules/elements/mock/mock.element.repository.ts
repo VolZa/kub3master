@@ -68,6 +68,12 @@ export class MockElementRepository implements ElementRepository {
     return row ? mapElementRowToDomain(row) : null;
   }
 
+  findByType(type: ElementType): ElementFull[] {
+    return this.rows
+      .filter((row) => row.Type === type)
+      .map((row) => mapElementRowToDomain(row));
+  }
+
   findByTypeInDocuments(
     type: ElementType,
     projectDocumentIDs: readonly string[],

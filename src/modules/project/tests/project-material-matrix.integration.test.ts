@@ -592,6 +592,10 @@ describe('ProjectMaterialMatrixService — integration', () => {
         );
       },
 
+      findByType(): ElementFull[] {
+        return [];
+      },
+
       findPartByMaterial(): ElementFull | null {
         return null;
       },

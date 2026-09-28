@@ -8,6 +8,7 @@ import {
 } from './bom.repository';
 import { TableRowInput } from './model/table-row-input.model';
 import { ElementRepository } from '../elements/element.repository';
+import { BOMRepository } from './bom.repository.interface';
 
 import { buildByKind } from '../../modules/elements/builders/builder.dispatcher';
 
@@ -23,6 +24,13 @@ import { buildElementName } from 'modules/elements/builders/name.builder';
 import { getProjectDocumentDependencyRepository } from '../../app/factories/project-document-dependency.factory';
 
 import { ProjectDocumentResolver } from '../../domain/project-document-dependencies';
+
+import { BOMCompletenessChecker } from './services/bom-completeness-checker';
+import { BOMWarningFormatter } from './services/bom-warning-formatter';
+import { getBOMRepository } from '../../app/factories/bom.factory';
+
+import { BuildBOMResult } from './bom.result';
+
 // 24	виріб	Виріб металевий	assembly			TRUE	weld	FALSE
 export function buildBOMRow(
   parentId: string,
@@ -204,7 +212,8 @@ export function buildBOMFromTable(
   catalogHelper: CatalogHelper,
   materialRepo: MaterialRepository,
   materialBatchRepo: MaterialBatchRepository,
-) {
+  bomRepo: BOMRepository,
+): BuildBOMResult {
   console.log('👉 START buildBOMFromTable');
   console.log('INPUT PARENT:', parent);
 
@@ -267,13 +276,36 @@ export function buildBOMFromTable(
   const aggregated = aggregateBOMRows(rawRows);
 
   console.log('🔎 AGGREGATED BOM:', JSON.stringify(aggregated, null, 2));
-  // insertBOMRows(aggregated);
+
   replaceBOMForParent(parentId, aggregated);
+
+  // Перевіряємо BOM вже після запису.
+  const bomChecker = new BOMCompletenessChecker(
+    elementRepo,
+    materialRepo,
+    bomRepo,
+    catalogHelper,
+  );
+
+  const warnings = bomChecker.check(parentId);
+
+  const warningFormatter = new BOMWarningFormatter();
+
+  const operatorMessage = warningFormatter.format(warnings, root.code);
+
+  if (operatorMessage) {
+    console.log('⚠️ BOM OPERATOR MESSAGE');
+    console.log(operatorMessage.title);
+    console.log(operatorMessage.text);
+  }
 
   return {
     added: aggregated.length,
     errors,
     errorCount: errors.length,
+    warnings,
+    warningCount: warnings.length,
+    operatorMessage,
   };
 }
 
@@ -294,13 +326,11 @@ export function buildBOMFromText(data: Input) {
   console.log('🔥 START buildBOMFromText');
 
   const elementRepo = getElementRepository();
-
   const catalogRepo = getCatalogRepository();
   const catalogHelper = new CatalogHelper(catalogRepo);
-
   const materialRepo = getMaterialRepository();
-
   const materialBatchRepo = getMaterialBatchRepository();
+  const bomRepo = getBOMRepository();
 
   // 🔹 Parent
   const parsedParent = parseParent(data.parentCode);
@@ -318,6 +348,7 @@ export function buildBOMFromText(data: Input) {
     catalogHelper,
     materialRepo,
     materialBatchRepo,
+    bomRepo,
   );
 }
 

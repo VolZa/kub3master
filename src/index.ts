@@ -64,6 +64,8 @@ import { testManufacturingWebOptionsApi } from 'modules/manufacturingSync/tests/
 import { testManufacturingPlacementRebuildExecute } from 'modules/manufacturing/tests/manufacturing-placement-rebuild.test';
 import { bomMaterialRequirementsIntegrationTest } from 'modules/bom/tests/bom-material-requirements.integration.test';
 import { testBOMCompletenessChecker } from 'modules/bom/tests/bom-completeness-checker.test';
+import { getBOMRepository } from './app/factories/bom.factory';
+import { testAuditAllProducts } from './modules/bom/tests/bom-products-audit.test';
 
 function testDiagnoseProductP1(): void {
   diagnoseProductP1();
@@ -78,12 +80,10 @@ function runTableParser(
   text: string,
 ) {
   const elementRepo = getElementRepository();
-
   const catalogRepo = getCatalogRepository();
-
   const materialRepo = getMaterialRepository();
-
   const materialBatchRepo = getMaterialBatchRepository();
+  const bomRepo = getBOMRepository();
 
   // 🔹 Parent
   const parsedParent = {
@@ -97,16 +97,29 @@ function runTableParser(
 
   // 🔥 ГОЛОВНИЙ ВИКЛИК
   const catalogHelper = new CatalogHelper(catalogRepo);
-  const count = buildBOMFromTable(
+  const result = buildBOMFromTable(
     parsedParent,
     rows,
     elementRepo,
-    catalogHelper, // 🔥 НОВЕ ❗ замість catalogRepo
-    materialRepo, // 🔥 НОВЕ
-    materialBatchRepo, // 🔥 НОВЕ
+    catalogHelper,
+    materialRepo,
+    materialBatchRepo,
+    bomRepo,
   );
 
-  return `Inserted rows: ${count}`;
+  const lines = [`Вставлено рядків BOM: ${result.added}`];
+
+  if (result.errorCount > 0) {
+    lines.push(`❌ Помилок: ${result.errorCount}`);
+  }
+
+  if (result.operatorMessage) {
+    lines.push('');
+    lines.push(result.operatorMessage.title);
+    lines.push(result.operatorMessage.text);
+  }
+
+  return lines.join('\n');
 }
 
 function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit) {
@@ -189,4 +202,5 @@ register({
   testManufacturingPlacementRebuildExecute,
   bomMaterialRequirementsIntegrationTest,
   testBOMCompletenessChecker,
+  testAuditAllProducts,
 });
