@@ -23,7 +23,7 @@ import { MaterialRepository } from '../../../domain/materials/material.repositor
 import { Material } from '../../../domain/materials/material.model';
 
 import { BOMExpansionRow } from './bom-expansion.row';
-
+import { ElementType } from '../../../config/config';
 interface ExpansionContext {
   level: number;
   parentId: string;
@@ -36,7 +36,7 @@ interface BOMNode {
   id: string;
   code: string;
   name: string;
-  type: string;
+  type: ElementType;
   isMaterial: boolean;
 }
 
@@ -182,7 +182,7 @@ export class BOMExpansionService {
         id,
         code: String(element.code),
         name: String(element.name),
-        type: String(element.type),
+        type: element.type,
         isMaterial: false,
       };
     }

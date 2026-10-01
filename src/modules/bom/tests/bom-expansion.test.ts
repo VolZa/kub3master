@@ -17,6 +17,7 @@ import { InMemoryBOMRepository } from '../repositories/in-memory-bom.repository'
 import { BOMExpansionService } from '../expansion/bom-expansion.service';
 import { getMaterialRepository } from '../../../app/factories/material.factory';
 import { BOMProductSpecificationService } from '../specification/bom-product-specification.service';
+import { BOMProductSpecificationGroupService } from '../specification/bom-product-specification-group.service';
 
 export function testExpandProductP31(): void {
   const productId = '2027';
@@ -45,7 +46,35 @@ export function testExpandProductP31(): void {
 
   const specification = specificationService.aggregate(rows);
 
+  const groupService = new BOMProductSpecificationGroupService();
+
+  const grouped = groupService.group(specification);
+
+  console.log(`Assemblies: ${grouped.assemblies.length}`);
+
+  console.log(`Parts: ${grouped.parts.length}`);
+
+  console.log(`Materials: ${grouped.materials.length}`);
+
   console.log(`Product Specification: ${specification.length} rows`);
+
+  console.log('--- ASSEMBLIES ---');
+
+  for (const row of grouped.assemblies) {
+    console.log(`${row.elementCode} | ${row.qty} ${row.unit}`);
+  }
+
+  console.log('--- PARTS ---');
+
+  for (const row of grouped.parts) {
+    console.log(`${row.elementCode} | ${row.qty} ${row.unit}`);
+  }
+
+  console.log('--- MATERIALS ---');
+
+  for (const row of grouped.materials) {
+    console.log(`${row.elementCode} | ${row.qty} ${row.unit}`);
+  }
 
   for (const row of specification) {
     console.log(

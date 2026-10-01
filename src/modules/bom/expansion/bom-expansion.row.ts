@@ -10,7 +10,7 @@
  * - зберігає розраховану кількість відносно Product;
  * - зберігає шлях проходження BOM для трасування.
  */
-
+import { ElementType } from '../../../config/config';
 export interface BOMExpansionRow {
   /**
    * Рівень відносно Product.
@@ -32,7 +32,7 @@ export interface BOMExpansionRow {
   elementId: string;
   elementCode: string;
   elementName: string;
-  elementType: string;
+  elementType: ElementType;
 
   /**
    * Кількість у безпосередньому BOM-зв'язку.

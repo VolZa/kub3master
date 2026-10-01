@@ -68,6 +68,13 @@ import { testBOMCompletenessChecker } from 'modules/bom/tests/bom-completeness-c
 import { getBOMRepository } from './app/factories/bom.factory';
 import { testAuditAllProducts } from './modules/bom/tests/bom-products-audit.test';
 import { testExpandProductP31 } from './modules/bom/tests/bom-expansion.test';
+import {
+  testProductSpecificationReport,
+  testProductSpecificationReportP31,
+} from './modules/reports/product-specification/product-specification-report.service.test';
+import { testRoundQuantity } from './utils/quantity/quantity-rounding.test';
+import { testBOMVerticalReportP31 } from './modules/reports/bom-vertical/bom-vertical-report.service.test';
+import { testMaterialConsumptionReportP31 } from './modules/reports/material-consumption/material-consumption-report.service.test';
 
 function testDiagnoseProductP1(): void {
   diagnoseProductP1();
@@ -206,4 +213,9 @@ register({
   testBOMCompletenessChecker,
   testAuditAllProducts,
   testExpandProductP31,
+  testProductSpecificationReport,
+  testProductSpecificationReportP31,
+  testRoundQuantity,
+  testBOMVerticalReportP31,
+  testMaterialConsumptionReportP31,
 });
