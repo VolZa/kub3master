@@ -257,6 +257,10 @@ export class GoogleSheetsElementRepository implements ElementRepository {
     );
   }
 
+  public findAll(): ElementFull[] {
+    return this.rows.map((row) => mapElementRowToDomain(row));
+  }
+
   public findByType(type: ElementType): ElementFull[] {
     return this.rows
       .filter((row) => row.Type === type)

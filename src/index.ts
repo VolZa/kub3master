@@ -1,3 +1,4 @@
+// src\index.ts
 import { onOpen } from './main';
 import { openFormTable } from './ui/openForm';
 import { doGet } from './ui/webApp';
@@ -66,6 +67,7 @@ import { bomMaterialRequirementsIntegrationTest } from 'modules/bom/tests/bom-ma
 import { testBOMCompletenessChecker } from 'modules/bom/tests/bom-completeness-checker.test';
 import { getBOMRepository } from './app/factories/bom.factory';
 import { testAuditAllProducts } from './modules/bom/tests/bom-products-audit.test';
+import { testExpandProductP31 } from './modules/bom/tests/bom-expansion.test';
 
 function testDiagnoseProductP1(): void {
   diagnoseProductP1();
@@ -203,4 +205,5 @@ register({
   bomMaterialRequirementsIntegrationTest,
   testBOMCompletenessChecker,
   testAuditAllProducts,
+  testExpandProductP31,
 });
