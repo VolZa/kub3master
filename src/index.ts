@@ -75,6 +75,9 @@ import {
 import { testRoundQuantity } from './utils/quantity/quantity-rounding.test';
 import { testBOMVerticalReportP31 } from './modules/reports/bom-vertical/bom-vertical-report.service.test';
 import { testMaterialConsumptionReportP31 } from './modules/reports/material-consumption/material-consumption-report.service.test';
+import { testMaterialBatchOptions } from './modules/material-batch/material-batch.repository.test';
+import { testReportFilter } from './modules/reports/report-filter.test';
+import { testReportFilterService } from './modules/reports/tests/report-filter.service.test';
 
 function testDiagnoseProductP1(): void {
   diagnoseProductP1();
@@ -218,4 +221,7 @@ register({
   testRoundQuantity,
   testBOMVerticalReportP31,
   testMaterialConsumptionReportP31,
+  testMaterialBatchOptions,
+  testReportFilter,
+  testReportFilterService,
 });

@@ -1,0 +1,1095 @@
+<!doctype html>
+<html>
+  <head>
+    <base target="_top" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>ERP КУБ — Виробництво</title>
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 12px;
+        font-family: Arial, sans-serif;
+        background: #f3f4f6;
+        color: #1f2937;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 520px;
+        margin: 0 auto;
+        padding: 16px;
+        background: #ffffff;
+        border-radius: 12px;
+      }
+
+      h2 {
+        margin: 0 0 4px 0;
+        font-size: 22px;
+      }
+
+      .subtitle {
+        margin: 0 0 18px 0;
+        color: #6b7280;
+        font-size: 14px;
+      }
+
+      /* --------------------------------------------------------
+         Режими
+         -------------------------------------------------------- */
+
+      .mode-switch {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        margin-bottom: 20px;
+        padding: 4px;
+        background: #e5e7eb;
+        border-radius: 10px;
+      }
+
+      .mode-button {
+        min-height: 42px;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: #4b5563;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .mode-button.active {
+        background: #ffffff;
+        color: #111827;
+      }
+
+      .mode-panel {
+        display: none;
+      }
+
+      .mode-panel.active {
+        display: block;
+      }
+
+      /* --------------------------------------------------------
+         Поля
+         -------------------------------------------------------- */
+
+      .field {
+        margin-bottom: 14px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      input,
+      textarea,
+      select {
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #ffffff;
+        font-size: 16px;
+      }
+
+      textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+
+      input:focus,
+      textarea:focus,
+      select:focus {
+        outline: none;
+        border-color: #2563eb;
+      }
+
+      .field-hint {
+        margin-top: 4px;
+        color: #6b7280;
+        font-size: 12px;
+      }
+
+      /* --------------------------------------------------------
+         Кнопки
+         -------------------------------------------------------- */
+
+      .button {
+        width: 100%;
+        min-height: 50px;
+        margin-top: 8px;
+        border: none;
+        border-radius: 10px;
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .button-green {
+        background: #16a34a;
+      }
+
+      .button-blue {
+        background: #2563eb;
+      }
+
+      .button:active {
+        transform: scale(0.99);
+      }
+
+      /* --------------------------------------------------------
+         Додаткові блоки
+         -------------------------------------------------------- */
+
+      .report-options {
+        padding-top: 4px;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .section-title {
+        margin: 4px 0 14px;
+        font-size: 16px;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <h2>ERP КУБ</h2>
+      <p class="subtitle">Виробництво</p>
+
+      <!-- ======================================================
+           Перемикач режимів
+           ====================================================== -->
+
+      <div class="mode-switch">
+        <button
+          id="modeManufacturing"
+          class="mode-button active"
+          type="button"
+          onclick="showMode('manufacturing')"
+        >
+          ВИГОТОВЛЕННЯ
+        </button>
+
+        <button
+          id="modeReports"
+          class="mode-button"
+          type="button"
+          onclick="showMode('reports')"
+        >
+          ЗВІТИ
+        </button>
+      </div>
+
+      <!-- ======================================================
+           РЕЖИМ: ВИГОТОВЛЕННЯ
+           ====================================================== -->
+
+      <div id="manufacturingPanel" class="mode-panel active">
+        <div class="field">
+          <label for="date">Дата</label>
+          <input id="date" type="date" />
+        </div>
+
+        <div class="field">
+          <label for="shift">Зміна</label>
+          <select id="shift">
+            <option value="">Оберіть зміну</option>
+            <option value="1">1 зміна</option>
+            <option value="2">2 зміна</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="houseCode">Будинок</label>
+          <select id="houseCode" onchange="handleHouseChange()">
+            <option value="">Завантаження...</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="productCode">Код виробу</label>
+          <input id="productCode" type="text" placeholder="Наприклад, П-2.2" />
+        </div>
+
+        <div class="field">
+          <label for="quantity">Кількість</label>
+          <input id="quantity" type="number" min="1" step="1" value="1" />
+        </div>
+
+        <div class="field">
+          <label for="placementId">Позиція</label>
+          <select id="placementId">
+            <option value="">NONE — поза проектом</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="master">Майстер</label>
+          <input id="master" type="text" placeholder="Прізвище та ім'я" />
+        </div>
+
+        <div class="field">
+          <label for="comment">Примітка</label>
+          <textarea id="comment" placeholder="Необов'язково"></textarea>
+        </div>
+
+        <button
+          class="button button-green"
+          type="button"
+          onclick="acceptManufacturing()"
+        >
+          ✓ ПРИЙНЯТИ
+        </button>
+      </div>
+
+      <!-- ======================================================
+           РЕЖИМ: ЗВІТИ
+           ====================================================== -->
+
+      <div id="reportsPanel" class="mode-panel">
+        <div class="section-title">Формування звіту</div>
+
+        <!-- Обсяг -->
+
+        <div class="field">
+          <label for="reportScope">Обсяг</label>
+
+          <select id="reportScope" onchange="handleReportScopeChange()">
+            <option value="product">Один виріб</option>
+
+            <option value="period">За період</option>
+
+            <option value="all">Вся виготовлена продукція</option>
+          </select>
+        </div>
+
+        <!-- Будинок -->
+
+        <div class="field">
+          <label for="reportHouseCode"> Будинок </label>
+
+          <select id="reportHouseCode">
+            <option value="">Усі будинки</option>
+          </select>
+        </div>
+
+        <!-- Виріб -->
+
+        <div class="field">
+          <label for="reportProductCode"> Виріб </label>
+
+          <select id="reportProductCode">
+            <option value="">Усі вироби</option>
+          </select>
+        </div>
+
+        <!-- Дата від -->
+
+        <div id="reportDateFromField" class="field hidden">
+          <label for="reportDateFrom"> Дата від </label>
+
+          <input id="reportDateFrom" type="date" />
+        </div>
+
+        <!-- Дата до -->
+
+        <div id="reportDateToField" class="field hidden">
+          <label for="reportDateTo"> Дата до </label>
+
+          <input id="reportDateTo" type="date" />
+        </div>
+
+        <!-- Тип звіту -->
+
+        <div class="field">
+          <label for="reportType"> Тип звіту </label>
+
+          <select id="reportType">
+            <option value="material-consumption">Витрата матеріалів</option>
+
+            <option value="product-specification">Специфікація виробу</option>
+
+            <option value="bom-vertical">Вертикальна специфікація</option>
+          </select>
+        </div>
+
+        <!-- Метод -->
+
+        <div class="field">
+          <label for="consumptionMethod"> Метод розрахунку </label>
+
+          <select
+            id="consumptionMethod"
+            onchange="handleConsumptionMethodChange()"
+          >
+            <option value="normative">Нормативний</option>
+
+            <option value="batch-based">Batch-based</option>
+          </select>
+
+          <div class="field-hint">
+            Batch-based використовує характеристики вибраних партій матеріалів.
+          </div>
+        </div>
+
+        <!-- Втрати -->
+
+        <div class="field">
+          <label for="lossPercent"> Нормативні втрати, % </label>
+
+          <input
+            id="lossPercent"
+            type="number"
+            min="0"
+            max="7"
+            step="0.1"
+            value="7"
+          />
+
+          <div class="field-hint">Допустимий діапазон: 0–7 %.</div>
+        </div>
+
+        <!-- Тут пізніше з'явиться вибір партій -->
+
+        <div id="batchSelection" class="report-options hidden">
+          <div class="section-title">Партії матеріалів</div>
+
+          <div id="batchSelectionFields">
+            <!--
+              Пізніше сюди динамічно
+              завантажимо MaterialBatchOption[].
+            -->
+          </div>
+        </div>
+
+        <!-- Формат -->
+
+        <div class="field">
+          <label for="reportFormat"> Формат </label>
+
+          <select id="reportFormat">
+            <option value="google-sheet">Google Sheet</option>
+          </select>
+        </div>
+
+        <button
+          class="button button-blue"
+          type="button"
+          onclick="generateReport()"
+        >
+          СФОРМУВАТИ
+        </button>
+      </div>
+    </div>
+
+    <script>
+      // ========================================================
+      // РЕЖИМИ
+      // ========================================================
+
+      function showMode(mode) {
+        const manufacturingPanel =
+          document.getElementById('manufacturingPanel');
+
+        const reportsPanel = document.getElementById('reportsPanel');
+
+        const manufacturingButton =
+          document.getElementById('modeManufacturing');
+
+        const reportsButton = document.getElementById('modeReports');
+
+        if (mode === 'reports') {
+          manufacturingPanel.classList.remove('active');
+          reportsPanel.classList.add('active');
+
+          manufacturingButton.classList.remove('active');
+          reportsButton.classList.add('active');
+
+          loadReportHouseOptions();
+
+          return;
+        }
+
+        reportsPanel.classList.remove('active');
+        manufacturingPanel.classList.add('active');
+
+        reportsButton.classList.remove('active');
+        manufacturingButton.classList.add('active');
+      }
+
+      // ========================================================
+      // ВИГОТОВЛЕННЯ
+      // ========================================================
+
+      function loadHouseOptions() {
+        google.script.run
+          .withSuccessHandler((options) => {
+            const select = document.getElementById('houseCode');
+
+            select.innerHTML = '';
+
+            for (const option of options) {
+              const element = document.createElement('option');
+
+              element.value = option.value;
+              element.textContent = option.label;
+
+              select.appendChild(element);
+            }
+
+            handleHouseChange();
+          })
+          .withFailureHandler((error) => {
+            alert('Помилка завантаження будинків: ' + error.message);
+          })
+          .getManufacturingHouseOptions();
+      }
+
+      function resetPlacement() {
+        const placementSelect = document.getElementById('placementId');
+
+        placementSelect.innerHTML = '';
+
+        const option = document.createElement('option');
+
+        option.value = '';
+        option.textContent = 'NONE — поза проектом';
+
+        placementSelect.appendChild(option);
+      }
+
+      function handleHouseChange() {
+        const houseCode = document.getElementById('houseCode').value;
+
+        resetPlacement();
+
+        const currentProductElement = document.getElementById('productCode');
+
+        if (houseCode === '') {
+          const input = document.createElement('input');
+
+          input.id = 'productCode';
+          input.type = 'text';
+          input.placeholder = 'Наприклад, П-2.2';
+
+          currentProductElement.replaceWith(input);
+
+          return;
+        }
+
+        const select = document.createElement('select');
+
+        select.id = 'productCode';
+        select.onchange = handleProductChange;
+
+        const loadingOption = document.createElement('option');
+
+        loadingOption.value = '';
+        loadingOption.textContent = 'Завантаження виробів...';
+
+        select.appendChild(loadingOption);
+
+        currentProductElement.replaceWith(select);
+
+        google.script.run
+          .withSuccessHandler((options) => {
+            select.innerHTML = '';
+
+            const emptyOption = document.createElement('option');
+
+            emptyOption.value = '';
+            emptyOption.textContent = 'Оберіть виріб';
+
+            select.appendChild(emptyOption);
+
+            for (const option of options) {
+              const element = document.createElement('option');
+
+              element.value = option.value;
+              element.textContent = option.label;
+
+              select.appendChild(element);
+            }
+          })
+          .withFailureHandler((error) => {
+            alert('Помилка завантаження виробів: ' + error.message);
+          })
+          .getManufacturingProductOptions(houseCode);
+      }
+
+      function handleProductChange() {
+        const houseCode = document.getElementById('houseCode').value;
+
+        const productCode = document.getElementById('productCode').value;
+
+        resetPlacement();
+
+        if (houseCode === '' || productCode === '') {
+          return;
+        }
+
+        const placementSelect = document.getElementById('placementId');
+
+        const loadingOption = document.createElement('option');
+
+        loadingOption.value = '';
+        loadingOption.textContent = 'Завантаження позицій...';
+
+        placementSelect.appendChild(loadingOption);
+
+        google.script.run
+          .withSuccessHandler((options) => {
+            placementSelect.innerHTML = '';
+
+            const emptyOption = document.createElement('option');
+
+            emptyOption.value = '';
+            emptyOption.textContent = 'Оберіть позицію';
+
+            placementSelect.appendChild(emptyOption);
+
+            for (const option of options) {
+              const element = document.createElement('option');
+
+              element.value = option.value;
+              element.textContent = option.label;
+
+              placementSelect.appendChild(element);
+            }
+          })
+          .withFailureHandler((error) => {
+            alert('Помилка завантаження позицій: ' + error.message);
+          })
+          .getManufacturingPlacementOptions(houseCode, productCode);
+      }
+
+      function acceptManufacturing() {
+        const webInput = {
+          date: document.getElementById('date').value,
+
+          shift: document.getElementById('shift').value,
+
+          houseCode: document.getElementById('houseCode').value,
+
+          productCode: document.getElementById('productCode').value,
+
+          quantity: Number(document.getElementById('quantity').value),
+
+          placementId:
+            document.getElementById('placementId').value === ''
+              ? undefined
+              : Number(document.getElementById('placementId').value),
+
+          master: document.getElementById('master').value,
+
+          comment: document.getElementById('comment').value,
+        };
+
+        google.script.run
+          .withSuccessHandler((manufacturingId) => {
+            alert(`Manufacturing ${manufacturingId} створений.`);
+          })
+          .withFailureHandler((error) => {
+            alert('Помилка: ' + error.message);
+          })
+          .createManufacturingFromWeb(webInput);
+      }
+
+      // ========================================================
+      // ЗВІТИ
+      // ========================================================
+
+      function loadReportHouseOptions() {
+        const select = document.getElementById('reportHouseCode');
+
+        /*
+         * Не завантажуємо повторно,
+         * якщо список вже отриманий.
+         */
+
+        if (select.dataset.loaded === 'true') {
+          return;
+        }
+
+        google.script.run
+          .withSuccessHandler((options) => {
+            select.innerHTML = '';
+
+            const allOption = document.createElement('option');
+
+            allOption.value = '';
+            allOption.textContent = 'Усі будинки';
+
+            select.appendChild(allOption);
+
+            for (const option of options) {
+              const element = document.createElement('option');
+
+              element.value = option.value;
+              element.textContent = option.label;
+
+              select.appendChild(element);
+            }
+
+            select.dataset.loaded = 'true';
+          })
+          .withFailureHandler((error) => {
+            alert('Помилка завантаження будинків: ' + error.message);
+          })
+          .getManufacturingHouseOptions();
+      }
+
+      function handleReportScopeChange() {
+        const scope = document.getElementById('reportScope').value;
+
+        const dateFrom = document.getElementById('reportDateFromField');
+
+        const dateTo = document.getElementById('reportDateToField');
+
+        const productSelect = document.getElementById('reportProductCode');
+
+        if (scope === 'product') {
+          dateFrom.classList.add('hidden');
+          dateTo.classList.add('hidden');
+
+          productSelect.disabled = false;
+
+          return;
+        }
+
+        if (scope === 'period') {
+          dateFrom.classList.remove('hidden');
+          dateTo.classList.remove('hidden');
+
+          productSelect.disabled = false;
+
+          return;
+        }
+
+        if (scope === 'all') {
+          dateFrom.classList.remove('hidden');
+          dateTo.classList.remove('hidden');
+
+          productSelect.disabled = true;
+          productSelect.value = '';
+
+          return;
+        }
+      }
+
+      function handleConsumptionMethodChange() {
+        const method = document.getElementById('consumptionMethod').value;
+
+        const batchSelection = document.getElementById('batchSelection');
+
+        if (method === 'batch-based') {
+          batchSelection.classList.remove('hidden');
+
+          /*
+           * Тут на наступному етапі:
+           *
+           * 1. визначаємо матеріали звіту;
+           * 2. для кожного MaterialID викликаємо
+           *    getMaterialBatchOptions(materialId);
+           * 3. будуємо select партії.
+           */
+
+          return;
+        }
+
+        batchSelection.classList.add('hidden');
+      }
+
+      function generateReport() {
+        const reportRequest = {
+          scope: document.getElementById('reportScope').value,
+
+          houseCode: document.getElementById('reportHouseCode').value,
+
+          productCode: document.getElementById('reportProductCode').value,
+
+          dateFrom: document.getElementById('reportDateFrom').value,
+
+          dateTo: document.getElementById('reportDateTo').value,
+
+          reportType: document.getElementById('reportType').value,
+
+          consumptionMethod: document.getElementById('consumptionMethod').value,
+
+          lossPercent: Number(document.getElementById('lossPercent').value),
+
+          format: document.getElementById('reportFormat').value,
+        };
+
+        console.log('Report request:', reportRequest);
+
+        /*
+         * Поки тільки перевіряємо сформований запит.
+         *
+         * Наступним кроком тут буде:
+         *
+         * google.script.run
+         *   .withSuccessHandler(...)
+         *   .withFailureHandler(...)
+         *   .generateReport(reportRequest);
+         */
+
+        alert(
+          'Параметри звіту сформовані.\n\n' +
+            JSON.stringify(reportRequest, null, 2),
+        );
+      }
+
+      // ========================================================
+      // ІНІЦІАЛІЗАЦІЯ
+      // ========================================================
+
+      loadHouseOptions();
+
+      handleReportScopeChange();
+    </script>
+  </body>
+</html>
+<!-- <!doctype html>
+<html>
+  <head>
+    <base target="_top" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>ERP КУБ — Виготовлення</title>
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 12px;
+        font-family: Arial, sans-serif;
+        background: #f3f4f6;
+        color: #1f2937;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 520px;
+        margin: 0 auto;
+        padding: 16px;
+        background: #ffffff;
+        border-radius: 12px;
+      }
+
+      h2 {
+        margin: 0 0 4px 0;
+        font-size: 22px;
+      }
+
+      .subtitle {
+        margin: 0 0 18px 0;
+        color: #6b7280;
+        font-size: 14px;
+      }
+
+      .field {
+        margin-bottom: 14px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      input,
+      textarea,
+      select {
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #ffffff;
+        font-size: 16px;
+      }
+
+      textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+
+      input:focus,
+      textarea:focus,
+      select:focus {
+        outline: none;
+        border-color: #2563eb;
+      }
+
+      .button {
+        width: 100%;
+        min-height: 50px;
+        margin-top: 8px;
+        border: none;
+        border-radius: 10px;
+        background: #16a34a;
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .button:active {
+        transform: scale(0.99);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <h2>ERP КУБ</h2>
+      <p class="subtitle">Виготовлення</p>
+
+      <div class="field">
+        <label for="date">Дата</label>
+        <input id="date" type="date" />
+      </div>
+
+      <div class="field">
+        <label for="shift">Зміна</label>
+        <select id="shift">
+          <option value="">Оберіть зміну</option>
+          <option value="1">1 зміна</option>
+          <option value="2">2 зміна</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="houseCode">Будинок</label>
+        <select id="houseCode" onchange="handleHouseChange()">
+          <option value="">Завантаження...</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="productCode">Код виробу</label>
+        <input id="productCode" type="text" placeholder="Наприклад, П-2.2" />
+      </div>
+
+      <div class="field">
+        <label for="quantity">Кількість</label>
+        <input id="quantity" type="number" min="1" step="1" value="1" />
+      </div>
+
+      <div class="field">
+        <label for="placementId">Позиція</label>
+        <select id="placementId">
+          <option value="">NONE — поза проектом</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="master">Майстер</label>
+        <input id="master" type="text" placeholder="Прізвище та ім'я" />
+      </div>
+
+      <div class="field">
+        <label for="comment">Примітка</label>
+        <textarea id="comment" placeholder="Необов'язково"></textarea>
+      </div>
+
+      <button class="button" type="button" onclick="acceptManufacturing()">
+        ✓ ПРИЙНЯТИ
+      </button>
+    </div>
+
+    <script>
+      function loadHouseOptions() {
+        google.script.run
+          .withSuccessHandler((options) => {
+            const select = document.getElementById('houseCode');
+
+            select.innerHTML = '';
+
+            for (const option of options) {
+              const element = document.createElement('option');
+
+              element.value = option.value;
+              element.textContent = option.label;
+
+              select.appendChild(element);
+            }
+            handleHouseChange();
+          })
+          .withFailureHandler((error) => {
+            alert('Помилка завантаження будинків: ' + error.message);
+          })
+          .getManufacturingHouseOptions();
+      }
+
+      function resetPlacement() {
+        const placementSelect = document.getElementById('placementId');
+
+        placementSelect.innerHTML = '';
+
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'NONE — поза проектом';
+
+        placementSelect.appendChild(option);
+      }
+
+      function handleHouseChange() {
+        const houseCode = document.getElementById('houseCode').value;
+
+        resetPlacement();
+
+        const currentProductElement = document.getElementById('productCode');
+
+        // --------------------------------------------------------
+        // NONE — ручний ввід ProductCode
+        // --------------------------------------------------------
+
+        if (houseCode === '') {
+          const input = document.createElement('input');
+
+          input.id = 'productCode';
+          input.type = 'text';
+          input.placeholder = 'Наприклад, П-2.2';
+
+          currentProductElement.replaceWith(input);
+
+          return;
+        }
+
+        // --------------------------------------------------------
+        // Конкретний будинок — список ProductCode
+        // --------------------------------------------------------
+
+        const select = document.createElement('select');
+
+        select.id = 'productCode';
+        select.onchange = handleProductChange;
+
+        const loadingOption = document.createElement('option');
+
+        loadingOption.value = '';
+        loadingOption.textContent = 'Завантаження виробів...';
+
+        select.appendChild(loadingOption);
+
+        currentProductElement.replaceWith(select);
+
+        google.script.run
+          .withSuccessHandler((options) => {
+            select.innerHTML = '';
+
+            const emptyOption = document.createElement('option');
+
+            emptyOption.value = '';
+            emptyOption.textContent = 'Оберіть виріб';
+
+            select.appendChild(emptyOption);
+
+            for (const option of options) {
+              const element = document.createElement('option');
+
+              element.value = option.value;
+              element.textContent = option.label;
+
+              select.appendChild(element);
+            }
+          })
+          .withFailureHandler((error) => {
+            alert('Помилка завантаження виробів: ' + error.message);
+          })
+          .getManufacturingProductOptions(houseCode);
+      }
+
+      function handleProductChange() {
+        const houseCode = document.getElementById('houseCode').value;
+        const productCode = document.getElementById('productCode').value;
+
+        resetPlacement();
+
+        if (houseCode === '' || productCode === '') {
+          return;
+        }
+
+        const placementSelect = document.getElementById('placementId');
+
+        const loadingOption = document.createElement('option');
+        loadingOption.value = '';
+        loadingOption.textContent = 'Завантаження позицій...';
+        placementSelect.appendChild(loadingOption);
+
+        google.script.run
+          .withSuccessHandler((options) => {
+            placementSelect.innerHTML = '';
+
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = 'Оберіть позицію';
+            placementSelect.appendChild(emptyOption);
+
+            for (const option of options) {
+              const element = document.createElement('option');
+              element.value = option.value;
+              element.textContent = option.label;
+              placementSelect.appendChild(element);
+            }
+          })
+          .withFailureHandler((error) => {
+            alert('Помилка завантаження позицій: ' + error.message);
+          })
+          .getManufacturingPlacementOptions(houseCode, productCode);
+      }
+
+      function acceptManufacturing() {
+        const webInput = {
+          date: document.getElementById('date').value,
+          shift: document.getElementById('shift').value,
+          houseCode: document.getElementById('houseCode').value,
+          productCode: document.getElementById('productCode').value,
+          quantity: Number(document.getElementById('quantity').value),
+          placementId:
+            document.getElementById('placementId').value === ''
+              ? undefined
+              : Number(document.getElementById('placementId').value),
+          master: document.getElementById('master').value,
+          comment: document.getElementById('comment').value,
+        };
+
+        google.script.run
+          .withSuccessHandler((manufacturingId) => {
+            alert(`Manufacturing ${manufacturingId} створений.`);
+          })
+          .withFailureHandler((error) => {
+            alert('Помилка: ' + error.message);
+          })
+          .createManufacturingFromWeb(webInput);
+      }
+      loadHouseOptions();
+    </script>
+  </body>
+</html> -->
