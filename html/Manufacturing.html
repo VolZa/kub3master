@@ -259,14 +259,98 @@
            РЕЖИМ: ЗВІТ
            ==================================================== -->
 
-      <div id="reportView" style="display: none">
+      <div id="reportView" class="view">
         <h2>Звіт</h2>
+        <p class="subtitle">Виробничі звіти</p>
 
-        <p class="subtitle">Формування виробничих звітів</p>
-
-        <div class="placeholder">
-          Форма звіту буде додана на наступному етапі.
+        <div class="field">
+          <label for="reportHouseCode">Будинок</label>
+          <select id="reportHouseCode" onchange="handleReportHouseChange()">
+            <option value="">Усі будинки</option>
+          </select>
         </div>
+
+        <div class="field">
+          <label for="reportProductCode">Виріб</label>
+          <select id="reportProductCode" disabled>
+            <option value="">Усі вироби</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Період</label>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px">
+            <div>
+              <input id="reportDateFrom" type="date" />
+              <small>від</small>
+            </div>
+
+            <div>
+              <input id="reportDateTo" type="date" />
+              <small>до</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="reportType">Тип звіту</label>
+
+          <select id="reportType">
+            <option value="material-consumption">Витрата матеріалів</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="reportCalculationMethod"> Метод розрахунку </label>
+
+          <select
+            id="reportCalculationMethod"
+            onchange="handleReportCalculationMethodChange()"
+          >
+            <option value="normative">Нормативна</option>
+            <option value="batch-based">Batch-based</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="reportLossPercent"> Нормативні втрати, % </label>
+
+          <input
+            id="reportLossPercent"
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            value="7"
+          />
+        </div>
+
+        <div class="field">
+          <label for="reportFormat">Формат</label>
+
+          <select id="reportFormat">
+            <option value="google-sheet">Google Sheet</option>
+          </select>
+        </div>
+
+        <button class="button" type="button" onclick="buildReportWebInput()">
+          ✓ СФОРМУВАТИ
+        </button>
+
+        <div
+          id="reportDebug"
+          style="
+            display: none;
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            background: #f3f4f6;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+          "
+        ></div>
       </div>
 
       <!-- ====================================================
@@ -531,6 +615,228 @@
       // ======================================================
 
       loadHouseOptions();
+
+      // ============================================================
+      // REPORT
+      // ============================================================
+
+      //   function loadReportHouseOptions() {
+      //     google.script.run
+      //       .withSuccessHandler((options) => {
+      //         const select = document.getElementById('reportHouseCode');
+
+      //         select.innerHTML = '';
+
+      //         const allOption = document.createElement('option');
+      //         allOption.value = '';
+      //         allOption.textContent = 'Усі будинки';
+
+      //         select.appendChild(allOption);
+
+      //         for (const option of options) {
+      //           const element = document.createElement('option');
+
+      //           element.value = option.value;
+      //           element.textContent = option.label;
+
+      //           select.appendChild(element);
+      //         }
+
+      //         resetReportProductOptions();
+      //       })
+      //       .withFailureHandler((error) => {
+      //         alert('Помилка завантаження будинків для звіту: ' + error.message);
+      //       })
+      //       .getManufacturingHouseOptions();
+      //   }
+      function loadReportHouseOptions() {
+        google.script.run
+          .withSuccessHandler((options) => {
+            console.log('REPORT house options:', options);
+
+            const select = document.getElementById('reportHouseCode');
+
+            console.log('REPORT house select:', select);
+
+            select.innerHTML = '';
+
+            const allOption = document.createElement('option');
+            allOption.value = '';
+            allOption.textContent = 'Усі будинки';
+
+            select.appendChild(allOption);
+
+            for (const option of options) {
+              console.log('REPORT house option:', option);
+
+              const element = document.createElement('option');
+
+              element.value = option.value;
+              element.textContent = option.label;
+
+              select.appendChild(element);
+            }
+
+            console.log('REPORT house select options:', select.options.length);
+
+            resetReportProductOptions();
+          })
+          .withFailureHandler((error) => {
+            console.error('REPORT house options error:', error);
+
+            alert('Помилка завантаження будинків для звіту: ' + error.message);
+          })
+          .getManufacturingHouseOptions();
+      }
+      function resetReportProductOptions() {
+        const select = document.getElementById('reportProductCode');
+
+        select.innerHTML = '';
+
+        const allOption = document.createElement('option');
+
+        allOption.value = '';
+        allOption.textContent = 'Усі вироби';
+
+        select.appendChild(allOption);
+
+        select.disabled = true;
+      }
+
+      function handleReportHouseChange() {
+        const houseCode = document.getElementById('reportHouseCode').value;
+
+        const productSelect = document.getElementById('reportProductCode');
+
+        resetReportProductOptions();
+
+        if (houseCode === '') {
+          return;
+        }
+
+        productSelect.disabled = true;
+
+        const loadingOption = document.createElement('option');
+
+        loadingOption.value = '';
+        loadingOption.textContent = 'Завантаження виробів...';
+
+        productSelect.innerHTML = '';
+        productSelect.appendChild(loadingOption);
+
+        google.script.run
+          .withSuccessHandler((options) => {
+            productSelect.innerHTML = '';
+
+            const allOption = document.createElement('option');
+
+            allOption.value = '';
+            allOption.textContent = 'Усі вироби';
+
+            productSelect.appendChild(allOption);
+
+            for (const option of options) {
+              const element = document.createElement('option');
+
+              element.value = option.value;
+              element.textContent = option.label;
+
+              productSelect.appendChild(element);
+            }
+
+            productSelect.disabled = false;
+          })
+          .withFailureHandler((error) => {
+            resetReportProductOptions();
+
+            alert('Помилка завантаження виробів для звіту: ' + error.message);
+          })
+          .getManufacturingProductOptions(houseCode);
+      }
+
+      function handleReportCalculationMethodChange() {
+        const method = document.getElementById('reportCalculationMethod').value;
+
+        const lossInput = document.getElementById('reportLossPercent');
+
+        if (method === 'normative') {
+          lossInput.disabled = false;
+          return;
+        }
+
+        if (method === 'batch-based') {
+          lossInput.disabled = false;
+        }
+      }
+
+      function buildReportWebInput() {
+        const houseCode = document.getElementById('reportHouseCode').value;
+
+        const productCode = document.getElementById('reportProductCode').value;
+
+        const dateFrom = document.getElementById('reportDateFrom').value;
+
+        const dateTo = document.getElementById('reportDateTo').value;
+
+        const reportType = document.getElementById('reportType').value;
+
+        const calculationMethod = document.getElementById(
+          'reportCalculationMethod',
+        ).value;
+
+        const lossPercent = Number(
+          document.getElementById('reportLossPercent').value,
+        );
+
+        const format = document.getElementById('reportFormat').value;
+
+        if (dateFrom && dateTo && dateFrom > dateTo) {
+          alert(
+            'Дата початку періоду не може бути пізнішою за дату завершення.',
+          );
+
+          return;
+        }
+
+        if (Number.isNaN(lossPercent) || lossPercent < 0 || lossPercent > 100) {
+          alert('Вкажіть коректний відсоток втрат від 0 до 100.');
+
+          return;
+        }
+
+        const webInput = {
+          houseCode: houseCode || undefined,
+          productCode: productCode || undefined,
+
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+
+          reportType,
+
+          calculationMethod,
+
+          lossPercent,
+
+          format,
+        };
+
+        console.log('ReportWebInput:', webInput);
+
+        const debugElement = document.getElementById('reportDebug');
+
+        debugElement.style.display = 'block';
+
+        debugElement.textContent = JSON.stringify(webInput, null, 2);
+
+        alert('Параметри звіту сформовані.');
+      }
+
+      // ============================================================
+      // INITIALIZATION
+      // ============================================================
+
+      loadHouseOptions();
+      loadReportHouseOptions();
     </script>
   </body>
 </html>

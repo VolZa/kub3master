@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "rollup -c && cpy appsscript.json html/**/*.html dist",
+    "build": "rollup -c && cpy appsscript.json dist && cpy html/**/*.html dist",
     "push": "npm run build && clasp push",
     "debug": "ts-node src/debug/debug.ts",
     "test": "vitest run",

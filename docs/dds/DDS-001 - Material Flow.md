@@ -1,16 +1,79 @@
-# DDS-001 — Material Flow
+# DDS-001 — Material Flow / (Матеріальний потік)
 
-**Document Type:** Domain Design Specification
+**Тип:** Domain Design Specification / (Доменна специфікація)
 
-**Status:** Accepted
+**Статус:** Accepted / (Прийнято)
 
-**Version:** 1.0
+**Другий редакційний прохід:** 2026-10-09.
 
-**Last Updated:** 2026-08-19
+**Версія джерела:** 1.0
+
+**Редакційна консолідація:** 2026-10-07
+
+**Дата в джерелі:** 2026-08-19
 
 ---
 
-# 1. Purpose
+## Термінологія
+
+- MaterialFlow / (Матеріальний потік).
+- MaterialFlowEvent / (Подія матеріального потоку).
+- BOM / (Специфікація складу виробу).
+- MaterialRequirement / (Потреба в матеріалі).
+- MaterialAllocation / (Розподіл матеріалу).
+- MaterialConsumption / (Споживання матеріалу).
+- MaterialBatch / (Партія матеріалу).
+- Business Engines / (механізми бізнес-розрахунку).
+- Business Engine / (механізм бізнес-розрахунку).
+- Business Layer / (Бізнес-рівень).
+- Batch Allocation Engine / (Механізм розподілу за партіями).
+- Material Consumption Engine / (Механізм розрахунку споживання матеріалу).
+- Planning Engine / (Механізм планування).
+- Presentation Layer / (Шар відображення).
+- Persistence Layer / (Шар збереження даних).
+- Reports / (Звіти).
+- Product Passport / (Паспорт виробу).
+- Material Demand / (Потреба в матеріалах).
+- Cost Calculation / (Розрахунок вартості).
+- Origin / (Походження розрахунку).
+- Context / (Бізнес-контекст).
+- Domain Value Object / (Доменний об’єкт-значення).
+- immutable / (незмінний).
+- Aggregation / (Агрегація).
+- Presentation / (Відображення).
+- Single Source of Truth / (Єдине канонічне джерело істини).
+- Product / (Виріб).
+- ProductInstance / (Екземпляр виробу).
+- House / (Будинок).
+- Project / (Проєкт).
+- Repository / (сховище даних).
+- DTO / (Об’єкт передавання даних).
+- Waste Flow / (Потік відходів).
+- Concrete Flow / (Потік бетону).
+- Equipment Flow / (Потік використання обладнання).
+- Labor Flow / (Потік трудовитрат).
+- Energy Flow / (Потік енергії).
+- Transport Flow / (Потік транспорту).
+
+- Event / (Подія). У межах цього DDS скорочення означає саме MaterialFlowEvent, а не ProductionConfirmed / (Підтвердження виготовлення) чи іншу domain event / (доменну подію).
+- ID / (Ідентифікатор).
+- PLANNING / (Плановий контекст); PRODUCTION / (Виробничий контекст); ESTIMATION / (Оцінювальний контекст); SIMULATION / (Контекст моделювання).
+- IMPORT / (Імпортоване походження); MANUAL / (Ручне походження); CORRECTION / (Походження з коригування).
+- By Material / (За матеріалом); By Diameter / (За діаметром); By Steel Class / (За класом сталі); By Category / (За категорією); By Product / (За виробом); By House / (За будинком); By Project / (За проєктом); By Period / (За періодом).
+
+- Deferred / (Відкладено).
+- Open Design Question / (Відкрите питання проєктування).
+- contract / (контракт).
+- contracts / (контракти).
+
+- Material Flow / (Матеріальний потік) — джерельне написання MaterialFlow.
+- Allocation / (Розподіл матеріалу) — скорочення MaterialAllocation у цьому DDS.
+- Consumption / (Споживання матеріалу) — скорочення MaterialConsumption у цьому DDS.
+- Requirement / (Потреба в матеріалі) — скорочення MaterialRequirement у цьому DDS.
+- Planning / (Планування).
+- Actual / (Фактичний контекст).
+
+## 1. Призначення
 
 Material Flow є внутрішньою доменною моделлю ERP КУБ, що описує використання матеріалів у процесі виконання виробничих або розрахункових операцій.
 
@@ -24,7 +87,7 @@ Material Flow існує лише всередині бізнес-логіки E
 
 ---
 
-# 2. Goal
+## 2. Мета
 
 Основне призначення Material Flow — бути універсальною мовою обміну інформацією між Business Engines.
 
@@ -32,7 +95,7 @@ Material Flow існує лише всередині бізнес-логіки E
 
 ---
 
-# 3. Sources
+## 3. Джерела
 
 Material Flow може бути сформований внаслідок:
 
@@ -45,7 +108,7 @@ Material Flow може бути сформований внаслідок:
 
 ---
 
-# 4. Consumers
+## 4. Споживачі моделі
 
 Material Flow використовується:
 
@@ -59,7 +122,7 @@ Material Flow використовується:
 
 ---
 
-# 5. Domain Model
+## 5. Доменна модель
 
 ```
 MaterialFlow
@@ -74,7 +137,7 @@ Material Flow являє собою незмінну (immutable) колекці�
 
 ---
 
-# 6. MaterialFlowEvent
+## 6. MaterialFlowEvent
 
 MaterialFlowEvent є атомарною подією використання матеріалу.
 
@@ -84,7 +147,7 @@ Event ніколи не містить агрегованих даних.
 
 ---
 
-# 7. Identity
+## 7. Ідентичність
 
 MaterialFlow не має власного ідентифікатора.
 
@@ -96,7 +159,7 @@ MaterialFlowEvent не має глобального ID.
 
 ---
 
-# 8. Lifecycle
+## 8. Життєвий цикл
 
 ```
 BOM
@@ -124,11 +187,11 @@ Presentation
 
 ---
 
-# 9. Invariants
+## 9. Інваріанти
 
 Material Flow завжди задовольняє такі правила.
 
-## 9.1 Immutable
+### 9.1 Незмінність
 
 Після створення MaterialFlow не модифікується.
 
@@ -136,7 +199,7 @@ Material Flow завжди задовольняє такі правила.
 
 ---
 
-## 9.2 Positive Quantity
+### 9.2 Додатна кількість
 
 Кількість матеріалу повинна бути більшою за нуль.
 
@@ -146,25 +209,25 @@ Quantity > 0
 
 ---
 
-## 9.3 Single Material
+### 9.3 Один матеріал
 
 Один Event описує лише один Material.
 
 ---
 
-## 9.4 Single Unit
+### 9.4 Одна одиниця
 
 Один Event використовує лише одну одиницю виміру.
 
 ---
 
-## 9.5 Explainable
+### 9.5 Пояснюваність
 
 Кожний Event повинен мати можливість бути поясненим через Origin.
 
 ---
 
-# 10. Context
+## 10. Context
 
 Material Flow існує у певному бізнес-контексті.
 
@@ -179,7 +242,7 @@ Context визначає бізнес-сценарій, але не змінює
 
 ---
 
-# 11. Origin
+## 11. Origin
 
 Кожний Event має походження.
 
@@ -194,7 +257,7 @@ Origin дозволяє відтворити джерело розрахунку
 
 ---
 
-# 12. Aggregation
+## 12. Агрегація
 
 Material Flow сам по собі не містить агрегованих даних.
 
@@ -213,7 +276,7 @@ Material Flow сам по собі не містить агрегованих д
 
 ---
 
-# 13. Relationship with BOM
+## 13. Зв’язок із BOM
 
 Material Flow не є частиною BOM.
 
@@ -223,7 +286,7 @@ Material Flow створюється на основі BOM.
 
 ---
 
-# 14. Relationship with Product
+## 14. Зв’язок із Product
 
 Material Flow може бути побудований для:
 
@@ -235,7 +298,7 @@ Material Flow може бути побудований для:
 
 ---
 
-# 15. Relationship with Material Batch
+## 15. Зв’язок із MaterialBatch
 
 Material Flow не містить інформації про партії.
 
@@ -243,7 +306,7 @@ Batch Allocation Engine використовує Material Flow для вибор
 
 ---
 
-# 16. Relationship with Presentation
+## 16. Зв’язок із відображенням
 
 Presentation Layer не змінює Material Flow.
 
@@ -251,7 +314,7 @@ Presentation лише відображає результат.
 
 ---
 
-# 17. Business Rules
+## 17. Доменні правила
 
 Material Flow не:
 
@@ -264,7 +327,7 @@ Material Flow не:
 
 ---
 
-# 18. Future Extensions
+## 18. Майбутні розширення
 
 Без зміни моделі можуть бути додані:
 
@@ -279,7 +342,9 @@ Material Flow не:
 
 ---
 
-# 19. Examples
+## 19. Приклади
+
+Наведені числа в кг збережені як пояснювальна розрахункова ілюстрація джерела. Вони не встановлюють первинної одиниці Actual Allocation/Consumption довгомірних матеріалів і не визначають норматив втрат. Групування і подання залишаються зовнішніми щодо неагрегованих Event.
 
 Плита П-2.11
 
@@ -317,7 +382,7 @@ Material Flow залишається неагрегованою моделлю.
 
 ---
 
-# 20. Design Principles
+## 20. Принципи проєктування
 
 1. Material Flow є внутрішньою доменною моделлю.
 
@@ -333,9 +398,9 @@ Material Flow залишається неагрегованою моделлю.
 
 7. Material Flow не містить бізнес-логіки.
 
-8. Material Flow є Single Source of Truth для розрахованого використання матеріалів усередині Business Layer.
+8. MaterialFlow є канонічним внутрішнім представленням розрахованого використання матеріалів у межах відповідного розрахунку Business Layer. Single Source of Truth тут стосується результату цього розрахунку, а не історичної облікової істини MaterialConsumption.
 
-# 21. Domain Classification
+## 21. Доменна класифікація
 
 Material Flow є Domain Value Object.
 
@@ -346,3 +411,18 @@ Material Flow:
 - є immutable;
 - створюється Business Engine;
 - використовується як вхідна модель для інших Business Engines.
+
+## Межі документа і пов’язані рішення
+
+Цей DDS описує виключно MaterialFlow / MaterialFlowEvent. Наскрізний виробничий процес, облікове споживання та історія надходжень документуються окремо. Незмінність створеного Value Object / (Об’єкта-значення) не забороняє повторний розрахунок із побудовою нового MaterialFlow.
+
+- [Material Requirement](<DDS — Material Requirement.md>).
+- [Material Allocation](<DDS — Material Allocation.md>).
+- [Material Consumption](<DDS — Material Consumption.md>).
+- [Unresolved Material + Material Reconciliation](<DDS — Unresolved Material + Material Reconciliation.md>): повні US-01 і US-02 перенесені сюди з наданої розширеної редакції DDS-001.
+- [ADR-042](<../adr/ADR-042 — Material Flow as Internal Domain Model.md>).
+- [ADR / (Архітектурне рішення) 048](<../adr/ADR-048 — Material Accounting Period Closure and Unresolved Stock.md>): облікові періоди, окремі від незмінності Value Object.
+
+## Deferred / Open Design Question / (Відкладені рішення / Відкриті питання проєктування)
+
+Остаточні технічні TypeScript contracts / (контракти) не встановлюються цією редакційною консолідацією. Питання Allocation, Consumption і Unresolved наведені у власних DDS, а не розширюють модель MaterialFlow.

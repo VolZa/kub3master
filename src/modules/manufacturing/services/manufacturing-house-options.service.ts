@@ -16,6 +16,29 @@ import { ManufacturingOption } from '../types/manufacturing-option';
 export class ManufacturingHouseOptionsService {
   constructor(private readonly houseRepository: IHouseRepository) {}
 
+  // public getOptions(): ManufacturingOption[] {
+  //   const options: ManufacturingOption[] = [
+  //     {
+  //       value: '',
+  //       label: 'NONE — поза проектом',
+  //     },
+  //   ];
+
+  //   const activeHouses = this.houseRepository
+  //     .findAll()
+  //     .filter((house) => house.status === 'Active');
+
+  //   for (const house of activeHouses) {
+  //     options.push({
+  //       value: house.code,
+  //       label: `${house.code} — ${house.name}`,
+  //     });
+  //   }
+
+  //   return options;
+  // }
+
+  // Тимчасово:
   public getOptions(): ManufacturingOption[] {
     const options: ManufacturingOption[] = [
       {
@@ -24,9 +47,17 @@ export class ManufacturingHouseOptionsService {
       },
     ];
 
-    const activeHouses = this.houseRepository
-      .findAll()
-      .filter((house) => house.status === 'Active');
+    const houses = this.houseRepository.findAll();
+
+    console.log('Manufacturing houses:', houses.length);
+
+    for (const house of houses) {
+      console.log(`House ${house.code}: status=${house.status}`);
+    }
+
+    const activeHouses = houses.filter((house) => house.status === 'Active');
+
+    console.log('Active houses:', activeHouses.length);
 
     for (const house of activeHouses) {
       options.push({
