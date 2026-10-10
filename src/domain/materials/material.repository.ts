@@ -130,11 +130,13 @@ export class MaterialRepository {
 
   findByCode(code: string): Material | null {
     const normalizedInput = normalizeCode(code);
-
-    return (
-      this.materials.find((m) => normalizeCode(m.code) === normalizedInput) ||
-      null
+    const matches = this.materials.filter(
+      (m) => normalizeCode(m.code) === normalizedInput,
     );
+    if (matches.length > 1) {
+      throw new Error(`Ambiguous material code in 05_Materials: ${code}`);
+    }
+    return matches[0] ?? null;
   }
 
   findById(id: string): Material | null {

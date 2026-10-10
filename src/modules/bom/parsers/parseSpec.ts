@@ -86,6 +86,13 @@ export function parseSpec(input: string, prefix?: string): ParsedSpec {
 }
 
 export function parseFromCode(code: string): ParsedSpec {
+  const concreteMatch = code.match(/^C_(\d+)_(\d+)$/);
+  if (concreteMatch) {
+    return {
+      kind: 'concrete',
+      className: `C${concreteMatch[1]}/${concreteMatch[2]}`,
+    };
+  }
   // 🔹 REBAR
   const rebarMatch = code.match(/^R_(\d+)_([A-Z0-9]+)(?:_L(\d+))?/);
   if (rebarMatch) {

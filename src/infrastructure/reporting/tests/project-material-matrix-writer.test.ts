@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ProjectMaterialMatrixWriter } from '../project-material-matrix-writer';
 
+import { SheetProvider } from '../../sheets/SheetProvider';
+import { SheetKey } from '../../sheets/SheetKey';
+
 import { BOMMaterialMatrix } from '../../../modules/bom/model/bom-material-matrix.model';
 
 describe('ProjectMaterialMatrixWriter', () => {
@@ -17,8 +20,8 @@ describe('ProjectMaterialMatrixWriter', () => {
       })),
     };
 
-    const spreadsheet = {
-      getSheetByName: vi.fn(() => sheet),
+    const provider = {
+      get: vi.fn((_key: SheetKey) => sheet),
     };
 
     const matrix: BOMMaterialMatrix = {
@@ -61,11 +64,11 @@ describe('ProjectMaterialMatrixWriter', () => {
       ],
     };
 
-    const writer = new ProjectMaterialMatrixWriter(spreadsheet as never);
+    const writer = new ProjectMaterialMatrixWriter(provider as unknown as SheetProvider);
 
     writer.write(matrix);
 
-    expect(spreadsheet.getSheetByName).toHaveBeenCalled();
+    expect(provider.get).toHaveBeenCalledWith(SheetKey.REPORT_MATERIAL_MATRIX);
 
     expect(sheet.clearContents).toHaveBeenCalled();
 
@@ -90,8 +93,8 @@ describe('ProjectMaterialMatrixWriter', () => {
       })),
     };
 
-    const spreadsheet = {
-      getSheetByName: vi.fn(() => sheet),
+    const provider = {
+      get: vi.fn((_key: SheetKey) => sheet),
     };
 
     const matrix: BOMMaterialMatrix = {
@@ -120,19 +123,22 @@ describe('ProjectMaterialMatrixWriter', () => {
       ],
     };
 
-    const writer = new ProjectMaterialMatrixWriter(spreadsheet as never);
+    const writer = new ProjectMaterialMatrixWriter(provider as unknown as SheetProvider);
 
     writer.write(matrix);
 
+    expect(provider.get).toHaveBeenCalledWith(SheetKey.REPORT_MATERIAL_MATRIX);
     expect(setValues).toHaveBeenNthCalledWith(2, [['1', '2021', 'П-1', 0]]);
   });
 
   it('викидає помилку, якщо аркуш не знайдено', () => {
-    const spreadsheet = {
-      getSheetByName: vi.fn(() => null),
+    const provider = {
+      get: vi.fn((_key: SheetKey) => {
+        throw new Error('Аркуш "ВідомістьВитрат" (REPORT_MATERIAL_MATRIX) не знайдено.');
+      }),
     };
 
-    const writer = new ProjectMaterialMatrixWriter(spreadsheet as never);
+    const writer = new ProjectMaterialMatrixWriter(provider as unknown as SheetProvider);
 
     const matrix: BOMMaterialMatrix = {
       projectId: '1',
@@ -141,7 +147,8 @@ describe('ProjectMaterialMatrixWriter', () => {
     };
 
     expect(() => writer.write(matrix)).toThrow(
-      'Аркуш "ВідомістьВитрат" не знайдено.',
+      'Аркуш "ВідомістьВитрат" (REPORT_MATERIAL_MATRIX) не знайдено.',
     );
+    expect(provider.get).toHaveBeenCalledWith(SheetKey.REPORT_MATERIAL_MATRIX);
   });
 });

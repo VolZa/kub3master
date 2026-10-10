@@ -202,23 +202,23 @@ describe('BOMMaterialMatrixService', () => {
     const result = service.build([product1, product2]);
 
     expect(result.rows[0].values).toEqual({
-      R_6_A500C: 7.952,
-      R_12_A500C: 93.702,
-      C_20_25: 1.317,
+      '3011': 7.952,
+      '3014': 93.702,
+      '3201': 1.317,
     });
 
     expect(result.rows[1].values).toEqual({
-      R_8_A500C: 12.5,
-      R_12_A500C: 50.25,
+      '3012': 12.5,
+      '3014': 50.25,
     });
   });
 
   it('does not create values for unused materials', () => {
     const result = service.build([product1, product2]);
 
-    expect(result.rows[0].values.R_8_A500C).toBeUndefined();
-    expect(result.rows[1].values.R_6_A500C).toBeUndefined();
-    expect(result.rows[1].values.C_20_25).toBeUndefined();
+    expect(result.rows[0].values['3012']).toBeUndefined();
+    expect(result.rows[1].values['3011']).toBeUndefined();
+    expect(result.rows[1].values['3201']).toBeUndefined();
   });
 
   it('ignores material requirements without configured matrix columns', () => {

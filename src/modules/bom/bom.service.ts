@@ -66,7 +66,7 @@ export function buildBOMRow(
     existingElement,
   );
 
-  if (existingElement) {
+  if (existingElement && existingElement.type !== 'material') {
     return [
       [
         parentId,
@@ -105,6 +105,19 @@ export function buildBOMRow(
   }
 
   const built = buildByKind(parsed);
+
+  const template = catalogHelper.resolveTemplate(row.prefix);
+  const isPart = template.supportsLength && built.length !== undefined;
+  if (template.type === 'material' && !isPart) {
+    const directMaterial = materialRepo.findByCode(built.code);
+    if (!directMaterial) {
+      throw new Error(`Material not found in 05_Materials: ${built.code}`);
+    }
+    return [[
+      parentId, directMaterial.id, qty, directMaterial.baseUnit, now,
+      parent.code, directMaterial.code,
+    ]];
+  }
 
   console.log('buildBOMRow 🔥 Built element from parsed spec:', built);
 
@@ -250,6 +263,7 @@ export function buildBOMFromTable(
 
   const rawRows: any[][] = [];
   const errors: any[] = [];
+  const errorMessages: string[] = [];
 
   for (const row of rows) {
     try {
@@ -268,6 +282,7 @@ export function buildBOMFromTable(
     } catch (e) {
       console.error('❌ ROW ERROR:', row, e);
       errors.push(row);
+      errorMessages.push(`${row.code}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -291,7 +306,14 @@ export function buildBOMFromTable(
 
   const warningFormatter = new BOMWarningFormatter();
 
-  const operatorMessage = warningFormatter.format(warnings, root.code);
+  const warningMessage = warningFormatter.format(warnings, root.code);
+  const operatorMessage = errorMessages.length > 0
+    ? {
+        severity: 'ERROR' as const,
+        title: `BOM: помилки введення для ${root.code}`,
+        text: [...errorMessages, ...(warningMessage ? [warningMessage.text] : [])].join('\n'),
+      }
+    : warningMessage;
 
   if (operatorMessage) {
     console.log('⚠️ BOM OPERATOR MESSAGE');

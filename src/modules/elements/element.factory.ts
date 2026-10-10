@@ -38,6 +38,12 @@ export function getOrCreateElementFromBuilt(
   // 🔹 2. Визначаємо кінцевий тип елемента
   const type = resolveElementType(template, built.length);
 
+  if (type === 'material') {
+    throw new Error(
+      `Material Elements cannot be created or reused: ${built.code}. Use 05_Materials in BOM.`,
+    );
+  }
+
   console.log('Resolved element type:', type);
 
   // 🔹 3. Визначаємо природу part
@@ -48,9 +54,7 @@ export function getOrCreateElementFromBuilt(
   // 🔹 4. Пошук матеріалу
   let material;
 
-  if (type === 'material') {
-    material = materialRepo.findByCode(built.code);
-  } else if (isMaterialPart) {
+  if (isMaterialPart) {
     const resolver = new MaterialResolver(materialRepo);
     material = resolver.resolve(built);
 
@@ -66,7 +70,7 @@ export function getOrCreateElementFromBuilt(
     }
   } else {
     existing = elementRepo.findByIdentity(
-      type === 'material' ? '' : projectDocumentID,
+      projectDocumentID,
       type,
       built.code,
     );
@@ -77,13 +81,13 @@ export function getOrCreateElementFromBuilt(
   }
 
   // 🔹 6. Базова одиниця виміру
-  const baseUnit = type === 'material' ? (material?.baseUnit ?? 'кг') : 'шт';
+  const baseUnit = 'шт';
 
   // 🔹 7. Генеруємо ID
   const id = generateIdByType(type);
 
   // 🔹 8. Для material/part матеріал обов'язковий
-  if ((type === 'material' || type === 'part') && !material) {
+  if (type === 'part' && !material) {
     throw new Error(`Material not found for element: ${built.code}`);
   }
 
