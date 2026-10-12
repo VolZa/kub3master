@@ -9,34 +9,25 @@
  * - формування MaterialConsumptionReport;
  * - коректність кількості матеріалів для П-3.1.
  */
+import { getBOMExpansionService } from '../../../app/factories/bom-expansion.factory';
 
-import { BOMExpansionService } from '../../bom/expansion/bom-expansion.service';
+
 import { ProductSpecificationService } from '../../bom/specification/product-specification.service';
 
 import { MaterialConsumptionReportService } from './material-consumption-report.service';
 
-import { getBOMRepository } from '../../../app/factories/bom.factory';
-import { getElementRepository } from '../../../app/factories/element.factory';
-import { getMaterialRepository } from '../../../app/factories';
 
 export function testMaterialConsumptionReportP31(): void {
   // ------------------------------------------------------------
   // Реальні repository
   // ------------------------------------------------------------
 
-  const bomRepository = getBOMRepository();
-  const elementRepository = getElementRepository();
-  const materialRepository = getMaterialRepository();
 
   // ------------------------------------------------------------
   // BOM Expansion
   // ------------------------------------------------------------
 
-  const bomExpansionService = new BOMExpansionService(
-    bomRepository,
-    elementRepository,
-    materialRepository,
-  );
+  const bomExpansionService = getBOMExpansionService();
 
   // ------------------------------------------------------------
   // Product Specification

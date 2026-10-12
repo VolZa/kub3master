@@ -15,19 +15,22 @@
  * - визначення структури BOM.
  */
 
-import { BOMExpansionRow } from '../expansion/bom-expansion.row';
+import { ExpandedBOMLine, componentId } from '../expansion/bom-expansion.model';
 import { BOMProductSpecificationRow } from './bom-product-specification.row';
 
 import { roundSpecificationQty } from './roundSpecificationQty';
 
 export class BOMProductSpecificationService {
   public aggregate(
-    rows: readonly BOMExpansionRow[],
+    rows: readonly ExpandedBOMLine[],
   ): BOMProductSpecificationRow[] {
     const result = new Map<string, BOMProductSpecificationRow>();
 
     for (const row of rows) {
-      const key = `${row.elementId}|${row.unit}`;
+      const ref = row.edge.child;
+      const component = ref.kind === 'ELEMENT' ? ref.element : ref.material;
+      const id = componentId(ref);
+      const key = `${ref.kind}|${id}|${row.edge.unit}`;
 
       const existing = result.get(key);
 
@@ -37,12 +40,12 @@ export class BOMProductSpecificationService {
       }
 
       result.set(key, {
-        elementId: row.elementId,
-        elementCode: row.elementCode,
-        elementName: row.elementName,
-        elementType: row.elementType,
+        elementId: id,
+        elementCode: component.code,
+        elementName: component.name,
+        elementType: ref.kind === 'ELEMENT' ? ref.element.type : 'material',
         qty: row.totalQty,
-        unit: row.unit,
+        unit: row.edge.unit,
       });
     }
 

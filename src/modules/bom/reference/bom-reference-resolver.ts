@@ -12,7 +12,7 @@ import type {
 } from './bom-reference.model';
 
 // IDs are text keys: do not coerce objects/booleans or parse numeric strings.
-function normalizeReferenceId(value: unknown): string | null {
+export function normalizeReferenceId(value: unknown): string | null {
   if (typeof value !== 'string' && !(typeof value === 'number' && Number.isFinite(value))) {
     return null;
   }

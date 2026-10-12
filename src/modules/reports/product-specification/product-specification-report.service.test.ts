@@ -10,18 +10,16 @@
  * - кількість рядків;
  * - агрегацію вже сформованих даних.
  */
+import { getBOMExpansionService } from '../../../app/factories/bom-expansion.factory';
+
 
 import { ProductSpecification } from '../../bom/specification/product-specification.model';
 
 import { ProductSpecificationReportService } from './product-specification-report.service';
 
-import { BOMExpansionService } from '../../bom/expansion/bom-expansion.service';
 
 import { ProductSpecificationService } from '../../bom/specification/product-specification.service';
 
-import { getBOMRepository } from '../../../app/factories/bom.factory';
-import { getElementRepository } from '../../../app/factories/element.factory';
-import { getMaterialRepository } from '../../../app/factories/material.factory';
 
 export function testProductSpecificationReport(): void {
   const service = new ProductSpecificationReportService();
@@ -144,15 +142,8 @@ export function testProductSpecificationReport(): void {
 }
 
 export function testProductSpecificationReportP31(): void {
-  const bomRepository = getBOMRepository();
-  const elementRepository = getElementRepository();
-  const materialRepository = getMaterialRepository();
 
-  const bomExpansionService = new BOMExpansionService(
-    bomRepository,
-    elementRepository,
-    materialRepository,
-  );
+  const bomExpansionService = getBOMExpansionService();
 
   const specificationService = new ProductSpecificationService(
     bomExpansionService,

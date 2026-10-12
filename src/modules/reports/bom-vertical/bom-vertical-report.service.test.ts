@@ -12,28 +12,19 @@
  * - відсутність агрегації однакових елементів,
  *   якщо вони знаходяться в різних гілках BOM.
  */
+import { getBOMExpansionService } from '../../../app/factories/bom-expansion.factory';
 
-import { BOMExpansionService } from '../../bom/expansion/bom-expansion.service';
+
 import { BOMVerticalReportService } from './bom-vertical-report.service';
 
-import { getBOMRepository } from '../../../app/factories/bom.factory';
-import { getElementRepository } from '../../../app/factories/element.factory';
-import { getMaterialRepository } from '../../../app/factories';
 
 export function testBOMVerticalReportP31(): void {
   // ------------------------------------------------------------
   // Створюємо реальні залежності
   // ------------------------------------------------------------
 
-  const bomRepository = getBOMRepository();
-  const elementRepository = getElementRepository();
-  const materialRepository = getMaterialRepository();
 
-  const bomExpansionService = new BOMExpansionService(
-    bomRepository,
-    elementRepository,
-    materialRepository,
-  );
+  const bomExpansionService = getBOMExpansionService();
 
   const reportService = new BOMVerticalReportService();
 
@@ -42,14 +33,15 @@ export function testBOMVerticalReportP31(): void {
   // ------------------------------------------------------------
 
   const expansion = bomExpansionService.expandProduct('2027');
+  if (!expansion.ok) throw new Error(JSON.stringify(expansion.diagnostics));
 
-  console.log(`BOM Expansion: ${expansion.length} rows`);
+  console.log(`BOM Expansion: ${expansion.lines.length} rows`);
 
   // ------------------------------------------------------------
   // Формуємо вертикальний звіт
   // ------------------------------------------------------------
 
-  const rows = reportService.buildRows(expansion);
+  const rows = reportService.buildRows(expansion.lines);
 
   console.log(`BOM Vertical Report: ${rows.length} rows`);
 

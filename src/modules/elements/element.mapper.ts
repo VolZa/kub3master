@@ -50,6 +50,8 @@ export function mapElementRowToDomain(row: ElementRow): ElementFull {
     className: row.Class,
 
     width: row.Width,
+    height: row.Height,
+    thickness: row.Thickness,
     length: row.Length,
 
     isActive: row.IsActive ?? true,

@@ -9,38 +9,30 @@
  * - працює тільки на читання;
  * - не змінює Google Sheets.
  */
+import { componentId } from '../expansion/bom-expansion.model';
+import { getBOMExpansionService } from '../../../app/factories/bom-expansion.factory';
 
-import { GoogleSheetsElementRepository } from '../../../modules/elements/element.repository';
-import { getAllBOMRows } from '../bom.repository';
-import { InMemoryBOMRepository } from '../repositories/in-memory-bom.repository';
 
-import { BOMExpansionService } from '../expansion/bom-expansion.service';
-import { getMaterialRepository } from '../../../app/factories/material.factory';
+
 import { BOMProductSpecificationService } from '../specification/bom-product-specification.service';
 import { BOMProductSpecificationGroupService } from '../specification/bom-product-specification-group.service';
 
 export function testExpandProductP31(): void {
   const productId = '2027';
 
-  // 00_Elements читається один раз.
-  const elementRepository = new GoogleSheetsElementRepository();
+  // Snapshot factory: 00_Elements читається один раз.
 
   // 01_BOM читається один раз.
-  const allBOMRows = getAllBOMRows();
 
   // Подальша робота — тільки з RAM.
-  const bomRepository = new InMemoryBOMRepository(allBOMRows);
 
-  // 05_Materials читається через існуючу фабрику.
-  const materialRepository = getMaterialRepository();
+  // Full snapshot: 05_Materials читається через існуючу фабрику.
 
-  const service = new BOMExpansionService(
-    bomRepository,
-    elementRepository,
-    materialRepository,
-  );
+  const service = getBOMExpansionService();
 
-  const rows = service.expandProduct(productId);
+  const expansion = service.expandProduct(productId);
+  if (!expansion.ok) throw new Error(JSON.stringify(expansion.diagnostics));
+  const rows = expansion.lines;
 
   const specificationService = new BOMProductSpecificationService();
 
@@ -129,18 +121,18 @@ export function testExpandProductP31(): void {
     console.log(
       [
         `L${row.level}`,
-        row.parentCode,
+        row.edge.parent.element.code,
         '→',
-        row.elementCode,
-        `direct=${row.directQty}`,
+        (row.edge.child.kind === 'ELEMENT' ? row.edge.child.element.code : row.edge.child.material.code),
+        `direct=${row.edge.directQty}`,
         `total=${row.totalQty}`,
-        row.unit,
-        `path=${row.path.join(' → ')}`,
+        row.edge.unit,
+        `path=${row.path.map(componentId).join(' → ')}`,
       ].join(' | '),
     );
   }
 
-  const rodRows = rows.filter((row) => row.elementId === '4013');
+  const rodRows = rows.filter((row) => row.edge.child.kind === 'ELEMENT' && row.edge.child.elementId === '4013');
 
   console.log('R_12_A500C_L800 rows:', rodRows);
 
