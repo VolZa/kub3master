@@ -1,19 +1,30 @@
 // src\modules\elements\element.mapper.ts
 import { getValue } from '../../utils/getValue';
 import { ElementRow, ElementFull, ElementShort } from './element.model';
+import { normalizeIntegerId } from '../../utils/id.logic';
+
+export function normalizeElementId(value: unknown): string {
+  return String(normalizeIntegerId(value, 'Element ID'));
+}
+
+export function normalizeParentMaterialId(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (value === '') return '';
+  return normalizeElementId(value);
+}
 
 export function mapSheetRowToElementRow(
   row: any[],
   map: Record<string, number>,
 ): ElementRow {
   return {
-    ID: getValue(row, map, 'ID')!,
+    ID: normalizeElementId(getValue(row, map, 'ID')),
     Code: getValue(row, map, 'Code')!,
     PrefixName: getValue(row, map, 'PrefixName')!,
     Name: getValue(row, map, 'Name')!,
     Type: getValue(row, map, 'Type')!,
     ProjectDocumentID: getValue(row, map, 'ProjectDocumentID'),
-    ParentMaterialID: getValue(row, map, 'ParentMaterialID'),
+    ParentMaterialID: normalizeParentMaterialId(getValue(row, map, 'ParentMaterialID')),
     Category: getValue(row, map, 'Category')!,
     BaseUnit: getValue(row, map, 'BaseUnit')!,
     ProfileType: getValue(row, map, 'ProfileType'),

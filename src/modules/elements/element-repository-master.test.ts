@@ -124,4 +124,37 @@ describe('explicit MASTER Elements', () => {
     expect(getSheet.mock.calls.every(([name]) => name === '00_Elements')).toBe(true);
     untouched();
   });
+  it('normalizes numeric migrated and legacy IDs and material references', () => {
+    data[1][0] = 4000000;
+    data[2][0] = 2000000;
+    data[2][6] = 3001;
+    data.push(asRow({ ...part, ID: '4185', Code: 'LEGACY' }));
+    data[3][0] = 4185;
+    const repo = new GoogleSheetsElementRepository();
+    expect(repo.findById('4000000')?.id).toBe('4000000');
+    expect(repo.findById('2000000')?.id).toBe('2000000');
+    expect(repo.findById('4185')?.id).toBe('4185');
+    expect(repo.findById(' 04000000 ')?.id).toBe('4000000');
+    expect(repo.findPartByMaterial('03001', part.Code)?.parentMaterialID).toBe('3001');
+    for (const id of ['400000', '4000000x', '4000000.5', '', 'Infinity']) {
+      expect(repo.findById(id)).toBeNull();
+    }
+    repo.updateType('4000000', 'assembly');
+    repo.updateType('2000000', 'product');
+    expect(update).toHaveBeenCalledWith(2, 5, 'assembly');
+    expect(update).toHaveBeenCalledWith(3, 5, 'product');
+    expect(repo.findById('4000000')?.type).toBe('assembly');
+    expect(repo.findByCode('П-1', 'DOC-1')?.code).toBe('П-1');
+    untouched();
+  });
+  it('normalizes IDs before insert and rejects malformed IDs before writing', () => {
+    const repo = new GoogleSheetsElementRepository();
+    repo.insert({ ...part, ID: ' 02000010 ', ParentMaterialID: '03001' });
+    expect(append.mock.calls[0][0][0]).toBe("'2000010");
+    expect(repo.findById('2000010')?.parentMaterialID).toBe('3001');
+    expect(() => repo.insert({ ...part, ID: '2000010junk' })).toThrow('Element ID');
+    expect(() => repo.updateType('4000000junk', 'part')).toThrow('Element ID');
+    expect(append).toHaveBeenCalledTimes(1);
+    expect(update).not.toHaveBeenCalled();
+  });
 });

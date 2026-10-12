@@ -2,13 +2,21 @@
 // Модуль: BOM
 // Layer: Infrastructure / Google Sheets
 // Відповідальність: фізична заміна BOM для одного ParentID
-import { getSheetByNameSafe } from '../../utils/sheets';
+import { SpreadsheetProvider } from '../../infrastructure/spreadsheets/SpreadsheetProvider';
+import { SpreadsheetKey } from '../../infrastructure/spreadsheets/SpreadsheetKey';
 import { forceText, insertRows } from '../../utils/sheets.utils';
 import { BOMRow } from './model/bom-row.model';
 
+export function getMasterBOMSheet(): GoogleAppsScript.Spreadsheet.Sheet {
+  const master = new SpreadsheetProvider().open(SpreadsheetKey.MASTER);
+  const sheet = master.getSheetByName('01_BOM');
+  if (!sheet) throw new Error('Лист 01_BOM не знайдено в MASTER');
+  return sheet;
+}
+
 export function insertBOMRows(rows: any[][]) {
   console.log('INPUT ROWS:', JSON.stringify(rows, null, 2));
-  const sheet = getSheetByNameSafe('01_BOM');
+  const sheet = getMasterBOMSheet();
 
   if (!rows.length) return;
 
@@ -91,7 +99,7 @@ export function insertBOMRows(rows: any[][]) {
 }
 
 export function deleteBOMByParentId(parentId: string) {
-  const sheet = getSheetByNameSafe('01_BOM');
+  const sheet = getMasterBOMSheet();
   const data = sheet.getDataRange().getValues();
 
   if (data.length <= 1) return;
@@ -111,7 +119,7 @@ export function deleteBOMByParentId(parentId: string) {
 }
 
 export function deleteBOMTree(parentId: string) {
-  const sheet = getSheetByNameSafe('01_BOM');
+  const sheet = getMasterBOMSheet();
 
   const data = sheet.getDataRange().getValues();
 
@@ -162,7 +170,7 @@ export function deleteBOMTree(parentId: string) {
 //                  та усунення дубльованих BOM-зв'язків
 
 export function replaceBOMForParent(parentId: string, rows: any[][]): void {
-  const sheet = getSheetByNameSafe('01_BOM');
+  const sheet = getMasterBOMSheet();
 
   const data = sheet.getDataRange().getValues();
 
@@ -256,7 +264,7 @@ export function replaceBOMForParent(parentId: string, rows: any[][]): void {
 
 // Сервіс для отримання всіх рядків BOM з листа "01_BOM"
 export function getAllBOMRows(): BOMRow[] {
-  const sheet = getSheetByNameSafe('01_BOM');
+  const sheet = getMasterBOMSheet();
 
   const values = sheet.getDataRange().getValues();
 

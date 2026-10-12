@@ -7,6 +7,8 @@ import {
   mapSheetRowToElementRow,
   mapElementRowToDomain,
   mapElementToRow,
+  normalizeElementId,
+  normalizeParentMaterialId,
 } from './element.mapper';
 import { mapRowToFull } from './element.mapper';
 import { ElementType } from '../../config/config';
@@ -81,6 +83,8 @@ export class GoogleSheetsElementRepository implements ElementRepository {
   }
 
   insert(row: ElementRow): void {
+    row = { ...row, ID: normalizeElementId(row.ID),
+      ParentMaterialID: normalizeParentMaterialId(row.ParentMaterialID) };
     // const asText = (v: any) => `'${String(v)}`;
 
     this.sheet.appendRow([
@@ -117,6 +121,7 @@ export class GoogleSheetsElementRepository implements ElementRepository {
   }
 
   findById(id: string): ElementFull | null {
+    try { id = normalizeElementId(id); } catch { return null; }
     const row = this.rows.find((r) => r.ID === id);
     return row ? mapElementRowToDomain(row) : null;
   }
@@ -272,6 +277,7 @@ export class GoogleSheetsElementRepository implements ElementRepository {
   }
 
   updateType(id: string, type: ElementType): void {
+    id = normalizeElementId(id);
     const data = this.sheet.getDataRange().getValues();
 
     const [headers, ...rows] = data;
@@ -284,7 +290,7 @@ export class GoogleSheetsElementRepository implements ElementRepository {
     }
 
     for (let i = 0; i < rows.length; i++) {
-      if (rows[i][idCol] === id) {
+      if (normalizeElementId(rows[i][idCol]) === id) {
         const rowIndex = i + 2; // +1 header, +1 index
 
         this.sheet.getRange(rowIndex, typeCol + 1).setValue(type);
@@ -303,6 +309,7 @@ export class GoogleSheetsElementRepository implements ElementRepository {
     parentMaterialID: string,
     code: string,
   ): ElementFull | null {
+    try { parentMaterialID = normalizeElementId(parentMaterialID); } catch { return null; }
     const row = this.rows.find(
       (r) =>
         r.Type === 'part' &&

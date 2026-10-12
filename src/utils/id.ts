@@ -25,17 +25,17 @@ function readCounter(sheet: GoogleAppsScript.Spreadsheet.Sheet, type: ElementTyp
   return { row: matches[0].index + 2, lastId: matches[0].row[1] };
 }
 
-function readOccupiedIds(sheet: GoogleAppsScript.Spreadsheet.Sheet): number[] {
+function readOccupiedIds(sheet: GoogleAppsScript.Spreadsheet.Sheet, idHeader: string): number[] {
   const [headers, ...rows] = sheet.getDataRange().getValues();
   const columns = headers?.reduce<number[]>((result, header, index) => {
-    if (header === 'ID') result.push(index);
+    if (header === idHeader) result.push(index);
     return result;
   }, []) ?? [];
-  if (columns.length !== 1) throw new Error(`Некоректна колонка ID в ${sheet.getName()}`);
+  if (columns.length !== 1) throw new Error(`Некоректна колонка ${idHeader} в ${sheet.getName()}`);
   return rows.flatMap((row, index) => {
     const value = row[columns[0]];
     if (value === '' || value === null || value === undefined) return [];
-    return [normalizeIntegerId(value, `${sheet.getName()}: ID рядка ${index + 2}`)];
+    return [normalizeIntegerId(value, `${sheet.getName()}: ${idHeader} рядка ${index + 2}`)];
   });
 }
 
@@ -48,8 +48,8 @@ export function generateIdByType(type: ElementType): string {
     const sheet = requireSheet(ss, '_Config_ID_Counters');
     const counter = readCounter(sheet, type);
     const occupied = new Set([
-      ...readOccupiedIds(requireSheet(ss, '00_Elements')),
-      ...readOccupiedIds(requireSheet(ss, '05_Materials')),
+      ...readOccupiedIds(requireSheet(ss, '00_Elements'), 'ID'),
+      ...readOccupiedIds(requireSheet(ss, '05_Materials'), 'MaterialID'),
     ]);
     const id = calculateNextId(type, counter.lastId, occupied);
     sheet.getRange(counter.row, 2).setValue(id);

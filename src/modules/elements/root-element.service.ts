@@ -6,7 +6,7 @@ import { buildAssemblyRow } from './element.mapper';
 import { generateIdByType } from '../../utils/id';
 import { addElementToCache } from '../../services/cache.service';
 
-import { getSheetByNameSafe } from '../../utils/sheets';
+import { getMasterBOMSheet } from '../bom/bom.repository';
 import { ELEMENT_TYPES } from '../../config/config';
 import { CatalogHelper } from 'modules/catalog/catalog.helper';
 import { resolveElementType } from './element-type.resolver';
@@ -111,7 +111,7 @@ export function calcAssemblyWeight(
   assemblyId: string,
   repo: ElementRepository,
 ): number {
-  const sheet = getSheetByNameSafe('01_BOM');
+  const sheet = getMasterBOMSheet();
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
 

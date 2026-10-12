@@ -75,7 +75,7 @@ describe('MASTER reservation', () => {
     failRead = failWrite = false;
     counters = [['Type', 'LastID'], ['material', 3000], ['part', 4185], ['assembly', 2000], ['product', 2064]];
     elements = [['Code', 'ID', 'Type', 'IsActive']];
-    materials = [['ID', 'IsActive']];
+    materials = [['MaterialID', 'IsActive']];
     acquire.mockImplementation(() => { held = true; return true; });
     release.mockImplementation(() => { locked(); held = false; });
     flush.mockImplementation(locked);
@@ -124,6 +124,16 @@ describe('MASTER reservation', () => {
     expect(generateIdByType('material')).toBe('1000004');
     expect(generateIdByType('assembly')).toBe('3000001');
   });
+  it('uses MaterialID instead of an unrelated ID column', () => {
+    materials = [['ID', 'IsActive', 'MaterialID'], [1999999, false, '01000001']];
+    expect(generateIdByType('material')).toBe('1000002');
+  });
+  it('rejects duplicated MaterialID headers before reserving', () => {
+    materials = [['MaterialID', 'MaterialID'], [1000001, 1000002]];
+    expect(() => generateIdByType('material')).toThrow('MaterialID');
+    expect(write).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledTimes(1);
+  });
   it('preserves reservation after record deletion and uses latest counter on each call', () => {
     counters[1][1] = 1000040;
     expect(generateIdByType('material')).toBe('1000041');
@@ -153,7 +163,7 @@ describe('MASTER reservation', () => {
     if (failure === 'empty counters') counters.splice(1);
     if (failure === 'invalid counter') counters[1][1] = '';
     if (failure === 'missing sheet') missing = '05_Materials';
-    if (failure === 'bad header') materials[0] = ['MaterialID'];
+    if (failure === 'bad header') materials[0] = ['ID'];
     if (failure === 'bad ID') materials.push(['1000001garbage']);
     if (failure === 'read') failRead = true;
     if (failure === 'write') failWrite = true;
