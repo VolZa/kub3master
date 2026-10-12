@@ -1,6 +1,7 @@
 // src\modules\elements\element.repository.ts
 
-import { getSheetByNameSafe } from '../../utils/sheets';
+import { SpreadsheetProvider } from '../../infrastructure/spreadsheets/SpreadsheetProvider';
+import { SpreadsheetKey } from '../../infrastructure/spreadsheets/SpreadsheetKey';
 import { ElementFull, ElementRow, ParsedPart } from './element.model';
 import {
   mapSheetRowToElementRow,
@@ -55,7 +56,12 @@ export class GoogleSheetsElementRepository implements ElementRepository {
   private rows: ElementRow[];
 
   constructor() {
-    this.sheet = getSheetByNameSafe(this.SHEET_NAME);
+    const master = new SpreadsheetProvider().open(SpreadsheetKey.MASTER);
+    const sheet = master.getSheetByName(this.SHEET_NAME);
+    if (!sheet) {
+      throw new Error(`Лист ${this.SHEET_NAME} не знайдено в MASTER`);
+    }
+    this.sheet = sheet;
 
     const data = this.sheet.getDataRange().getValues();
 
@@ -75,11 +81,9 @@ export class GoogleSheetsElementRepository implements ElementRepository {
   }
 
   insert(row: ElementRow): void {
-    const sheet = getSheetByNameSafe(this.SHEET_NAME);
-
     // const asText = (v: any) => `'${String(v)}`;
 
-    sheet.appendRow([
+    this.sheet.appendRow([
       forceText(row.ID), // 🔥 гарантія string
       forceText(row.Code), // 🔥 гарантія string
 
