@@ -94,8 +94,14 @@ export type ProductionType =
 export type IdRange = [number, number];
 
 export const ID_RANGES: Record<ElementType, IdRange> = {
-  product: [1000, 1999],
-  assembly: [2000, 2999],
-  material: [3000, 3999],
-  part: [4000, 5999],
+  product: [4000000, 4999999],
+  assembly: [3000001, 3999999],
+  material: [1000001, 1999999],
+  part: [2000000, 2999999],
+};
+
+// Historical migration reservations remain occupied even after record deletion.
+export const ID_MIGRATION_LAST: Partial<Record<ElementType, number>> = {
+  product: 4000013,
+  part: 2000009,
 };
