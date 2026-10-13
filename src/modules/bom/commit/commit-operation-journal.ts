@@ -48,7 +48,7 @@ function chunks(text: string): string[] {
   return result;
 }
 interface Entry { kind: string; payload: string; digest: string }
-interface Frame { eventID: string; count: number; length: number; digest: string }
+interface Frame { eventID: string; count: number; length: number; digest: string; retryPayload?: string }
 interface Decoded { events: OperationEvent[]; incomplete?: { frame: Frame; pieces: string[] } }
 
 /** Every API requires a caller-owned ScriptLock; this module never reserves IDs or inserts Elements. */
@@ -218,6 +218,33 @@ export class CommitOperationJournal {
     if (decoded.incomplete) throw new Error(`Incomplete event ${decoded.incomplete.frame.eventID}; retry original event to finish persistence`);
     return state;
   }
+  /** Recover a complete serialized creation event whose final acknowledgment/marker was lost. */
+  repairCreationTail(operationID: string): void {
+    const decoded = this.decode(operationID);
+    if (!decoded.incomplete) return;
+    const tail = decoded.incomplete;
+    // CREATED can be regenerated from durable intent, but still requires fresh verification.
+    if (tail.frame.eventID.startsWith('created:')) {
+      const result = this.confirmCreated(operationID, tail.frame.eventID, tail.frame.eventID.slice('created:'.length));
+      if (result.status === 'CONFLICT') throw new Error(result.error);
+      return;
+    }
+    if (tail.frame.eventID.startsWith('reserve:')) {
+      const result = this.reserving(operationID, tail.frame.eventID, tail.frame.eventID.slice('reserve:'.length));
+      if (result.status === 'CONFLICT') throw new Error(result.error);
+      return;
+    }
+    if (tail.pieces.length !== tail.frame.count && !tail.frame.retryPayload) throw new Error('Incomplete creation payload requires original exact-event retry');
+    const text = tail.frame.retryPayload ?? tail.pieces.join('');
+    if (text.length !== tail.frame.length || textDigest(text) !== tail.frame.digest) throw new Error('Corrupt creation tail');
+    const event = parse(text) as OperationEvent;
+    if (event.eventID !== tail.frame.eventID) throw new Error('Creation event ID mismatch');
+    let result: JournalResult;
+    if (event.type === 'CREATED') result = this.confirmCreated(operationID, event.eventID, String(event.data.localKey));
+    else if (['RESERVING', 'INSERT_INTENT', 'REUSED'].includes(event.type)) result = this.persist(operationID, event);
+    else throw new Error('Not a recoverable creation event');
+    if (result.status === 'CONFLICT') throw new Error(result.error);
+  }
   private persist(operationID: string, event: OperationEvent): JournalResult {
     try {
       const decoded = this.decode(operationID);
@@ -230,6 +257,12 @@ export class CommitOperationJournal {
       const state = this.reduce([...decoded.events, event]); // Validate before any writes.
       const text = stringify(event), pieces = chunks(text);
       const frame: Frame = { eventID: event.eventID, count: pieces.length, length: text.length, digest: textDigest(text) };
+      // Small identity decisions are recoverable even if only their frame survived.
+      // Old frames remain valid and retain their exact physical retry representation.
+      if ((event.type === 'INSERT_INTENT' || event.type === 'REUSED') && text.length <= 18000 &&
+          (!decoded.incomplete || decoded.incomplete.frame.retryPayload !== undefined)) frame.retryPayload = text;
+      if (!decoded.incomplete && (event.type === 'INSERT_INTENT' || event.type === 'REUSED') &&
+          (!frame.retryPayload || stringify(frame).length > 20000)) throw new Error('Identity event exceeds recoverable frame capacity');
       if (decoded.incomplete) {
         if (!same(decoded.incomplete.frame, frame) || decoded.incomplete.pieces.some((piece, index) => piece !== pieces[index])) return { status: 'CONFLICT', error: 'Incomplete event differs from retry' };
       } else this.appendRecord(operationID, 'OP_FRAME', stringify(frame));

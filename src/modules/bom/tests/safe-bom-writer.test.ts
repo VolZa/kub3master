@@ -6,7 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
-import { JOURNAL_HEADERS, writeSafeBOM, recoverSafeBOM, SafeBOMPlan, Cell } from '../commit/safe-bom-writer';
+import { JOURNAL_HEADERS, writeSafeBOM, recoverSafeBOM, writeSafeBOMUnderLock, recoverSafeBOMUnderLock, SafeBOMPlan, Cell } from '../commit/safe-bom-writer';
 import { SpreadsheetConfig } from '../../../infrastructure/spreadsheets/SpreadsheetConfig';
 const headers = ['ParentID', 'ChildID', 'Qty', 'Unit', 'CreatedAt', 'ParentCode', 'ChildCode', 'Comment', 'Formula'];
 const date = { date: '2026-10-13T00:00:00.000Z' };
@@ -74,6 +74,27 @@ describe('Safe BOM writer and durable journal', () => {
   });
   afterEach(() => { expect(clearAll).not.toHaveBeenCalled(); expect(mutateElements).not.toHaveBeenCalled(); expect(held).toBe(false); vi.unstubAllGlobals(); });
   const foreignRows = () => clone(bom.filter((r, i) => i > 0 && r[0] !== '4000000' && r.some(c => c !== '')));
+  it('writes and recovers under caller-owned lock without acquiring or releasing it', () => {
+    held = true; const lock = LockService.getScriptLock(); const before = foreignRows();
+    try {
+      expect(writeSafeBOMUnderLock(request(), lock).status).toBe('COMMITTED');
+      expect(recoverSafeBOMUnderLock('op-1', lock).status).toBe('ALREADY_APPLIED');
+      expect(foreignRows()).toEqual(before); expect(acquire).not.toHaveBeenCalled(); expect(release).not.toHaveBeenCalled(); expect(held).toBe(true);
+    } finally { held = false; }
+  });
+  it('internal recovery retains outer lock after a physical writer failure', () => {
+    held = true; const lock = LockService.getScriptLock(); failBOMAt = 2;
+    try {
+      expect(() => writeSafeBOMUnderLock(request(), lock)).toThrow(); expect(held).toBe(true);
+      failBOMAt = -1; expect(recoverSafeBOMUnderLock('op-1', lock).status).toBe('RECOVERED');
+      expect(acquire).not.toHaveBeenCalled(); expect(release).not.toHaveBeenCalled();
+    } finally { held = false; }
+  });
+  it('internal writer APIs reject missing lock before touching journal or BOM', () => {
+    expect(() => writeSafeBOMUnderLock(request(), LockService.getScriptLock())).toThrow('Caller-owned');
+    expect(() => recoverSafeBOMUnderLock('op-1', LockService.getScriptLock())).toThrow('Caller-owned');
+    expect(bomWrites).toBe(0); expect(journalAppends).toBe(0);
+  });
   it('replaces root only, retaining mixed foreign duplicates, old Part BOM and all extra columns/formulas', () => {
     const before = foreignRows();
     expect(writeSafeBOM(request()).status).toBe('COMMITTED');

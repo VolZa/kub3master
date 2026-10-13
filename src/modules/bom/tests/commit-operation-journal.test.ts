@@ -6,7 +6,7 @@
  */
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
-import { CommitOperationJournal, openCommitOperationJournal } from '../commit/commit-operation-journal';
+import { CommitOperationJournal, openCommitOperationJournal, commitDigest } from '../commit/commit-operation-journal';
 import { JOURNAL_HEADERS, writeSafeBOM } from '../commit/safe-bom-writer';
 import type { PreparedBOM, BOMPreparationInput } from '../preparation/bom-preparation.model';
 import type { ElementRow } from '../../elements/element.model';
@@ -81,6 +81,20 @@ describe('Durable pre-creation journal', () => {
   });
   afterEach(() => { expect(forbidden).not.toHaveBeenCalled(); vi.unstubAllGlobals(); });
   const begin = () => accepted(api.begin('operation', clone(input), clone(prepared)));
+  it('reads original 1H.3B identity frames without retryPayload', () => {
+    begin(); accepted(api.reserving('operation', 'reserve-part', 'part'));
+    accepted(api.insertIntent('operation', 'intent-part', intent()));
+    let previous = '';
+    for (const row of journal.slice(1)) {
+      if (row[0] !== 'operation') continue;
+      if (row[1] === 'OP_FRAME') {
+        const frame = JSON.parse(String(row[3])); delete frame.retryPayload;
+        row[3] = JSON.stringify(frame);
+      }
+      row[4] = commitDigest([row[0], row[1], row[2], row[3], previous]); previous = String(row[4]);
+    }
+    expect(api.load('operation').elements.part.status).toBe('INSERT_INTENT');
+  });
   const create = () => {
     begin(); accepted(api.reserving('operation', 'reserve-part', 'part'));
     accepted(api.insertIntent('operation', 'intent-part', intent()));

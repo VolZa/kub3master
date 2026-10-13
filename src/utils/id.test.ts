@@ -103,7 +103,7 @@ describe('MASTER reservation', () => {
         throw new Error('unexpected sheet');
       } };
     });
-    vi.stubGlobal('LockService', { getScriptLock: () => ({ tryLock: acquire, releaseLock: release }) });
+    vi.stubGlobal('LockService', { getScriptLock: () => ({ hasLock: () => held, tryLock: acquire, releaseLock: release }) });
     vi.stubGlobal('SpreadsheetApp', { openById: open, flush, getActive: () => { throw new Error('active spreadsheet forbidden'); } });
   });
   afterEach(() => vi.unstubAllGlobals());

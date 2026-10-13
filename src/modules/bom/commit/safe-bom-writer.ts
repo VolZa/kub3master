@@ -185,11 +185,11 @@ class CommitJournal {
     return { payload, status: statuses[statuses.length - 1] };
   }
 }
-function withLock<T>(action: () => T): T {
+function withLock<T>(action: (lock: GoogleAppsScript.Lock.Lock) => T): T {
   const lock = LockService.getScriptLock();
   if (lock.hasLock()) throw new Error('Safe writer must not be called under an already held ScriptLock');
   if (!lock.tryLock(30000)) throw new Error('Cannot acquire BOM ScriptLock');
-  try { return action(); } finally { lock.releaseLock(); }
+  try { return action(lock); } finally { lock.releaseLock(); }
 }
 function checkSlots(rows: Cell[][], payload: Payload, targetOnly: boolean): boolean {
   return payload.slots.every(slot => {
@@ -243,8 +243,12 @@ function apply(sheet: GoogleAppsScript.Spreadsheet.Sheet, journal: CommitJournal
   }
 }
 export function writeSafeBOM(input: SafeBOMPlan): SafeBOMResult {
+  normalizePlan(input);
+  return withLock(lock => writeSafeBOMUnderLock(input, lock));
+}
+export function writeSafeBOMUnderLock(input: SafeBOMPlan, lock: GoogleAppsScript.Lock.Lock): SafeBOMResult {
+  if (!lock.hasLock()) throw new Error('Caller-owned ScriptLock required');
   const plan = normalizePlan(input); // Invalid plans cannot cause any journal or BOM writes.
-  return withLock(() => {
     const master = new SpreadsheetProvider().open(SpreadsheetKey.MASTER);
     const sheet = requireSheet(master, '01_BOM');
     const journal = new CommitJournal(requireSheet(master, '_BOM_CommitJournal'), plan.operationID);
@@ -268,11 +272,14 @@ export function writeSafeBOM(input: SafeBOMPlan): SafeBOMResult {
     const payload: Payload = { version: 1, request: plan, headers: state.headers, foreignDigest: foreignDigest(state.rows, slots), slots };
     journal.save(payload);
     return apply(sheet, journal, payload, false);
-  });
 }
 export function recoverSafeBOM(operationID: string): SafeBOMResult {
   if (!/^[A-Za-z0-9_-]{1,120}$/.test(operationID)) throw new Error('Invalid OperationID');
-  return withLock(() => {
+  return withLock(lock => recoverSafeBOMUnderLock(operationID, lock));
+}
+export function recoverSafeBOMUnderLock(operationID: string, lock: GoogleAppsScript.Lock.Lock): SafeBOMResult {
+  if (!lock.hasLock()) throw new Error('Caller-owned ScriptLock required');
+  if (!/^[A-Za-z0-9_-]{1,120}$/.test(operationID)) throw new Error('Invalid OperationID');
     const master = new SpreadsheetProvider().open(SpreadsheetKey.MASTER);
     const journal = new CommitJournal(requireSheet(master, '_BOM_CommitJournal'), operationID);
     let stored: ReturnType<CommitJournal['load']>;
@@ -280,5 +287,4 @@ export function recoverSafeBOM(operationID: string): SafeBOMResult {
     if (stored.status === 'CONFLICT') return { status: 'CONFLICT', operationID, error: 'Explicit conflict resolution required' };
     const terminal = ['COMMITTED', 'RECOVERED'].includes(stored.status);
     return apply(requireSheet(master, '01_BOM'), journal, stored.payload, !terminal, terminal);
-  });
 }

@@ -8,6 +8,7 @@ import { ElementType } from '../config/config';
 import { SpreadsheetProvider } from '../infrastructure/spreadsheets/SpreadsheetProvider';
 import { SpreadsheetKey } from '../infrastructure/spreadsheets/SpreadsheetKey';
 import { calculateNextId, normalizeIntegerId } from './id.logic';
+import { requireScriptLock } from './script-lock';
 
 function requireSheet(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, name: string) {
   const sheet = ss.getSheetByName(name);
@@ -42,8 +43,17 @@ function readOccupiedIds(sheet: GoogleAppsScript.Spreadsheet.Sheet, idHeader: st
 export function generateIdByType(type: ElementType): string {
   // Script lock also works outside a bound spreadsheet (e.g. web app execution).
   const lock = LockService.getScriptLock();
+  if (lock.hasLock()) throw new Error('Public ID allocator must not be called under an already held ScriptLock');
   if (!lock.tryLock(30000)) throw new Error('Не вдалося отримати lock для резервування ID');
   try {
+    return generateIdByTypeUnderLock(type, lock);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+export function generateIdByTypeUnderLock(type: ElementType, lock: GoogleAppsScript.Lock.Lock): string {
+    requireScriptLock(lock);
     const ss = new SpreadsheetProvider().open(SpreadsheetKey.MASTER);
     const sheet = requireSheet(ss, '_Config_ID_Counters');
     const counter = readCounter(sheet, type);
@@ -55,7 +65,4 @@ export function generateIdByType(type: ElementType): string {
     sheet.getRange(counter.row, 2).setValue(id);
     SpreadsheetApp.flush();
     return String(id);
-  } finally {
-    lock.releaseLock();
-  }
 }
