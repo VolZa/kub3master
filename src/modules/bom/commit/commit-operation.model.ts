@@ -6,11 +6,13 @@
  */
 import type { PreparedBOM, BOMPreparationInput } from '../preparation/bom-preparation.model';
 import type { ElementRow } from '../../elements/element.model';
-export type OperationEventType = 'INITIALIZED' | 'READY' | 'RESERVING' | 'INSERT_INTENT' | 'CREATED' | 'REUSED' | 'BOM_READY' | 'COMPLETED' | 'CONFLICT';
+import type { SafeBOMPlan } from './safe-bom-writer';
+export type OperationEventType = 'INITIALIZED' | 'READY' | 'RESERVING' | 'INSERT_INTENT' | 'CREATED' | 'REUSED' | 'BOM_READY' | 'BOM_PLANNED' | 'COMPLETED' | 'CONFLICT';
 export interface OperationEvent { eventID: string; type: OperationEventType; data: Record<string, unknown> }
 export interface OperationManifest {
   version: 1; operationID: string; writerOperationID: string; requestDigest: string;
   input: BOMPreparationInput; prepared: PreparedBOM;
+  validationContext?: { materialsDigest: string; catalogDigest: string; documents: string[] };
 }
 export interface InsertIntent { localKey: string; reservedID: string; row: ElementRow }
 export interface CreationVerifier {
@@ -23,6 +25,8 @@ export interface CreationVerifier {
 export interface OperationState {
   manifest: OperationManifest; status: 'PREPARING' | 'READY' | 'CREATING' | 'BOM_READY' | 'COMPLETED' | 'CONFLICT';
   events: OperationEvent[];
+  bomPlan?: SafeBOMPlan;
+  bomSnapshotDigest?: string;
   elements: Record<string, { status: 'RESERVING' | 'INSERT_INTENT' | 'CREATED' | 'REUSED'; intent?: InsertIntent; id?: string }>;
 }
 export type JournalResult = { status: 'APPLIED' | 'ALREADY_APPLIED'; state: OperationState } | { status: 'CONFLICT'; error: string };

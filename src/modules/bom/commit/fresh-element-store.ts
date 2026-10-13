@@ -41,6 +41,10 @@ export class MasterFreshElementStore implements FreshElementStore {
       return normalized as unknown as ElementRow;
     });
   }
+  validateWritable(): void {
+    const { headers } = this.table();
+    if (headers.some(key => !ELEMENT_COLUMNS.includes(key as typeof ELEMENT_COLUMNS[number]))) throw new Error('Unreviewed Element column');
+  }
   insert(row: ElementRow): void {
     const { sheet, headers } = this.table();
     const canonical = physicalElement(row);

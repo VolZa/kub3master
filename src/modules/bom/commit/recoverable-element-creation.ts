@@ -13,19 +13,19 @@ import type { ElementRow } from '../../elements/element.model';
 import type { CreationVerifier, InsertIntent, JournalResult } from './commit-operation.model';
 import type { ElementType } from '../../../config/config';
 type PendingRow = Omit<ElementRow, 'ID' | 'CreatedAt'>;
-function candidates(rows: ElementRow[], expected: PendingRow): ElementRow[] {
+export function candidates(rows: ElementRow[], expected: PendingRow): ElementRow[] {
   return rows.filter(row => expected.ParentMaterialID
     ? normalizeCode(row.Code) === normalizeCode(expected.Code)
     : row.Code === expected.Code && (row.ProjectDocumentID ?? '') === (expected.ProjectDocumentID ?? ''));
 }
-function identity(row: ElementRow, expected: PendingRow): boolean {
+export function identity(row: ElementRow, expected: PendingRow): boolean {
   const fields = ['Type', 'ProfileType', 'Diameter', 'Width', 'Height', 'Length', 'Thickness'] as const;
   return fields.every(key => (row[key] ?? '') === (expected[key] ?? '')) &&
     normalizeClassName(row.Class ?? '') === normalizeClassName(expected.Class ?? '') &&
     (expected.ParentMaterialID ? row.ParentMaterialID === expected.ParentMaterialID : !(row.ParentMaterialID ?? '')) &&
     row.BaseUnit === expected.BaseUnit;
 }
-function verifiedRow(store: FreshElementStore, intent: InsertIntent): ElementRow {
+export function verifiedRow(store: FreshElementStore, intent: InsertIntent): ElementRow {
   const rows = store.read(), byID = rows.filter(row => row.ID === intent.reservedID);
   const matches = candidates(rows, intent.row);
   if (byID.length !== 1 || matches.length !== 1 || matches[0].ID !== intent.reservedID ||

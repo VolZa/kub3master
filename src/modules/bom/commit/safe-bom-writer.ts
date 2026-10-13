@@ -70,7 +70,7 @@ function readBOM(sheet: GoogleAppsScript.Spreadsheet.Sheet, recoverySlots: numbe
   });
   return { headers, rows };
 }
-function normalizePlan(plan: SafeBOMPlan): SafeBOMPlan {
+export function normalizePlan(plan: SafeBOMPlan): SafeBOMPlan {
   if (!plan.operationID || !/^[A-Za-z0-9_-]{1,120}$/.test(plan.operationID)) throw new Error('Invalid OperationID');
   const rootID = id(plan.rootID);
   const affectedParentIDs = plan.affectedParentIDs.map(id);
@@ -109,6 +109,15 @@ function normalizePlan(plan: SafeBOMPlan): SafeBOMPlan {
 }
 function scopedRows(rows: Cell[][], parents: string[]): Cell[][] {
   return rows.filter(row => row[0] !== '' && parents.includes(id(row[0])));
+}
+function plannedSlots(plan: SafeBOMPlan, state: { headers: string[]; rows: Cell[][] }, sheet: GoogleAppsScript.Spreadsheet.Sheet, journal: CommitJournal): Slot[] {
+  const existing = scopedRows(state.rows, plan.affectedParentIDs);
+  const indices = state.rows.flatMap((row, index) => row[0] !== '' && plan.affectedParentIDs.includes(id(row[0])) ? [index + 2] : []);
+  const appendStart = Math.max(state.rows.length + 2, journal.appendFloor());
+  while (indices.length < plan.targetRows.length) indices.push(appendStart + (indices.length - existing.length));
+  const slots = indices.map((row, index) => ({ row, before: state.rows[row - 2] ?? blank(state.headers.length), target: plan.targetRows[index] ?? blank(state.headers.length) }));
+  if (slots.some(slot => sheet.getRange(slot.row, 1, 1, state.headers.length).isPartOfMerge())) throw new Error('Merged target BOM cells are unsupported');
+  return slots;
 }
 function semantic(rows: Cell[][]): string[] {
   // Comment and code values are significant, independent of physical row order.
@@ -284,11 +293,7 @@ export function writeSafeBOMUnderLock(input: SafeBOMPlan, lock: GoogleAppsScript
     const existing = scopedRows(state.rows, plan.affectedParentIDs);
     if (equal(semantic(existing), semantic(plan.targetRows))) return { status: 'ALREADY_APPLIED', operationID: plan.operationID };
     if (plan.createdParts.some(receipt => state.rows.some(row => row[0] !== '' && id(row[0]) === receipt.id))) throw new Error('Cannot initialize a Part with an existing BOM');
-    const indices = state.rows.flatMap((row, index) => row[0] !== '' && plan.affectedParentIDs.includes(id(row[0])) ? [index + 2] : []);
-    const appendStart = Math.max(state.rows.length + 2, journal.appendFloor());
-    while (indices.length < plan.targetRows.length) indices.push(appendStart + (indices.length - existing.length));
-    const slots = indices.map((row, index) => ({ row, before: state.rows[row - 2] ?? blank(state.headers.length), target: plan.targetRows[index] ?? blank(state.headers.length) }));
-    if (slots.some(slot => sheet.getRange(slot.row, 1, 1, state.headers.length).isPartOfMerge())) throw new Error('Merged target BOM cells are unsupported');
+    const slots = plannedSlots(plan, state, sheet, journal);
     const payload: Payload = { version: 1, request: plan, headers: state.headers, foreignDigest: foreignDigest(state.rows, slots), slots };
     journal.save(payload);
     return apply(sheet, journal, payload, false);
@@ -307,4 +312,24 @@ export function recoverSafeBOMUnderLock(operationID: string, lock: GoogleAppsScr
     if (stored.status === 'CONFLICT') return { status: 'CONFLICT', operationID, error: 'Explicit conflict resolution required' };
     const terminal = ['COMMITTED', 'RECOVERED'].includes(stored.status);
     return apply(requireSheet(master, '01_BOM'), journal, stored.payload, !terminal, terminal);
+}
+export function inspectSafeBOMUnderLock(operationID: string, lock: GoogleAppsScript.Lock.Lock): { plan: SafeBOMPlan; status: JournalStatus } | null {
+  if (!lock.hasLock()) throw new Error('Caller-owned ScriptLock required');
+  const master = new SpreadsheetProvider().open(SpreadsheetKey.MASTER);
+  const journal = new CommitJournal(requireSheet(master, '_BOM_CommitJournal'), operationID);
+  if (!journal.sheetHasOperation()) return null;
+  const stored = journal.load(); return { plan: stored.payload.request, status: stored.status };
+}
+export function readSafeBOMSnapshotUnderLock(lock: GoogleAppsScript.Lock.Lock) {
+  if (!lock.hasLock()) throw new Error('Caller-owned ScriptLock required');
+  return readBOM(requireSheet(new SpreadsheetProvider().open(SpreadsheetKey.MASTER), '01_BOM'));
+}
+export function preflightSafeBOMPlanUnderLock(input: SafeBOMPlan, lock: GoogleAppsScript.Lock.Lock): void {
+  if (!lock.hasLock()) throw new Error('Caller-owned ScriptLock required');
+  const plan = normalizePlan(input), master = new SpreadsheetProvider().open(SpreadsheetKey.MASTER);
+  const sheet = requireSheet(master, '01_BOM'), state = readBOM(sheet);
+  const journal = new CommitJournal(requireSheet(master, '_BOM_CommitJournal'), plan.operationID);
+  if (journal.sheetHasOperation()) throw new Error('Existing writer phase requires recovery');
+  if (plan.createdParts.some(receipt => state.rows.some(row => row[0] !== '' && id(row[0]) === receipt.id))) throw new Error('Cannot initialize a Part with an existing BOM');
+  plannedSlots(plan, state, sheet, journal);
 }

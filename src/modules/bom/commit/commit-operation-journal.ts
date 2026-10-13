@@ -4,7 +4,7 @@
  * Layer: Infrastructure / Protocol
  * Responsibility: append-only framed events, retry and pre-creation evidence in the existing six-column journal.
  */
-import { JOURNAL_HEADERS } from './safe-bom-writer';
+import { JOURNAL_HEADERS, normalizePlan, type SafeBOMPlan } from './safe-bom-writer';
 import { SpreadsheetProvider } from '../../../infrastructure/spreadsheets/SpreadsheetProvider';
 import { SpreadsheetKey } from '../../../infrastructure/spreadsheets/SpreadsheetKey';
 import { normalizeIntegerId } from '../../../utils/id.logic';
@@ -104,8 +104,10 @@ export class CommitOperationJournal {
     }
     return { events };
   }
-  private manifest(operationID: string, input: BOMPreparationInput, prepared: PreparedBOM): OperationManifest {
+  private manifest(operationID: string, input: BOMPreparationInput, prepared: PreparedBOM, validationContext?: OperationManifest['validationContext']): OperationManifest {
     if (!/^[A-Za-z0-9_-]{1,116}$/.test(operationID) || operationID.endsWith('_BOM')) throw new Error('Invalid/reserved OperationID');
+    if (validationContext && (!/^[0-9a-f]{64}$/.test(validationContext.materialsDigest) || !/^[0-9a-f]{64}$/.test(validationContext.catalogDigest) ||
+        !Array.isArray(validationContext.documents) || validationContext.documents.some(document => typeof document !== 'string'))) throw new Error('Invalid fresh validation context');
     if (input.parentInput !== prepared.sourceContext.parentInput || input.specification !== prepared.sourceContext.specification ||
         (input.projectDocumentID ?? '') !== (prepared.sourceContext.projectDocumentID ?? '')) throw new Error('Prepared source context mismatch');
     const keys = prepared.pendingElements.map(item => item.localKey);
@@ -146,13 +148,13 @@ export class CommitOperationJournal {
     }
     if (prepared.plannedEdges.some(edge => !same(edge.parent, prepared.parent) &&
         !(edge.parent.kind === 'pending-element' && prepared.writeScope.initializeMaterialBOMFor.includes(edge.parent.localKey)))) throw new Error('Planned edge outside writeScope');
-    return { version: 1, operationID, writerOperationID: `${operationID}_BOM`, requestDigest: commitDigest(input), input, prepared };
+    return { version: 1, operationID, writerOperationID: `${operationID}_BOM`, requestDigest: commitDigest(input), input, prepared, ...(validationContext ? { validationContext } : {}) };
   }
   private reduce(events: OperationEvent[]): OperationState {
     const first = events[0];
     if (first?.type !== 'INITIALIZED') throw new Error('Operation manifest is not durable');
     const manifest = first.data.manifest as OperationManifest;
-    if (!manifest || manifest.version !== 1 || !same(manifest, this.manifest(manifest.operationID, manifest.input, manifest.prepared))) throw new Error('Invalid operation manifest');
+    if (!manifest || manifest.version !== 1 || !same(manifest, this.manifest(manifest.operationID, manifest.input, manifest.prepared, manifest.validationContext))) throw new Error('Invalid operation manifest');
     const state: OperationState = { manifest, status: 'PREPARING', events: [], elements: {} };
     for (const event of events) {
       token(event.eventID);
@@ -169,6 +171,18 @@ export class CommitOperationJournal {
         } else if (event.type === 'BOM_READY') {
           if (!['READY', 'CREATING'].includes(state.status) || manifest.prepared.pendingElements.some(item => !['CREATED', 'REUSED'].includes(state.elements[item.localKey]?.status))) throw new Error('Unresolved Elements before BOM_READY');
           state.status = 'BOM_READY';
+        } else if (event.type === 'BOM_PLANNED') {
+          const plan = event.data.plan as SafeBOMPlan;
+          if (state.status !== 'BOM_READY' || state.bomPlan || plan?.operationID !== manifest.writerOperationID || !same(plan, normalizePlan(plan))) throw new Error('Invalid immutable BOM plan');
+          const root = manifest.prepared.parent;
+          const rootID = root.kind === 'existing-element' ? root.element.id : state.elements[root.localKey]?.id;
+          const receipts = manifest.prepared.writeScope.initializeMaterialBOMFor.flatMap(key => state.elements[key]?.status === 'CREATED' ? [{ id: state.elements[key].id!, operationID: manifest.writerOperationID }] : []);
+          if (plan.rootID !== rootID || !same([...plan.createdParts].sort((a,b) => a.id.localeCompare(b.id)), receipts.sort((a,b) => a.id.localeCompare(b.id)))) throw new Error('BOM plan provenance mismatch');
+          state.bomPlan = plan;
+          if (event.data.snapshotDigest !== undefined) {
+            if (!/^[0-9a-f]{64}$/.test(String(event.data.snapshotDigest))) throw new Error('Invalid mapping snapshot digest');
+            state.bomSnapshotDigest = String(event.data.snapshotDigest);
+          }
         } else if (event.type === 'COMPLETED') {
           if (state.status !== 'BOM_READY' || event.data.writerOperationID !== manifest.writerOperationID || !['COMMITTED', 'RECOVERED', 'ALREADY_APPLIED'].includes(String(event.data.writerStatus))) throw new Error('Writer completion evidence required'); state.status = 'COMPLETED';
         } else {
@@ -218,6 +232,37 @@ export class CommitOperationJournal {
     if (decoded.incomplete) throw new Error(`Incomplete event ${decoded.incomplete.frame.eventID}; retry original event to finish persistence`);
     return state;
   }
+  hasOperation(operationID: string): boolean {
+    this.guard(); return this.sheet.getDataRange().getValues().slice(1).some(row => row[0] === operationID);
+  }
+  peek(operationID: string): OperationState {
+    const decoded = this.decode(operationID);
+    if (decoded.events.length) return this.reduce(decoded.events);
+    const text = decoded.incomplete?.frame.retryPayload;
+    if (!text || textDigest(text) !== decoded.incomplete?.frame.digest) throw new Error('Manifest payload unavailable');
+    return this.reduce([parse(text) as OperationEvent]);
+  }
+  restore(operationID: string, replay?: (state: OperationState, eventID: string) => OperationEvent): OperationState {
+    const decoded = this.decode(operationID), tail = decoded.incomplete;
+    if (tail) {
+      if (tail.frame.eventID.startsWith('created:') || tail.frame.eventID.startsWith('reserve:')) this.repairCreationTail(operationID);
+      else {
+        const text = tail.frame.retryPayload ?? (tail.pieces.length === tail.frame.count ? tail.pieces.join('') : '');
+        if (text && (text.length !== tail.frame.length || textDigest(text) !== tail.frame.digest)) throw new Error('Corrupt recovery payload');
+        const event = text ? parse(text) as OperationEvent : replay?.(this.reduce(decoded.events), tail.frame.eventID);
+        if (!event) throw new Error('Recovery requires original exact event payload');
+        if (event.type === 'CREATED' || event.eventID !== tail.frame.eventID) throw new Error('Invalid recovery event');
+        const result = this.persist(operationID, event); if (result.status === 'CONFLICT') throw new Error(result.error);
+      }
+    }
+    const state = this.load(operationID);
+    if (state.status === 'PREPARING') {
+      const result = this.persist(operationID, { eventID: 'ready', type: 'READY', data: {} });
+      if (result.status === 'CONFLICT') throw new Error(result.error);
+      return result.state;
+    }
+    return state;
+  }
   /** Recover a complete serialized creation event whose final acknowledgment/marker was lost. */
   repairCreationTail(operationID: string): void {
     const decoded = this.decode(operationID);
@@ -257,6 +302,7 @@ export class CommitOperationJournal {
       const state = this.reduce([...decoded.events, event]); // Validate before any writes.
       const text = stringify(event), pieces = chunks(text);
       const frame: Frame = { eventID: event.eventID, count: pieces.length, length: text.length, digest: textDigest(text) };
+      if (text.length <= 8000 && (!decoded.incomplete || decoded.incomplete.frame.retryPayload !== undefined)) frame.retryPayload = text;
       // Small identity decisions are recoverable even if only their frame survived.
       // Old frames remain valid and retain their exact physical retry representation.
       if ((event.type === 'INSERT_INTENT' || event.type === 'REUSED') && text.length <= 18000 &&
@@ -273,9 +319,9 @@ export class CommitOperationJournal {
       return { status: 'APPLIED', state: confirmed };
     } catch (error) { return { status: 'CONFLICT', error: String(error) }; }
   }
-  begin(operationID: string, input: BOMPreparationInput, prepared: PreparedBOM): JournalResult {
+  begin(operationID: string, input: BOMPreparationInput, prepared: PreparedBOM, validationContext?: OperationManifest['validationContext']): JournalResult {
     try {
-      const manifest = this.manifest(operationID, input, prepared);
+      const manifest = this.manifest(operationID, input, prepared, validationContext);
       const decoded = this.decode(operationID);
       if (!decoded.events.length && !decoded.incomplete && this.sheet.getDataRange().getValues().some(row => row[0] === manifest.writerOperationID)) return { status: 'CONFLICT', error: 'Orphan writer phase cannot be adopted' };
       const initialized: OperationEvent = { eventID: 'initial', type: 'INITIALIZED', data: { manifest } };
@@ -315,6 +361,7 @@ export class CommitOperationJournal {
       ? [{ id: state.elements[key].id!, operationID: state.manifest.writerOperationID }] : []);
   }
   bomReady(operationID: string, eventID: string) { return this.persist(operationID, { eventID, type: 'BOM_READY', data: {} }); }
+  bomPlanned(operationID: string, plan: SafeBOMPlan, snapshotDigest?: string) { return this.persist(operationID, { eventID: 'bom-plan', type: 'BOM_PLANNED', data: { plan, ...(snapshotDigest ? { snapshotDigest } : {}) } }); }
   completed(operationID: string, eventID: string, writerOperationID: string, writerStatus: string) { return this.persist(operationID, { eventID, type: 'COMPLETED', data: { writerOperationID, writerStatus } }); }
   conflict(operationID: string, eventID: string, reason: string) { return this.persist(operationID, { eventID, type: 'CONFLICT', data: { reason } }); }
 }
