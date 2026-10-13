@@ -7,9 +7,10 @@
 import { SpreadsheetProvider } from '../../../infrastructure/spreadsheets/SpreadsheetProvider';
 import { SpreadsheetKey } from '../../../infrastructure/spreadsheets/SpreadsheetKey';
 import { normalizeIntegerId } from '../../../utils/id.logic';
+import { PHYSICAL_BOM_HEADERS, validateBOMHeaders, validateBOMRow } from './physical-bom-schema';
 
 export const JOURNAL_HEADERS = ['OperationID', 'Kind', 'Sequence', 'Payload', 'Digest', 'UpdatedAt'];
-const CORE = ['ParentID', 'ChildID', 'Qty', 'Unit', 'CreatedAt', 'ParentCode', 'ChildCode'];
+const CORE = PHYSICAL_BOM_HEADERS;
 export type JournalStatus = 'PREPARING' | 'READY' | 'APPLYING' | 'COMMITTED' | 'RECOVERY_REQUIRED' | 'CONFLICT' | 'RECOVERED';
 export type Cell = string | number | boolean | { date: string } | { formula: string };
 export interface SafeBOMPlan {
@@ -18,7 +19,7 @@ export interface SafeBOMPlan {
   affectedParentIDs: string[];
   /** Trusted creation receipts supplied by future Commit; writer never creates Elements. */
   createdParts: { id: string; operationID: string }[];
-  /** Complete physical rows in the sheet header order, including additional columns/formulas. */
+  /** Complete seven-column value-only rows: ParentID, ChildID, Qty, Unit, Comment, ParentCode, ChildCode. */
   targetRows: Cell[][];
 }
 interface Slot { row: number; before: Cell[]; target: Cell[] }
@@ -52,24 +53,21 @@ function requireSheet(ss: GoogleAppsScript.Spreadsheet.Spreadsheet, name: string
   if (!sheet) throw new Error(`Лист ${name} не знайдено в MASTER`);
   return sheet;
 }
-function readBOM(sheet: GoogleAppsScript.Spreadsheet.Sheet): { headers: string[]; rows: Cell[][] } {
+function readBOM(sheet: GoogleAppsScript.Spreadsheet.Sheet, recoverySlots: number[] = []): { headers: string[]; rows: Cell[][] } {
   const range = sheet.getDataRange();
   if (range.getMergedRanges().length) throw new Error('Merged BOM cells require a separately approved mapping');
   const values = range.getValues();
   const formulas = range.getFormulas();
-  const headers = values[0]?.map(String) ?? [];
-  if (headers.length < CORE.length || CORE.some((name, index) => headers[index] !== name) ||
-      headers.some(name => !name.trim()) || new Set(headers).size !== headers.length || formulas[0]?.some(Boolean)) {
-    throw new Error('Unsupported 01_BOM schema; expected canonical core columns followed by unique extra headers');
-  }
+  const headers = values[0] ?? [];
+  validateBOMHeaders(headers);
+  if (formulas.some(row => row.some(Boolean))) throw new Error('Formulas in 01_BOM are unsupported');
+  if (values.some(row => row.length !== CORE.length)) throw new Error('Invalid physical BOM width');
   const rows = values.slice(1).map((row, index) => headers.map((_, column) => encode(row[column], formulas[index + 1]?.[column] ?? '')));
-  for (const row of rows) {
-    if (row.every(cell => cell === '')) continue;
-    if (row.slice(0, CORE.length).some(cell => typeof cell === 'object' && 'formula' in cell)) {
-      throw new Error('Formulas in BOM core columns require a separately approved mapping');
-    }
-
-  }
+  rows.forEach((row, index) => {
+    if (row.some(cell => typeof cell === 'object')) throw new Error('Unsupported physical BOM cell type');
+    // Only durable writer-owned slots may be temporarily partial during recovery.
+    if (!recoverySlots.includes(index + 2)) validateBOMRow(row, index + 2);
+  });
   return { headers, rows };
 }
 function normalizePlan(plan: SafeBOMPlan): SafeBOMPlan {
@@ -84,6 +82,7 @@ function normalizePlan(plan: SafeBOMPlan): SafeBOMPlan {
       createdParts.some(receipt => !affectedParentIDs.includes(receipt.id))) throw new Error('Scope requires creation receipts from this operation');
   const keys = new Set<string>();
   const targetRows = plan.targetRows.map(row => {
+    if (!validateBOMRow(row)) throw new Error('Empty target row');
     const copy = row.map(cell => {
       if ((typeof cell === 'string' && cell.length > 45000) ||
           (typeof cell === 'object' && cell !== null && 'formula' in cell && cell.formula.length > 45000)) {
@@ -112,8 +111,8 @@ function scopedRows(rows: Cell[][], parents: string[]): Cell[][] {
   return rows.filter(row => row[0] !== '' && parents.includes(id(row[0])));
 }
 function semantic(rows: Cell[][]): string[] {
-  // CreatedAt is physical metadata; it does not make a repeat a different BOM.
-  return rows.map(row => json(row.map((cell, column) => column === 4 ? '' : column < 2 ? id(cell) : cell))).sort();
+  // Comment and code values are significant, independent of physical row order.
+  return rows.map(row => json(row.map((cell, column) => column < 2 ? id(cell) : cell))).sort();
 }
 function sameRequest(a: SafeBOMPlan, b: SafeBOMPlan): boolean {
   return a.operationID === b.operationID && a.rootID === b.rootID &&
@@ -132,6 +131,20 @@ class CommitJournal {
   }
   sheetHasOperation(): boolean {
     return this.sheet.getDataRange().getValues().slice(1).some(row => row[0] === this.operationID);
+  }
+  appendFloor(): number {
+    // Cleared tail slots may disappear from getDataRange but remain reserved in durable snapshots.
+    const operations = new Set(this.sheet.getDataRange().getValues().slice(1)
+      .filter(row => row[1] === 'META').map(row => String(row[0])));
+    let floor = 2;
+    for (const operation of operations) {
+      const { payload } = new CommitJournal(this.sheet, operation).load();
+      for (const slot of payload.slots) {
+        if (!Number.isSafeInteger(slot.row) || slot.row < 2) throw new Error('Invalid reserved journal slot');
+        floor = Math.max(floor, slot.row + 1);
+      }
+    }
+    return floor;
   }
   entries(): RecordEntry[] {
     const data = this.sheet.getDataRange().getValues().slice(1).filter(row => row[0] === this.operationID);
@@ -199,8 +212,14 @@ function checkSlots(rows: Cell[][], payload: Payload, targetOnly: boolean): bool
 }
 function apply(sheet: GoogleAppsScript.Spreadsheet.Sheet, journal: CommitJournal, payload: Payload, recovery: boolean, terminal = false): SafeBOMResult {
   const operationID = payload.request.operationID;
+  // Unsupported schemas (including old CreatedAt snapshots) never mutate the journal.
+  try {
+    validateBOMHeaders(payload.headers);
+    normalizePlan(payload.request);
+    readBOM(sheet, payload.slots.map(slot => slot.row));
+  } catch (error) { return { status: 'CONFLICT', operationID, error: String(error) }; }
   const read = () => {
-    const state = readBOM(sheet);
+    const state = readBOM(sheet, payload.slots.map(slot => slot.row));
     if (!equal(state.headers, payload.headers) || foreignDigest(state.rows, payload.slots) !== payload.foreignDigest ||
         scopedRows(state.rows, payload.request.affectedParentIDs).some(row => !payload.slots.some(slot => equal(row, state.rows[slot.row - 2])))) {
       throw new Error('External BOM/schema conflict');
@@ -266,7 +285,8 @@ export function writeSafeBOMUnderLock(input: SafeBOMPlan, lock: GoogleAppsScript
     if (equal(semantic(existing), semantic(plan.targetRows))) return { status: 'ALREADY_APPLIED', operationID: plan.operationID };
     if (plan.createdParts.some(receipt => state.rows.some(row => row[0] !== '' && id(row[0]) === receipt.id))) throw new Error('Cannot initialize a Part with an existing BOM');
     const indices = state.rows.flatMap((row, index) => row[0] !== '' && plan.affectedParentIDs.includes(id(row[0])) ? [index + 2] : []);
-    while (indices.length < plan.targetRows.length) indices.push(state.rows.length + 2 + (indices.length - existing.length));
+    const appendStart = Math.max(state.rows.length + 2, journal.appendFloor());
+    while (indices.length < plan.targetRows.length) indices.push(appendStart + (indices.length - existing.length));
     const slots = indices.map((row, index) => ({ row, before: state.rows[row - 2] ?? blank(state.headers.length), target: plan.targetRows[index] ?? blank(state.headers.length) }));
     if (slots.some(slot => sheet.getRange(slot.row, 1, 1, state.headers.length).isPartOfMerge())) throw new Error('Merged target BOM cells are unsupported');
     const payload: Payload = { version: 1, request: plan, headers: state.headers, foreignDigest: foreignDigest(state.rows, slots), slots };

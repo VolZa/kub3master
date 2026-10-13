@@ -6,6 +6,7 @@ import { SpreadsheetProvider } from '../../infrastructure/spreadsheets/Spreadshe
 import { SpreadsheetKey } from '../../infrastructure/spreadsheets/SpreadsheetKey';
 import { forceText, insertRows } from '../../utils/sheets.utils';
 import { BOMRow } from './model/bom-row.model';
+import { validateBOMHeaders, validateBOMRow } from './commit/physical-bom-schema';
 
 export function getMasterBOMSheet(): GoogleAppsScript.Spreadsheet.Sheet {
   const master = new SpreadsheetProvider().open(SpreadsheetKey.MASTER);
@@ -266,21 +267,28 @@ export function replaceBOMForParent(parentId: string, rows: any[][]): void {
 export function getAllBOMRows(): BOMRow[] {
   const sheet = getMasterBOMSheet();
 
-  const values = sheet.getDataRange().getValues();
+  const range = sheet.getDataRange();
+  const values = range.getValues();
+  validateBOMHeaders(values[0] ?? []);
+  if (range.getFormulas().some(row => row.some(Boolean))) throw new Error('Formulas in 01_BOM are unsupported');
 
   if (values.length <= 1) {
     return [];
   }
 
-  return values.slice(1).map((row) => ({
+  return values.slice(1).flatMap((physical, index) => {
+    const row = validateBOMRow(physical, index + 2);
+    if (!row) return [];
+    return [{
     parentId: String(row[0]),
     childId: String(row[1]),
     qty: Number(row[2]),
     unit: String(row[3]),
+    comment: row[4],
 
     parentCode: String(row[5] ?? ''),
     childCode: String(row[6] ?? ''),
-  }));
+  }]; });
 }
 
 // Сервіс для отримання всіх дочірніх елементів (BOMRow) за ParentID

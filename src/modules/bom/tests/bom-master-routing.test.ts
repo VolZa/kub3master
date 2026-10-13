@@ -16,9 +16,9 @@ import { MATERIAL_HEADERS } from '../../material/material.headers';
 vi.mock('../../../app/factories/catalog.factory', () => ({
   getCatalogRepository: () => ({ getAll: () => [{ typeCode: 'product', hasBOM: true }] }),
 }));
-const headers = ['ParentID', 'ChildID', 'Qty', 'Unit', 'CreatedAt', 'ParentCode', 'ChildCode'];
+const headers = ['ParentID', 'ChildID', 'Qty', 'Unit', 'Comment', 'ParentCode', 'ChildCode'];
 const date = new Date('2026-03-01T00:00:00Z');
-const edge = (parent: string | number, child: string | number, qty = 1) => [parent, child, qty, 'шт', date, 'P', 'PART'];
+const edge = (parent: string | number, child: string | number, qty = 1) => [parent, child, qty, 'шт', '', 'P', 'PART'];
 
 describe('BOM MASTER routing', () => {
   let data: unknown[][];
@@ -27,7 +27,7 @@ describe('BOM MASTER routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     missing = false;
-    data = [headers, edge(4000000, 2000000, 2), [2000000, 3001, 0.395, 'кг', date, 'PART', 'R_8_A240']];
+    data = [headers, edge(4000000, 2000000, 2), [2000000, 3001, 0.395, 'кг', '', 'PART', 'R_8_A240']];
     active.mockReturnValue({ getSheetByName: foreign });
     clear.mockImplementation(() => { data = []; });
     write.mockImplementation((row: number, col: number, values: unknown[][]) => {
@@ -39,7 +39,7 @@ describe('BOM MASTER routing', () => {
       });
     });
     const bomSheet = {
-      getDataRange: () => ({ getValues: () => data.map(row => [...row]) }),
+      getDataRange: () => ({ getValues: () => data.map(row => [...row]), getFormulas: () => data.map(row => row.map(() => '')) }),
       getLastRow: () => data.length, clearContents: clear,
       getRange: (row: number, col: number, count = 1, columns = 1) => ({
         getValues: () => data.slice(row - 1, row - 1 + count).map(value => value.slice(col - 1, col - 1 + columns)),

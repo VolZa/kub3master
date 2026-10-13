@@ -47,8 +47,8 @@ describe('Durable pre-creation journal', () => {
   beforeEach(() => {
     held = true; attempts = 0; failAt = -1; afterAppend = false; missing = false; physical.clear(); vi.clearAllMocks();
     journal = [clone(JOURNAL_HEADERS)];
-    bom = [['ParentID', 'ChildID', 'Qty', 'Unit', 'CreatedAt', 'ParentCode', 'ChildCode'],
-      ['4000000', '4001', 1, 'шт', new Date('2026-10-13'), 'P', 'C']];
+    bom = [['ParentID', 'ChildID', 'Qty', 'Unit', 'Comment', 'ParentCode', 'ChildCode'],
+      ['4000000', '4001', 1, 'шт', '', 'P', 'C']];
     const table = (data: unknown[][], isJournal: boolean) => ({
       getLastColumn: () => data[0].length,
       getDataRange: () => ({ getValues: () => clone(data), getFormulas: () => data.map(row => row.map(() => '')), getMergedRanges: () => [] }),
@@ -203,10 +203,10 @@ describe('Durable pre-creation journal', () => {
     begin(); const operationRows = clone(journal);
     held = false;
     expect(writeSafeBOM({ operationID: 'operation_BOM', rootID: '4000000', affectedParentIDs: ['4000000'], createdParts: [],
-      targetRows: [['4000000', '4002', 4, 'шт', { date: '2026-10-13T00:00:00.000Z' }, 'P', 'C']] }).status).toBe('COMMITTED');
+      targetRows: [['4000000', '4002', 4, 'шт', '', 'P', 'C']] }).status).toBe('COMMITTED');
     held = false;
     expect(writeSafeBOM({ operationID: 'operation_BOM', rootID: '4000000', affectedParentIDs: ['4000000'], createdParts: [],
-      targetRows: [['4000000', '4002', 4, 'шт', { date: '2026-10-13T00:00:00.000Z' }, 'P', 'C']] }).status).toBe('ALREADY_APPLIED');
+      targetRows: [['4000000', '4002', 4, 'шт', '', 'P', 'C']] }).status).toBe('ALREADY_APPLIED');
     held = true; expect(api.load('operation').status).toBe('READY');
     expect(journal.filter(row => row[0] === 'operation')).toEqual(operationRows.slice(1));
   });

@@ -8,9 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { JOURNAL_HEADERS, writeSafeBOM, recoverSafeBOM, writeSafeBOMUnderLock, recoverSafeBOMUnderLock, SafeBOMPlan, Cell } from '../commit/safe-bom-writer';
 import { SpreadsheetConfig } from '../../../infrastructure/spreadsheets/SpreadsheetConfig';
-const headers = ['ParentID', 'ChildID', 'Qty', 'Unit', 'CreatedAt', 'ParentCode', 'ChildCode', 'Comment', 'Formula'];
+const headers = ['ParentID', 'ChildID', 'Qty', 'Unit', 'Comment', 'ParentCode', 'ChildCode'];
 const date = { date: '2026-10-13T00:00:00.000Z' };
-const row = (parent: string, child: string, qty = 1): Cell[] => [parent, child, qty, 'шт', date, 'P', 'C', 'extra', { formula: '=1+1' }];
+const row = (parent: string, child: string, qty = 1): Cell[] => [parent, child, qty, '\u0448\u0442', 'note', 'P', 'C'];
 const request = (): SafeBOMPlan => ({ operationID: 'op-1', rootID: '4000000', affectedParentIDs: ['4000000'], createdParts: [], targetRows: [row('4000000', '2000009', 4)] });
 describe('Safe BOM writer and durable journal', () => {
   let bom: Cell[][], journal: unknown[][], held: boolean, missing: string;
@@ -18,8 +18,8 @@ describe('Safe BOM writer and durable journal', () => {
   let partialJournal: boolean, afterWriteFailure: boolean, silentWrite: boolean;
   const release = vi.fn(), acquire = vi.fn(), clearAll = vi.fn(), mutateElements = vi.fn();
   const clone = <T>(value: T): T => structuredClone(value);
-  const values = (data: unknown[][]) => data.map(r => r.map(c => c && typeof c === 'object' ? 'date' in c ? new Date(String(c.date)) : 'formula' in c ? 2 : c : c));
-  const formulas = (data: unknown[][]) => data.map(r => r.map(c => c && typeof c === 'object' && 'formula' in c ? String(c.formula) : ''));
+  const values = (data: unknown[][]) => Array.from(data, r => (r ?? Array(headers.length).fill('')).map(c => c && typeof c === 'object' ? 'date' in c ? new Date(String(c.date)) : 'formula' in c ? 2 : c : c));
+  const formulas = (data: unknown[][]) => Array.from(data, r => (r ?? Array(headers.length).fill('')).map(c => c && typeof c === 'object' && 'formula' in c ? String(c.formula) : ''));
   beforeEach(() => {
     vi.clearAllMocks(); held = false; missing = ''; failJournalAt = failBOMAt = -1;
     partialJournal = afterWriteFailure = silentWrite = false; journalAppends = bomWrites = 0;
@@ -74,6 +74,58 @@ describe('Safe BOM writer and durable journal', () => {
   });
   afterEach(() => { expect(clearAll).not.toHaveBeenCalled(); expect(mutateElements).not.toHaveBeenCalled(); expect(held).toBe(false); vi.unstubAllGlobals(); });
   const foreignRows = () => clone(bom.filter((r, i) => i > 0 && r[0] !== '4000000' && r.some(c => c !== '')));
+  it('treats Comment as a significant value on write and OperationID retry', () => {
+    const plan = request(); plan.targetRows[0][4] = 'new note';
+    expect(writeSafeBOM(plan).status).toBe('COMMITTED'); expect(bom[1][4]).toBe('new note');
+    const count = bomWrites; plan.targetRows[0][4] = 'another note';
+    expect(writeSafeBOM(plan).status).toBe('CONFLICT'); expect(bomWrites).toBe(count);
+  });
+  it.each(['CreatedAt', 'extra', 'formula', 'partial', 'comment date', 'qty string'])('rejects unsupported %s before all mutations', kind => {
+    if (kind === 'CreatedAt') bom[0][4] = 'CreatedAt';
+    if (kind === 'extra') { bom[0].push('Extra'); bom.slice(1).forEach(row => row.push('')); }
+    if (kind === 'formula') bom[2][6] = { formula: '=1+1' };
+    if (kind === 'partial') bom[2][0] = '';
+    if (kind === 'comment date') bom[2][4] = date;
+    if (kind === 'qty string') bom[2][2] = '1';
+    expect(() => writeSafeBOM(request())).toThrow(); expect(bomWrites).toBe(0); expect(journalAppends).toBe(0);
+  });
+  it('does not reuse blank or foreign stable positions when another root adds rows', () => {
+    bom.splice(2, 0, Array(7).fill('')); const before = clone(bom);
+    const plan = request(); plan.rootID = '4000002'; plan.affectedParentIDs = ['4000002']; plan.targetRows = [row('4000002', '2000000')];
+    expect(writeSafeBOM(plan).status).toBe('COMMITTED'); expect(bom.slice(0, before.length)).toEqual(before);
+    expect(bom[before.length]).toEqual(plan.targetRows[0]);
+  });
+  it('unsupported recovery schema does not append journal status or mutate BOM', () => {
+    failBOMAt = 1; expect(() => writeSafeBOM(request())).toThrow(); failBOMAt = -1;
+    bom[0][4] = 'CreatedAt'; const before = clone(journal), count = bomWrites;
+    expect(recoverSafeBOM('op-1').status).toBe('CONFLICT'); expect(journal).toEqual(before); expect(bomWrites).toBe(count);
+  });
+  it('does not reuse a retired journal slot that vanished from the physical data range', () => {
+    writeSafeBOM(request()); expect(bom[6]).toEqual(Array(7).fill(''));
+    bom.pop(); // GAS can omit fully cleared tail rows from getDataRange.
+    const plan = request(); plan.operationID = 'next'; plan.rootID = '4000002'; plan.affectedParentIDs = ['4000002']; plan.targetRows = [row('4000002', '2000000')];
+    // Mock physical empty gap as Sheets returns it once the later target is written.
+    const original = bom.length;
+    writeSafeBOM(plan); expect(bom[original]).toBeUndefined(); expect(bom[original + 1][0]).toBe('4000002');
+  });
+  it('reads old journal framing but refuses reinterpretation of a CreatedAt snapshot', () => {
+    failBOMAt = 1; expect(() => writeSafeBOM(request())).toThrow(); failBOMAt = -1;
+    const chunk = journal.find(record => record[1] === 'CHUNK')!;
+    const payload = JSON.parse(String(chunk[3])); payload.headers[4] = 'CreatedAt'; chunk[3] = JSON.stringify(payload);
+    const digest = (text: string) => createHash('sha256').update(text).digest('hex');
+    const meta = JSON.parse(String(journal[1][3])); meta.length = String(chunk[3]).length; meta.digest = digest(String(chunk[3])); journal[1][3] = JSON.stringify(meta);
+    let previous = '';
+    for (const record of journal.slice(1)) {
+      record[4] = digest(JSON.stringify([record[0], record[1], record[2], record[3], previous])); previous = String(record[4]);
+    }
+    const before = clone(journal), count = bomWrites;
+    expect(recoverSafeBOM('op-1').status).toBe('CONFLICT'); expect(journal).toEqual(before); expect(bomWrites).toBe(count);
+  });
+  it.each([4, 5, 6])('recovery protects foreign Comment/code column %s', column => {
+    failBOMAt = 1; expect(() => writeSafeBOM(request())).toThrow(); failBOMAt = -1;
+    bom[2][column] = 'foreign edit'; const before = clone(bom);
+    expect(recoverSafeBOM('op-1').status).toBe('CONFLICT'); expect(bom).toEqual(before);
+  });
   it('writes and recovers under caller-owned lock without acquiring or releasing it', () => {
     held = true; const lock = LockService.getScriptLock(); const before = foreignRows();
     try {
@@ -95,7 +147,7 @@ describe('Safe BOM writer and durable journal', () => {
     expect(() => recoverSafeBOMUnderLock('op-1', LockService.getScriptLock())).toThrow('Caller-owned');
     expect(bomWrites).toBe(0); expect(journalAppends).toBe(0);
   });
-  it('replaces root only, retaining mixed foreign duplicates, old Part BOM and all extra columns/formulas', () => {
+  it('replaces root only, retaining mixed foreign duplicates, old Part BOM and all comment/code values', () => {
     const before = foreignRows();
     expect(writeSafeBOM(request()).status).toBe('COMMITTED');
     expect(foreignRows()).toEqual(before);
@@ -108,9 +160,9 @@ describe('Safe BOM writer and durable journal', () => {
     writeSafeBOM(request()); const count = bomWrites;
     expect(writeSafeBOM(request()).status).toBe('ALREADY_APPLIED'); expect(bomWrites).toBe(count);
   });
-  it('recognizes equivalent existing rows independent of order and CreatedAt', () => {
+  it('recognizes equivalent existing rows independent of order with identical Comment', () => {
     const plan = request(); plan.targetRows = [row('4000000', '2000000', 2), row('4000000', '4001', 4)];
-    plan.targetRows[0][4] = { date: '2026-01-01T00:00:00.000Z' };
+    plan.targetRows[0][4] = 'note';
     expect(writeSafeBOM(plan).status).toBe('ALREADY_APPLIED'); expect(bomWrites).toBe(0); expect(journalAppends).toBe(0);
   });
   it('updates quantity without modifying foreign parents', () => {
@@ -167,7 +219,7 @@ describe('Safe BOM writer and durable journal', () => {
     failBOMAt = 1; expect(() => writeSafeBOM(request())).toThrow(); failBOMAt = -1;
     if (change === 'scoped') bom[1][2] = 999;
     if (change === 'foreign') bom[2][2] = 999;
-    if (change === 'schema') bom[0][7] = 'Changed';
+    if (change === 'schema') bom[0][4] = 'CreatedAt';
     const count = bomWrites; expect(recoverSafeBOM('op-1').status).toBe('CONFLICT'); expect(bomWrites).toBe(count);
   });
   it('rejects reusing an OperationID for another request', () => {
@@ -188,7 +240,7 @@ describe('Safe BOM writer and durable journal', () => {
     expect(() => writeSafeBOM(request())).toThrow(); expect(bomWrites).toBe(0); expect(journalAppends).toBe(0);
   });
   it('chunks large snapshots and verifies integrity before writing', () => {
-    bom[1][7] = 'x'.repeat(25000); const plan = request(); plan.targetRows[0][7] = 'y'.repeat(25000);
+    bom[1][4] = 'x'.repeat(25000); const plan = request(); plan.targetRows[0][4] = 'y'.repeat(25000);
     writeSafeBOM(plan); expect(journal.filter(r => r[1] === 'CHUNK').length).toBeGreaterThan(1);
     expect(journal.filter(r => r[1] === 'CHUNK').every(r => String(r[3]).length <= 20000)).toBe(true);
     journal.find(r => r[1] === 'CHUNK')![3] = 'corrupt';
@@ -207,7 +259,7 @@ describe('Safe BOM writer and durable journal', () => {
     expect(writeSafeBOM(request()).status).toBe('CONFLICT'); expect(bomWrites).toBe(count);
   });
   it('rejects oversized target cells before any writes', () => {
-    const plan = request(); plan.targetRows[0][7] = 'x'.repeat(45001);
+    const plan = request(); plan.targetRows[0][4] = 'x'.repeat(45001);
     expect(() => writeSafeBOM(plan)).toThrow('size limit'); expect(journalAppends).toBe(0); expect(bomWrites).toBe(0);
   });
   it('appends new rows without shifting any foreign rows when target grows', () => {

@@ -4,6 +4,7 @@ export interface BOMRow {
   childId: string;
   qty: number;
   unit: string;
+  comment?: string;
 
   parentCode?: string;
   childCode?: string;
