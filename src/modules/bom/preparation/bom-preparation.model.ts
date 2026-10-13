@@ -7,6 +7,7 @@
 import type { ElementFull, ElementRow } from '../../elements/element.model';
 import type { Material } from '../../../domain/materials/material.model';
 import type { TableRowInput } from '../model/table-row-input.model';
+import type { ElementType } from '../../../config/config';
 
 export type PreparedElementRef =
   | { kind: 'existing-element'; element: ElementFull }
@@ -26,6 +27,8 @@ export interface PreparedBOMComponent {
   sourceRowIndex: number;
   input: TableRowInput;
   ref: PreparedComponentRef;
+  identity: { kind: 'project-element' | 'material-part' | 'direct-material'; code: string;
+    projectDocumentID?: string; materialID?: string; geometry?: Partial<ElementFull> };
 }
 export interface BOMPreparationInput {
   parentInput: string;
@@ -33,6 +36,9 @@ export interface BOMPreparationInput {
   projectDocumentID?: string;
 }
 export interface PreparedBOM {
+  rootType: ElementType;
+  /** Local keys only: Commit may initialize these BOMs only if it actually creates the Parts. */
+  writeScope: { root: PreparedElementRef; initializeMaterialBOMFor: string[] };
   parent: PreparedElementRef;
   components: PreparedBOMComponent[];
   pendingElements: PendingBOMElement[];

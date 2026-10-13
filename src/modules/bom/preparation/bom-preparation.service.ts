@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Path: C:/www/26/03/kub3master-ts/src/modules/bom/preparation/bom-preparation.service.ts
  * Module: BOM
  * Layer: Application
@@ -17,14 +17,16 @@ import { parseSpec } from '../parsers/parseSpec';
 import { buildByKind } from '../../elements/builders/builder.dispatcher';
 import { buildElementName } from '../../elements/builders/name.builder';
 import { resolveElementType } from '../../elements/element-type.resolver';
-import { isNumericString } from '../../../utils/normalize';
+import { isNumericString, normalizeCode, normalizeClassName } from '../../../utils/normalize';
+import { normalizeIntegerId } from '../../../utils/id.logic';
+import type { ElementType } from '../../../config/config';
 import type { TableRowInput } from '../model/table-row-input.model';
 import type { BOMPreparationInput, BOMPreparationResult, BOMPreparationError,
   PendingBOMElement, PreparedElementRef, PreparedComponentRef, PreparedBOMComponent, PlannedBOMEdge } from './bom-preparation.model';
 
 export interface BOMPreparationDependencies {
-  elements: Pick<ElementRepository, 'findByCode' | 'findByCodeInDocuments' | 'findByIdentity' | 'findPartByMaterial'>;
-  materials: Pick<MaterialRepository, 'findByCode' | 'findById' | 'findBySpec'>;
+  elements: Pick<ElementRepository, 'findByType'>;
+  materials: Pick<MaterialRepository, 'findByCode' | 'findById' | 'findBySpec' | 'getAll'>;
   catalog: Pick<CatalogHelper, 'resolveTemplate'>;
   documents: Pick<ProjectDocumentResolver, 'resolve'>;
 }
@@ -54,6 +56,8 @@ export function prepareBOM(input: BOMPreparationInput, deps: BOMPreparationDepen
   const edges: PlannedBOMEdge[] = [];
   const plannedMaterialParents = new Set<string>();
   let parent: PreparedElementRef | undefined;
+  let rootType: ElementType = 'product';
+  let elementSnapshot: ElementFull[] = [];
   let documentID: string | undefined = input.projectDocumentID ?? '';
   let searchDocuments: readonly string[] = [];
   const message = (error: unknown) => error instanceof Error ? error.message : String(error);
@@ -67,20 +71,38 @@ export function prepareBOM(input: BOMPreparationInput, deps: BOMPreparationDepen
     return { kind: 'pending-element', localKey: item.localKey };
   };
   try {
+    elementSnapshot = (['product', 'assembly', 'part', 'material'] as const).flatMap(type => deps.elements.findByType(type));
     searchDocuments = [...deps.documents.resolve(documentID)];
   } catch (error) {
     errors.push({ sourceRowIndex: -1, code: 'CONTEXT_INVALID', message: message(error) });
   }
+  const projectElement = (code: string, type: ElementType, documents: readonly string[]): ElementFull | undefined => {
+    const byCode = elementSnapshot.filter(element => element.code === code);
+    let candidates: ElementFull[] = [];
+    for (const doc of documents) {
+      candidates = byCode.filter(element => (element.projectDocumentID ?? '') === doc);
+      if (candidates.length) break;
+    }
+    if (!candidates.length) candidates = byCode.filter(element => !element.projectDocumentID);
+    if (candidates.length > 1) throw new Error(`Ambiguous Element identity: ${code}`);
+    const found = candidates[0];
+    if (found && (found.type !== type || (type === 'part' && found.parentMaterialID))) {
+      throw new Error(`Conflicting project Element identity: ${code}`);
+    }
+    return found;
+  };
   try {
     const parsed = parseParent(input.parentInput);
-    const existing = deps.elements.findByCode(parsed.code, documentID);
+    const template = deps.catalog.resolveTemplate(parsed.prefix);
+    const type = resolveElementType(template);
+    if (!['product', 'assembly', 'part'].includes(type)) throw new Error('Invalid parent Catalog type');
+    rootType = type;
+    const existing = projectElement(parsed.code, type, [documentID]);
     if (existing) {
       if (!['product', 'assembly', 'part'].includes(existing.type)) throw new Error('Invalid parent Element type');
       parent = existingRef(existing);
       documentID = existing.projectDocumentID;
     } else {
-      const template = deps.catalog.resolveTemplate(parsed.prefix);
-      const type = resolveElementType(template);
       if (!['product', 'assembly', 'part'].includes(type)) throw new Error('Invalid parent Catalog type');
       requireText(template.category, 'Parent category');
       parent = planElement(['identity', input.projectDocumentID ?? '', type, parsed.code], {
@@ -116,71 +138,116 @@ export function prepareBOM(input: BOMPreparationInput, deps: BOMPreparationDepen
         requireText(unit, 'Component unit');
         if (concreteUnit !== undefined && concreteUnit !== unit) throw new Error(`Invalid unit: ${concreteUnit}; expected ${unit}`);
       };
-      const existing = deps.elements.findByCodeInDocuments(row.code, searchDocuments);
+      const template = deps.catalog.resolveTemplate(row.prefix);
+      if (!['product', 'assembly', 'part', 'material'].includes(template.type)) throw new Error('Invalid Catalog type');
       let ref: PreparedComponentRef;
       let unit: string;
       let materialEdge: { material: Material; qty: number } | undefined;
-      if (existing && existing.type !== 'material') {
-        if (!['product', 'assembly', 'part'].includes(existing.type)) throw new Error('Invalid Element type');
-        ref = existingRef(existing);
-        unit = existing.baseUnit;
-      } else {
-        const direct = deps.materials.findByCode(row.code);
-        if (direct) {
-          ref = materialRef(direct); unit = direct.baseUnit;
+      let identity: PreparedBOMComponent['identity'];
+      if (template.type !== 'material') {
+        const existing = projectElement(row.code, template.type, searchDocuments);
+        if (existing) {
+          ref = existingRef(existing);
+          unit = existing.baseUnit;
+          identity = { kind: 'project-element', code: existing.code, projectDocumentID: existing.projectDocumentID };
         } else {
+          if (rootType === 'product') throw new Error(`Project Element not found: ${row.code}`);
           const parsed = parseSpec(row.spec, row.prefix);
+          if (parsed.kind === 'assembly' || parsed.kind === 'unknown') throw new Error(`Project Element not found: ${row.code}`);
+          const built = buildByKind(parsed);
+          const type = resolveElementType(template, built.length);
+          // Preserve the existing restriction on creating project Parts as children without material.
+          if (type === 'part') throw new Error(`Material not found for element: ${built.code}`);
+          const reused = projectElement(built.code, type, [documentID ?? '']);
+          if (reused) ref = existingRef(reused);
+          else {
+            requireText(template.category, 'Component category');
+            for (const field of ['length', 'diameter', 'width', 'height', 'thickness'] as const) {
+              if (built[field] !== undefined) positive(built[field], field);
+            }
+            ref = planElement(['identity', documentID, type, built.code], {
+              Code: built.code, PrefixName: row.prefix, Name: built.name, Type: type,
+              ProjectDocumentID: documentID, Category: template.category, BaseUnit: 'шт',
+              ProfileType: template.profileType ?? '', Diameter: built.diameter, Class: built.className,
+              Width: built.width, Height: built.height, Length: built.length, Thickness: built.thickness, IsActive: true, Comment: '',
+            });
+          }
+          unit = reused?.baseUnit ?? 'шт';
+          identity = { kind: 'project-element', code: built.code, projectDocumentID: documentID };
+        }
+      } else {
+        const parsed = parseSpec(row.spec, row.prefix);
+        const direct = deps.materials.findByCode(row.code);
+        if (direct && (parsed.kind === 'assembly' || parsed.kind === 'unknown')) {
+          ref = materialRef(direct); unit = direct.baseUnit;
+          identity = { kind: 'direct-material', code: direct.code, materialID: direct.id };
+        } else {
           if (parsed.kind === 'assembly' || parsed.kind === 'unknown') throw new Error(`Element not found: ${row.code}`);
           const built = buildByKind(parsed);
           if (built.length === undefined && /(?:_L|L\s*=)/i.test(row.spec)) throw new Error('Invalid length');
           for (const field of ['length', 'diameter', 'width', 'height', 'thickness'] as const) {
             if (built[field] !== undefined) positive(built[field], field);
           }
-          requireText(built.code, 'Built component code');
-          requireText(built.name, 'Built component name');
-          const template = deps.catalog.resolveTemplate(row.prefix);
-          if (!['product', 'assembly', 'part', 'material'].includes(template.type)) throw new Error('Invalid Catalog type');
           const type = resolveElementType(template, built.length);
-          if (!['product', 'assembly', 'part', 'material'].includes(type)) throw new Error('Invalid Catalog type');
           if (type === 'material') {
-            const material = deps.materials.findByCode(built.code);
+            const material = direct ?? deps.materials.findByCode(built.code);
             if (!material) throw new Error(`Material not found in 05_Materials: ${built.code}`);
             ref = materialRef(material); unit = material.baseUnit;
+            identity = { kind: 'direct-material', code: material.code, materialID: material.id };
           } else {
-            const isMaterialPart = template.type === 'material' && type === 'part';
-            const material = isMaterialPart ? new MaterialResolver(deps.materials).resolve(built) : undefined;
-            // Current creation path requires a material for a new Part, including project Parts.
-            const reused = material
-              ? deps.elements.findPartByMaterial(material.id, built.code)
-              : deps.elements.findByIdentity(documentID, type, built.code);
-            if (reused) ref = existingRef(reused);
-            else {
-              if (type === 'part' && !material) throw new Error(`Material not found for element: ${built.code}`);
+            if (type !== 'part') throw new Error('Invalid material Part type');
+            const material = new MaterialResolver(deps.materials).resolve(built);
+            materialRef(material);
+            const materialMatches = deps.materials.getAll().filter(candidate => {
+              if (candidate.profileType !== material.profileType) return false;
+              const fields = material.profileType === 'round' ? ['diameter'] as const
+                : material.profileType === 'plate' ? ['width', 'thickness'] as const
+                : material.profileType === 'angle' ? ['width', 'height', 'thickness'] as const
+                : ['diameter', 'thickness'] as const;
+              return fields.every(field => candidate[field] === material[field]) &&
+                (material.profileType !== 'round' || (candidate.category === material.category &&
+                  normalizeClassName(candidate.class ?? '') === normalizeClassName(material.class ?? '')));
+            });
+            if (materialMatches.length !== 1) throw new Error(`Ambiguous canonical Material: ${built.code}`);
+            const candidates = elementSnapshot.filter(element => normalizeCode(element.code) === normalizeCode(built.code));
+            if (candidates.length > 1) throw new Error(`Ambiguous material Part identity: ${built.code}`);
+            const reused = candidates[0];
+            if (reused) {
+              const materialID = reused.parentMaterialID ? String(normalizeIntegerId(reused.parentMaterialID, 'ParentMaterialID')) : '';
+              if (reused.type !== 'part' || materialID !== String(normalizeIntegerId(material.id, 'MaterialID'))) {
+                throw new Error(`Conflicting material Part identity: ${built.code}`);
+              }
+              for (const field of ['length', 'diameter', 'width', 'height', 'thickness'] as const) {
+                if (built[field] !== undefined && Number(reused[field]) !== built[field]) throw new Error(`Conflicting Part geometry: ${field}`);
+              }
+              if (built.className && normalizeClassName(reused.className ?? '') !== normalizeClassName(built.className)) {
+                throw new Error('Conflicting Part class');
+              }
+              if (reused.profileType !== built.profileType) throw new Error('Conflicting Part profile');
+              ref = existingRef(reused);
+            } else {
               requireText(template.category, 'Component category');
-              ref = planElement(material ? ['material-part', material.id, built.code] : ['identity', documentID, type, built.code], {
-                Code: built.code, PrefixName: row.prefix, Name: built.name, Type: type,
-                ProjectDocumentID: material ? '' : documentID, ParentMaterialID: material?.id,
+              ref = planElement(['material-part', material.id, normalizeCode(built.code)], {
+                Code: built.code, PrefixName: row.prefix, Name: built.name, Type: 'part',
+                ProjectDocumentID: '', ParentMaterialID: material.id,
                 Category: template.category, ProfileType: template.profileType ?? '', BaseUnit: 'шт',
                 Diameter: built.diameter, Class: built.className, Width: built.width, Height: built.height,
                 Length: built.length, Thickness: built.thickness, IsActive: true, Comment: '',
               });
+              positive(material.weightPerMeter, 'weightPerMeter');
+              const qty = Math.round((built.length !== undefined ? built.length / 1000 * material.weightPerMeter : 1) * 100) / 100;
+              positive(qty, 'Part material quantity');
+              materialEdge = { material, qty };
             }
             unit = reused?.baseUnit ?? 'шт';
-            // Existing Part BOM belongs to that Part and must not be rewritten by parent preparation.
-            if (type === 'part' && !reused) {
-              const linkedMaterial = material;
-              if (!linkedMaterial) throw new Error(`Material not found for element: ${built.code}`);
-              materialRef(linkedMaterial);
-              positive(linkedMaterial.weightPerMeter, 'weightPerMeter');
-              const qty = Math.round((built.length !== undefined ? built.length / 1000 * linkedMaterial.weightPerMeter : 1) * 100) / 100;
-              positive(qty, 'Part material quantity');
-              materialEdge = { material: linkedMaterial, qty };
-            }
+            identity = { kind: 'material-part', code: built.code, materialID: material.id,
+              geometry: { length: built.length, diameter: built.diameter, width: built.width, height: built.height,
+                thickness: built.thickness, className: built.className, profileType: built.profileType } };
           }
         }
       }
       validateUnit(unit);
-      components.push({ sourceRowIndex, input: { ...row }, ref });
+      components.push({ sourceRowIndex, input: { ...row }, ref, identity });
       if (parent) edges.push({ parent, child: ref, qty: row.qty, unit });
       // Material consumption is per one new Part, independent of occurrences in the parent input.
       if (materialEdge && ref.kind === 'pending-element' && !plannedMaterialParents.has(ref.localKey)) {
@@ -202,6 +269,6 @@ export function prepareBOM(input: BOMPreparationInput, deps: BOMPreparationDepen
       if (!Number.isFinite(existing.qty)) return { ok: false, errors: [{ sourceRowIndex: -1, code: 'COMPONENT_INVALID', message: 'Aggregated quantity overflow' }] };
     } else aggregated.set(key, { ...edge });
   }
-  return { ok: true, prepared: { parent, components, pendingElements: [...pending.values()], plannedEdges: [...aggregated.values()],
+  return { ok: true, prepared: { rootType, writeScope: { root: parent, initializeMaterialBOMFor: [...plannedMaterialParents] }, parent, components, pendingElements: [...pending.values()], plannedEdges: [...aggregated.values()],
     sourceContext: { ...input, searchProjectDocumentIDs: searchDocuments } } };
 }
