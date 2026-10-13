@@ -5,7 +5,7 @@ import { BuiltElement } from '../elements/built-element.model';
 import { normalizeClassName } from '../../utils/normalize';
 
 export class MaterialResolver {
-  constructor(private materialRepo: MaterialRepository) {}
+  constructor(private materialRepo: Pick<MaterialRepository, 'findBySpec'>) {}
 
   resolve(built: BuiltElement): Material {
     switch (built.profileType) {
