@@ -7,6 +7,7 @@ import { SpreadsheetKey } from '../../infrastructure/spreadsheets/SpreadsheetKey
 import { forceText, insertRows } from '../../utils/sheets.utils';
 import { BOMRow } from './model/bom-row.model';
 import { validateBOMHeaders, validateBOMRow } from './commit/physical-bom-schema';
+import { assertLegacyBOMCompatibility } from './legacy-save-quarantine';
 
 export function getMasterBOMSheet(): GoogleAppsScript.Spreadsheet.Sheet {
   const master = new SpreadsheetProvider().open(SpreadsheetKey.MASTER);
@@ -16,6 +17,7 @@ export function getMasterBOMSheet(): GoogleAppsScript.Spreadsheet.Sheet {
 }
 
 export function insertBOMRows(rows: any[][]) {
+  assertLegacyBOMCompatibility();
   console.log('INPUT ROWS:', JSON.stringify(rows, null, 2));
   const sheet = getMasterBOMSheet();
 
@@ -100,6 +102,7 @@ export function insertBOMRows(rows: any[][]) {
 }
 
 export function deleteBOMByParentId(parentId: string) {
+  assertLegacyBOMCompatibility();
   const sheet = getMasterBOMSheet();
   const data = sheet.getDataRange().getValues();
 
@@ -120,6 +123,7 @@ export function deleteBOMByParentId(parentId: string) {
 }
 
 export function deleteBOMTree(parentId: string) {
+  assertLegacyBOMCompatibility();
   const sheet = getMasterBOMSheet();
 
   const data = sheet.getDataRange().getValues();
@@ -171,6 +175,7 @@ export function deleteBOMTree(parentId: string) {
 //                  та усунення дубльованих BOM-зв'язків
 
 export function replaceBOMForParent(parentId: string, rows: any[][]): void {
+  assertLegacyBOMCompatibility();
   const sheet = getMasterBOMSheet();
 
   const data = sheet.getDataRange().getValues();

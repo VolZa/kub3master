@@ -7,6 +7,8 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { SafeCommitService } from '../commit/safe-commit.service';
+import * as safeCommitExports from '../commit/safe-commit.service';
+import { submitBOM } from '../../../ui/bom-commit.api';
 import { openCommitOperationJournal, commitDigest } from '../commit/commit-operation-journal';
 import { ELEMENT_COLUMNS, MasterFreshElementStore } from '../commit/fresh-element-store';
 import { mapElementRowToDomain } from '../../elements/element.mapper';
@@ -73,7 +75,7 @@ beforeEach(() => {
   vi.stubGlobal('Utilities', { DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' }, computeDigest: (_a: string, text: string) => [...createHash('sha256').update(text).digest()] });
 
 });
-afterEach(() => { expect(forbidden).not.toHaveBeenCalled(); vi.unstubAllGlobals(); });
+afterEach(() => { expect(forbidden).not.toHaveBeenCalled(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 function context() {
   const material = { id: '3014', code: 'R_12_A500C', name: 'Rebar', category: 'rebar' as const, profileType: 'round' as const, diameter: 12, class: 'A500C', weightPerMeter: 1.15, baseUnit: 'кг', isActive: true };
   const materials = new MaterialRepository([]); materials.setData([material]);
@@ -243,4 +245,18 @@ it('retries original input when a large manifest lost acknowledgment before any 
   expect(service().commitBOM(large, 'Large').status).toBe('RECOVERY_REQUIRED'); expect(elements).toHaveLength(1);
   expect(service().resumeBOMCommit('Large').status).toBe('RECOVERY_REQUIRED');
   expect(service().commitBOM(large, 'Large').status).toBe('COMMITTED'); expect(elements).toHaveLength(3);
+});
+it('trusted UI route serializes submissions, preserves foreign duplicate slots and old Parts', () => {
+  vi.stubGlobal('Session', { getActiveUser: () => ({ getEmail: () => 'owner@example.com' }) });
+  vi.stubGlobal('DriveApp', { getFileById: (id: string) => { expect(id).toBe(SpreadsheetConfig.MASTER.id); return { getOwner: () => ({ getEmail: () => 'owner@example.com' }), getEditors: () => [] }; } });
+  const app = service(); vi.spyOn(safeCommitExports, 'commitBOM').mockImplementation((raw, id) => app.commitBOM(raw, id));
+  bom.push(clone(bom[1])); const before = clone(bom);
+  const raw = { projectDocumentID: input.projectDocumentID!, parentInput: input.parentInput, specification: input.specification };
+  expect(submitBOM({ ...raw, operationID: 'Ui1' }).status).toBe('COMMITTED');
+  const rows = clone(elements), ids = clone(counters), written = clone(bom);
+  expect(submitBOM({ ...raw, operationID: 'Ui2' }).status).toBe('ALREADY_APPLIED');
+  expect(submitBOM({ ...raw, operationID: 'Ui1' }).status).toBe('ALREADY_APPLIED');
+  expect(elements).toEqual(rows); expect(counters).toEqual(ids); expect(bom).toEqual(written); expect(bom.slice(0, before.length)).toEqual(before);
+  expect(submitBOM({ ...raw, specification: raw.specification + '\nАрматура; R_12_A500C_L400; 1', operationID: 'Ui1' }).status).toBe('CONFLICT');
+  expect(bom).toEqual(written);
 });

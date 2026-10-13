@@ -5,7 +5,9 @@
  * Responsibility: verify direct Material identity and PART creation without Google Sheets.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildBOMRow, buildBOMFromTable, aggregateBOMRows } from '../bom.service';
+import { withLegacyBOMCompatibilityForTests as compatibility } from '../legacy-save-quarantine';
+const buildBOMFromTable = (...args: Parameters<typeof legacyBuildBOMFromTable>) => compatibility(() => legacyBuildBOMFromTable(...args));
+import { buildBOMRow, buildBOMFromTable as legacyBuildBOMFromTable, aggregateBOMRows } from '../bom.service';
 import { getOrCreateElementFromBuilt } from '../../elements/element.factory';
 import { MockElementRepository } from '../../elements/mock/mock.element.repository';
 import { CatalogHelper } from '../../catalog/catalog.helper';

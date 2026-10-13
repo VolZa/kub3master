@@ -5,8 +5,8 @@
  * Responsibility: verify all BOM readers/writers and typed expansion use mocked MASTER.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAllBOMRows, getChildrenRows, getParentsRows, hasChildren, insertBOMRows,
-  replaceBOMForParent, deleteBOMByParentId, deleteBOMTree } from '../bom.repository';
+import { getAllBOMRows, getChildrenRows, getParentsRows, hasChildren, insertBOMRows as legacyInsertBOMRows,
+  replaceBOMForParent as legacyReplaceBOMForParent, deleteBOMByParentId as legacyDeleteBOMByParentId, deleteBOMTree as legacyDeleteBOMTree } from '../bom.repository';
 import { GoogleSheetsBOMRepository } from '../repositories/google-sheets-bom.repository';
 import { calcAssemblyWeight } from '../../elements/root-element.service';
 import { GoogleSheetsElementRepository } from '../../elements/element.repository';
@@ -16,6 +16,11 @@ import { MATERIAL_HEADERS } from '../../material/material.headers';
 vi.mock('../../../app/factories/catalog.factory', () => ({
   getCatalogRepository: () => ({ getAll: () => [{ typeCode: 'product', hasBOM: true }] }),
 }));
+import { withLegacyBOMCompatibilityForTests as compatibility } from '../legacy-save-quarantine';
+const insertBOMRows = (...args: Parameters<typeof legacyInsertBOMRows>) => compatibility(() => legacyInsertBOMRows(...args));
+const replaceBOMForParent = (...args: Parameters<typeof legacyReplaceBOMForParent>) => compatibility(() => legacyReplaceBOMForParent(...args));
+const deleteBOMByParentId = (...args: Parameters<typeof legacyDeleteBOMByParentId>) => compatibility(() => legacyDeleteBOMByParentId(...args));
+const deleteBOMTree = (...args: Parameters<typeof legacyDeleteBOMTree>) => compatibility(() => legacyDeleteBOMTree(...args));
 const headers = ['ParentID', 'ChildID', 'Qty', 'Unit', 'Comment', 'ParentCode', 'ChildCode'];
 const date = new Date('2026-03-01T00:00:00Z');
 const edge = (parent: string | number, child: string | number, qty = 1) => [parent, child, qty, 'шт', '', 'P', 'PART'];

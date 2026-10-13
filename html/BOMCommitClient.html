@@ -1,0 +1,105 @@
+<script>
+(() => {
+  const storageKey = 'erp-kub:bom:' + __BOM_CLIENT_SCOPE__ + ':v1';
+  const byId = id => document.getElementById(id);
+  const fields = ['projectDocumentID', 'parentInput', 'specification'];
+  let record = null, history = [], busy = false, attempt = 0;
+  const readInput = () => Object.fromEntries(fields.map(id => [id, byId(id).value]));
+  const validID = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,116}$/.test(id) && !id.endsWith('_BOM');
+  function display(message) { byId('bomStatus').textContent = message; }
+  function controls() {
+    byId('saveBOM').disabled = busy || record?.phase === 'conflict';
+    byId('resumeBOM').disabled = busy;
+    byId('newBOM').disabled = busy;
+  }
+  function remember(resetID = false) {
+    try { localStorage.setItem(storageKey, JSON.stringify({ current: record, history, draft: readInput() })); }
+    catch { byId('storageWarning').textContent = 'Збереження у браузері недоступне. Скопіюйте OperationID: після закриття форми його потрібно ввести вручну для відновлення.'; }
+    if (record) byId('operationID').value = record.operationID;
+    else if (resetID) byId('operationID').value = '';
+    byId('operationHistory').textContent = history.length ? 'Попередні OperationID: ' + history.join(', ') : '';
+    controls();
+  }
+  function finish(token, id, result, transportError) {
+    if (token !== attempt || record?.operationID !== id) return;
+    busy = false;
+    if (transportError) {
+      record.phase = 'pending';
+      display('Результат запису невідомий: ' + String(transportError.message || transportError) + '\nOperationID: ' + id + '\nПовтор або відновлення має використовувати цей самий ID.');
+    } else if (!result || result.operationID !== id || !['COMMITTED', 'ALREADY_APPLIED', 'VALIDATION_ERROR', 'RECOVERY_REQUIRED', 'CONFLICT'].includes(result.status)) {
+      record.phase = 'pending'; display('Непідтверджена відповідь. Збережіть ID і відновіть операцію: ' + id);
+    } else {
+      const messages = { COMMITTED: 'BOM успішно збережено.', ALREADY_APPLIED: 'Операція вже застосована та перевірена.', VALIDATION_ERROR: 'Валідація не пройшла. Збереження не підтверджене.', RECOVERY_REQUIRED: 'Потрібне відновлення цієї самої операції.', CONFLICT: 'Конфлікт. Автоматичний повтор заблокований; потрібна перевірка власником ERP.' };
+      record.phase = ['COMMITTED', 'ALREADY_APPLIED'].includes(result.status) ? 'completed' : result.status === 'CONFLICT' ? 'conflict' : result.status === 'VALIDATION_ERROR' ? 'validation' : 'pending';
+      const diagnostics = (result.diagnostics || []).map(item => (item.sourceRowIndex < 0 ? 'Контекст' : 'Рядок ' + (item.sourceRowIndex + 1)) + ': ' + item.message);
+      display(messages[result.status] + '\nOperationID: ' + id + (diagnostics.length ? '\n' + diagnostics.join('\n') : result.error ? '\n' + result.error : ''));
+    }
+    remember();
+  }
+  function invoke(method, payload) {
+    busy = true; const token = ++attempt, id = record.operationID;
+    remember(); display('Виконується операція ' + id + '.');
+    const timer = setTimeout(() => finish(token, id, null, { message: 'Час очікування відповіді минув; сервер міг виконати запис' }), 60000);
+    try {
+      const runner = google.script.run.withSuccessHandler(result => { clearTimeout(timer); finish(token, id, result); })
+        .withFailureHandler(error => { clearTimeout(timer); finish(token, id, null, error); });
+      runner[method](payload);
+    } catch (error) { clearTimeout(timer); finish(token, id, null, error); }
+  }
+  function save() {
+    if (busy || record?.phase === 'conflict') return;
+    const input = readInput();
+    if (fields.some(id => !input[id].trim())) { display('Вкажіть ProjectDocumentID, батьківський Element і специфікацію.'); return; }
+    const manualID = byId('operationID').value.trim();
+    if (!record && manualID) {
+      if (!validID(manualID)) { display('Некоректний OperationID.'); return; }
+      record = { operationID: manualID, input: null, phase: 'pending' };
+    }
+    if (record && !record.input) {
+      if (!confirm('Початковий input невідомий у браузері. Підтвердіть, що поля містять саме початкові дані операції ' + record.operationID + '. Сервер перевірить їхній digest; для іншої специфікації використовуйте «Нова операція».')) return;
+      record.input = input;
+    }
+    if (record && JSON.stringify(record.input) !== JSON.stringify(input)) { display('Дані змінено. Для нової специфікації натисніть «Нова операція»; стару відновлюйте за її ID.'); return; }
+    if (!record) {
+      if (!globalThis.crypto?.getRandomValues) { display('Генерація безпечного OperationID недоступна. Зверніться до адміністратора.'); return; }
+      const bytes = new Uint8Array(16); crypto.getRandomValues(bytes);
+      record = { operationID: 'BOM_' + Array.from(bytes, value => value.toString(16).padStart(2, '0')).join(''), input, phase: 'pending' };
+    }
+    invoke('submitBOM', { ...record.input, operationID: record.operationID });
+  }
+  function resume() {
+    if (busy) return;
+    const id = byId('operationID').value.trim();
+    if (!validID(id)) { display('Вкажіть коректний OperationID для відновлення.'); return; }
+    if (record?.phase === 'conflict' && id === record.operationID && !confirm('Конфлікт має бути перевірений власником ERP. Виконати явну перевірку відновлення цього ID?')) return;
+    if (!record || record.operationID !== id) {
+      if (record && !history.includes(record.operationID)) history.push(record.operationID);
+      record = { operationID: id, input: null, phase: 'pending' };
+    }
+    // The journal, not current form fields, supplies all input for resume.
+    invoke('resumeBOM', id);
+  }
+  function newOperation() {
+    if (busy) return;
+    if (record && !['completed', 'validation'].includes(record.phase) && !confirm('Це нова специфікація, а не повтор після timeout? Стару операцію збережено за ID ' + record.operationID + '; вона може потребувати відновлення.')) return;
+    if (record && !history.includes(record.operationID)) history.push(record.operationID);
+    record = null; attempt++; remember(true); display('Нова операція. ID буде створено перед збереженням.');
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
+    if (saved) {
+      history = Array.isArray(saved.history) ? saved.history.filter(validID) : [];
+      if (saved.current && validID(saved.current.operationID) && ['pending', 'completed', 'conflict', 'validation'].includes(saved.current.phase)) record = saved.current;
+      const draft = record?.input || saved.draft;
+      if (draft && fields.every(id => typeof draft[id] === 'string')) fields.forEach(id => { byId(id).value = draft[id]; });
+      else if (record?.input) record.input = null;
+    }
+  } catch { byId('storageWarning').textContent = 'Локальний стан недоступний. Для відновлення введіть збережений OperationID вручну.'; }
+  byId('saveBOM').addEventListener('click', save);
+  byId('resumeBOM').addEventListener('click', resume);
+  byId('newBOM').addEventListener('click', newOperation);
+  fields.forEach(id => byId(id).addEventListener('input', () => { if (!record) remember(); }));
+  remember();
+  if (record) display('Збережений OperationID: ' + record.operationID + '. Відновлення використовує input і ProjectDocumentID із серверного журналу, а не змінені поля форми.');
+})();
+</script>

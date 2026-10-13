@@ -1,72 +1,19 @@
 <!doctype html>
-<html>
-  <body>
-    <h3>Створити BOM</h3>
+<html><head><base target="_top" /><meta charset="utf-8" /><style>input,textarea{width:100%;box-sizing:border-box}button{margin:6px 0}</style></head><body>
+<h3>Створити BOM</h3>
+<label for="projectDocumentID">ProjectDocumentID:</label><input id="projectDocumentID" required />
+<label for="parentInput">Батьківський Element:</label><input id="parentInput" value="Каркас; КП-1" />
+<label for="specification">Специфікація:</label><textarea id="specification" rows="8">Арматура; ø12 А500С; L=1015; 1
+Арматура; ø4 Вр-І; L=340; 2</textarea>
 
-    <label>Parent Code:</label><br />
-    <input id="parentCode" value="КП-1" /><br /><br />
-
-    <label>Specification:</label><br />
-    <textarea id="spec" rows="6">
-Арматура ø12 А500С, L=1015 1
-Арматура ø4 Вр-І, L=340 2
-    </textarea
-    ><br /><br />
-
-    <button onclick="submitForm()">Створити BOM</button>
-
-    <script>
-      function submitForm() {
-        const data = {
-          parentCode: document.getElementById('parentCode').value,
-          specification: document.getElementById('spec').value,
-        };
-
-        console.log('SEND:', data); // 🔥 debug HTML
-
-        google.script.run
-          .withSuccessHandler((res) => {
-            console.log('SUCCESS:', res);
-          })
-          .withFailureHandler((err) => {
-            console.error('ERROR:', err);
-          })
-          .buildBOMFromText(data); // ✅
-      }
-    </script>
-  </body>
-</html>
-
-<!-- <!doctype html>
-<html>
-  <body>
-    <h3>Створити дя BOM</h3>
-    <label>Parent Code:</label><br />
-    <input type="text" id="parent" /><br /><br />
-    <label>Specification:</label><br />
-    <textarea
-      id="spec"
-      rows="10"
-      cols="40"
-      placeholder="12А3 1015 4Вр1 340 12А3 560"
-    ></textarea>
-    <br /><br />
-    <button onclick="buildBOM()">Створити BOM</button>
-    <p id="result"></p>
-    <script>
-      function buildBOM() {
-        const parent = document.getElementById('parent').value;
-        const spec = document.getElementById('spec').value;
-        google.script.run
-          .withSuccessHandler(function (res) {
-            document.getElementById('result').innerText = res;
-            google.script.host.close(); // закрити форму
-          })
-          .withFailureHandler(function (err) {
-            document.getElementById('result').innerText = err.message;
-          })
-          .buildBOMFromText(parent, spec);
-      }
-    </script>
-  </body>
-</html> -->
+    <p>Батьківський Element: тип; код; опис (за потреби). Рядки: тип; код/специфікація; кількість.</p>
+    <button id="saveBOM" type="button">Зберегти</button>
+    <button id="newBOM" type="button">Нова операція</button>
+    <label for="operationID">OperationID (збережіть для повтору та відновлення):</label>
+    <input id="operationID" autocomplete="off" />
+    <button id="resumeBOM" type="button">Відновити за ID</button>
+    <p id="storageWarning" role="status"></p>
+    <p id="operationHistory"></p>
+    <pre id="bomStatus" role="status" aria-live="polite" style="white-space:pre-wrap"></pre>
+    <?!= includeBOMCommitClient_(); ?>
+</body></html>

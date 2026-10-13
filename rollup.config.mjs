@@ -1,12 +1,37 @@
 import typescript from '@rollup/plugin-typescript';
 import alias from '@rollup/plugin-alias';
 import path from 'path';
+import ts from 'typescript';
+import fs from 'node:fs';
+
+function gasEntrypoints() {
+  return { name: 'explicit-gas-entrypoints', generateBundle(_options, bundle) {
+    const source = ts.createSourceFile('index.ts', fs.readFileSync('src/index.ts', 'utf8'), ts.ScriptTarget.Latest, true);
+    const names = [];
+    function visit(node) {
+      if (ts.isCallExpression(node) && node.expression.getText(source) === 'register') {
+        const object = node.arguments[0];
+        if (!ts.isObjectLiteralExpression(object)) throw new Error('Explicit register object required');
+        for (const property of object.properties) {
+          if (!ts.isShorthandPropertyAssignment(property)) throw new Error('Explicit shorthand entrypoint required');
+          names.push(property.name.text);
+        }
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(source);
+    if (!names.length || new Set(names).size !== names.length) throw new Error('Invalid GAS entrypoint list');
+    const chunk = bundle['Code.gs'];
+    chunk.code += '\n' + names.map(name => `function ${name}() { return __kubGasHandlers_.${name}.apply(null, arguments); }`).join('\n') + '\n';
+  } };
+}
 
 export default {
   input: 'src/index.ts',
   output: {
     file: 'dist/Code.gs',
-    format: 'es', // 🔥 назад
+    format: 'iife', // 🔥 назад
+    banner: 'var __kubGasHandlers_ = {};',
     sourcemap: true, // 🔥 додали
   },
   plugins: [
@@ -28,6 +53,7 @@ export default {
       ],
     }),
     typescript(),
+    gasEntrypoints(),
   ],
   treeshake: false,
 };
@@ -46,4 +72,4 @@ export default {
 //   treeshake: false,
 // };
 
-// раніше було format: 'es', і код компілювався
+// раніше було format: 'iife', і код компілювався

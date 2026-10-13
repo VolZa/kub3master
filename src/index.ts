@@ -1,13 +1,10 @@
 // src\index.ts
 import { onOpen } from './main';
-import { openFormTable } from './ui/openForm';
-import { doGet } from './ui/webApp';
-import { buildBOMFromText, buildBOMFromTable } from './modules/bom/bom.service';
+import { openFormTable, openForm, includeBOMCommitClient_ } from './ui/openForm';
+import { doGet, createManufacturingFromWeb, getManufacturingHouseOptions, getManufacturingProductOptions, getManufacturingPlacementOptions } from './ui/webApp';
+import { rebuildManufacturingState, createManufacturingFromBuffer } from './app/entrypoints/manufacturing.entrypoints';
+import { submitBOM, resumeBOM, runTableParser, buildBOMFromText } from './ui/bom-commit.api';
 import { register } from './core/register';
-import { parseTableText } from './utils/parseTableText';
-import { parseParent } from './modules/bom/parsers/parseParent';
-import { validateParentCode } from './modules/bom/bom.service';
-import { CatalogHelper } from './modules/catalog/catalog.helper';
 import {
   handleProductionEdit_,
   handleKrabsEdit_,
@@ -86,54 +83,6 @@ function testGenerateProjectMaterialMatrixReport(): void {
   generateProjectMaterialMatrixReport('1');
 }
 
-function runTableParser(
-  projectDocumentID: string,
-  parentCode: string,
-  text: string,
-) {
-  const elementRepo = getElementRepository();
-  const catalogRepo = getCatalogRepository();
-  const materialRepo = getMaterialRepository();
-  const materialBatchRepo = getMaterialBatchRepository();
-  const bomRepo = getBOMRepository();
-
-  // 🔹 Parent
-  const parsedParent = {
-    ...parseParent(parentCode),
-    projectDocumentID,
-  };
-  validateParentCode(parsedParent.code);
-
-  // 🔹 Table rows
-  const rows = parseTableText(text);
-
-  // 🔥 ГОЛОВНИЙ ВИКЛИК
-  const catalogHelper = new CatalogHelper(catalogRepo);
-  const result = buildBOMFromTable(
-    parsedParent,
-    rows,
-    elementRepo,
-    catalogHelper,
-    materialRepo,
-    materialBatchRepo,
-    bomRepo,
-  );
-
-  const lines = [`Вставлено рядків BOM: ${result.added}`];
-
-  if (result.errorCount > 0) {
-    lines.push(`❌ Помилок: ${result.errorCount}`);
-  }
-
-  if (result.operatorMessage) {
-    lines.push('');
-    lines.push(result.operatorMessage.title);
-    lines.push(result.operatorMessage.text);
-  }
-
-  return lines.join('\n');
-}
-
 function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit) {
   if (!e.range || !e.value) return;
 
@@ -156,8 +105,19 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit) {
 // 🔥 РЕЄСТРАЦІЯ ВСЬОГО
 register({
   onOpen,
+  onEdit,
   openFormTable,
+  openForm,
+  includeBOMCommitClient_,
+  submitBOM,
+  resumeBOM,
   doGet,
+  createManufacturingFromWeb,
+  getManufacturingHouseOptions,
+  getManufacturingProductOptions,
+  getManufacturingPlacementOptions,
+  rebuildManufacturingState,
+  createManufacturingFromBuffer,
   buildBOMFromText,
   testBOMExplorer,
   testBOMTree,

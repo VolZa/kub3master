@@ -2,7 +2,8 @@
 <html>
   <head>
     <base target="_top" />
-    <title>BOM Table Parser</title>
+    <meta charset="utf-8" />
+    <title>ERP КУБ — Специфікація</title>
     <!-- 🔥 ОБОВ'ЯЗКОВО -->
     <style>
       textarea {
@@ -15,15 +16,15 @@
     </style>
   </head>
   <body>
-    <h3>Створити BOM (Table Parser V1)</h3>
+    <h3>Зберегти специфікацію BOM</h3>
     <label>Project Document ID:</label>
-    <input id="projectDocumentId" value="7" />
+    <input id="projectDocumentID" required />
 
     <label>Parent Code:</label>
-    <input id="parentCode" value="Плита міжколонна; П-2.7" />
+    <input id="parentInput" value="Плита міжколонна; П-2.7" />
 
     <label>Table Input:</label>
-    <textarea id="tableInput">
+    <textarea id="specification">
 Каркас просторовий; КП-1; 7
 Сітка; ВСП-П-2.7; (верхня); 1
 Сітка; СП-П-2.7; (нижня);  1
@@ -37,21 +38,16 @@
 
     </textarea>
 
-    <button onclick="submit()">Створити BOM</button>
 
-    <script>
-      function submit() {
-        const projectDocumentId =
-          document.getElementById('projectDocumentId').value;
-
-        const parentCode = document.getElementById('parentCode').value;
-
-        const text = document.getElementById('tableInput').value;
-
-        google.script.run
-          .withSuccessHandler((res) => alert('OK: ' + res))
-          .runTableParser(projectDocumentId, parentCode, text);
-      }
-    </script>
+    <p>Батьківський Element: тип; код; опис (за потреби). Рядки: тип; код/специфікація; кількість.</p>
+    <button id="saveBOM" type="button">Зберегти</button>
+    <button id="newBOM" type="button">Нова операція</button>
+    <label for="operationID">OperationID (збережіть для повтору та відновлення):</label>
+    <input id="operationID" autocomplete="off" />
+    <button id="resumeBOM" type="button">Відновити за ID</button>
+    <p id="storageWarning" role="status"></p>
+    <p id="operationHistory"></p>
+    <pre id="bomStatus" role="status" aria-live="polite" style="white-space:pre-wrap"></pre>
+    <?!= includeBOMCommitClient_(); ?>
   </body>
 </html>

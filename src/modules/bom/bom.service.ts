@@ -1,5 +1,7 @@
 //🏗️
 import { parseSpec } from './parsers/parseSpec';
+import { assertLegacyBOMCompatibility } from './legacy-save-quarantine';
+import { buildBOMFromText as safeBuildBOMFromText } from '../../ui/bom-commit.api';
 import { parseTableText } from '../../utils/parseTableText';
 import {
   deleteBOMTree,
@@ -227,6 +229,7 @@ export function buildBOMFromTable(
   materialBatchRepo: MaterialBatchRepository,
   bomRepo: BOMRepository,
 ): BuildBOMResult {
+  assertLegacyBOMCompatibility();
   console.log('👉 START buildBOMFromTable');
   console.log('INPUT PARENT:', parent);
 
@@ -344,34 +347,8 @@ import {
   getMaterialRepository,
 } from '../../app/factories';
 
-export function buildBOMFromText(data: Input) {
-  console.log('🔥 START buildBOMFromText');
-
-  const elementRepo = getElementRepository();
-  const catalogRepo = getCatalogRepository();
-  const catalogHelper = new CatalogHelper(catalogRepo);
-  const materialRepo = getMaterialRepository();
-  const materialBatchRepo = getMaterialBatchRepository();
-  const bomRepo = getBOMRepository();
-
-  // 🔹 Parent
-  const parsedParent = parseParent(data.parentCode);
-  validateParentCode(parsedParent.code);
-
-  // 🔹 Table
-  const tableRows = parseTableText(data.specification);
-
-  console.log('TABLE ROWS:', JSON.stringify(tableRows, null, 2));
-
-  return buildBOMFromTable(
-    parsedParent,
-    tableRows,
-    elementRepo,
-    catalogHelper,
-    materialRepo,
-    materialBatchRepo,
-    bomRepo,
-  );
+export function buildBOMFromText(data: Input & { projectDocumentID?: string; operationID?: string }) {
+  return safeBuildBOMFromText(data);
 }
 
 export function aggregateBOMRows(rows: any[][]): any[][] {
