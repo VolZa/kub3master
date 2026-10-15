@@ -99,6 +99,57 @@ it.each(['Плита', 'Каркас', 'Стержень'])('commits and repeats
   expect(service().commitBOM(request, 'O').status).toBe('ALREADY_APPLIED'); expect(inserts).toHaveBeenCalledTimes(inserted); expect(counters).toEqual(counter); expect(bom).toEqual(physical);
   expect(bom.slice(0, before.length)).toEqual(before);
 });
+it.each(['LastID', 'Last_ID'])('accepts exact counter header %s and reserves the same IDs', header => {
+  counters[0][1] = header;
+  const result = service().commitBOM(input, 'O');
+  expect(result.status, result.error).toBe('COMMITTED');
+  expect(counters).toEqual([['Type', header], ['part', 2000010], ['product', 4000014], ['assembly', 3000000]]);
+});
+it.each([
+  ['LastID', 'Type'], ['Last_ID', 'Type'], ['Type', 'Unknown'],
+  ['Type', 'Last_ID', 'Extra'], ['Type', 'LastID', 'Extra'],
+  ['type', 'Last_ID'], ['Type', 'Last_ID '], ['Type'],
+])('rejects counter headers %j before all side effects', (...headers) => {
+  counters[0] = headers;
+  const before = clone({ journal, counters, elements, bom });
+  expect(service().commitBOM(input, 'O')).toMatchObject({ status: 'VALIDATION_ERROR', error: 'Error: Invalid counter schema' });
+  expect({ journal, counters, elements, bom }).toEqual(before);
+});
+it('runs counter schema preflight with Last_ID when no new IDs are needed', () => {
+  expect(service().commitBOM(input, 'O').status).toBe('COMMITTED');
+  counters[0][1] = 'Last_ID';
+  const before = clone({ counters, elements, bom }), inserted = inserts.mock.calls.length;
+  expect(service().commitBOM(input, 'Existing').status).toBe('ALREADY_APPLIED');
+  expect({ counters, elements, bom }).toEqual(before);
+  expect(inserts).toHaveBeenCalledTimes(inserted);
+  counters[0][1] = 'Unknown';
+  const invalid = clone({ journal, counters, elements, bom });
+  expect(service().commitBOM(input, 'InvalidExisting')).toMatchObject({ status: 'VALIDATION_ERROR', error: 'Error: Invalid counter schema' });
+  expect({ journal, counters, elements, bom }).toEqual(invalid);
+});
+it.each(['LastID', 'Last_ID'])('preserves invalid counter protection with %s', header => {
+  counters[0][1] = header;
+  for (const value of ['', -1, 1.5, 'invalid', 4999999]) {
+    counters[2][1] = value;
+    const before = clone({ journal, counters, elements, bom });
+    expect(service().commitBOM(input, 'O').status).toBe('VALIDATION_ERROR');
+    expect({ journal, counters, elements, bom }).toEqual(before);
+  }
+  counters.push(['product', 4000013]);
+  const before = clone({ journal, counters, elements, bom });
+  expect(service().commitBOM(input, 'O')).toMatchObject({ status: 'VALIDATION_ERROR', error: 'Error: Ambiguous counter type' });
+  expect({ journal, counters, elements, bom }).toEqual(before);
+});
+it.each(['LastID', 'Last_ID'])('skips occupied IDs with %s without overwriting existing Elements', header => {
+  counters[0][1] = header;
+  elements.push(ELEMENT_COLUMNS.map(column => ({ ID: '4000014', Code: 'Other', Type: 'product', ProjectDocumentID: '9', IsActive: true } as Record<string, unknown>)[column] ?? ''));
+  const occupied = clone(elements[1]);
+  const result = service().commitBOM(input, 'O');
+  expect(result.status, result.error).toBe('COMMITTED');
+  expect(counters[2][1]).toBe(4000015);
+  expect(elements[1]).toEqual(occupied);
+  expect(new Set(elements.slice(1).map(row => row[0])).size).toBe(elements.length - 1);
+});
 it('rejects any input diagnostic without journal, IDs, Elements or BOM mutations', () => {
   const before = clone({ journal, counters, elements, bom });
   expect(service().commitBOM({ ...input, specification: 'Арматура; UNKNOWN; 4' }, 'O').status).toBe('VALIDATION_ERROR');

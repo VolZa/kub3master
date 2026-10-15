@@ -32,7 +32,7 @@ function counterPreflight(types: ElementType[]) {
   const sheet = master.getSheetByName('_Config_ID_Counters');
   if (!sheet) throw new Error('Missing _Config_ID_Counters');
   const [headers, ...rows] = sheet.getDataRange().getValues();
-  if (headers?.[0] !== 'Type' || headers?.[1] !== 'LastID' || headers.length !== 2) throw new Error('Invalid counter schema');
+  if (headers?.[0] !== 'Type' || (headers?.[1] !== 'LastID' && headers?.[1] !== 'Last_ID') || headers.length !== 2) throw new Error('Invalid counter schema');
   const occupied = new Set<number>();
   for (const [name, key] of [['00_Elements', 'ID'], ['05_Materials', 'MaterialID']]) {
     const source = master.getSheetByName(name); if (!source) throw new Error(`Missing ${name}`);
