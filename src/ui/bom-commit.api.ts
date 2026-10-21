@@ -2,16 +2,12 @@
  * Path: C:/www/26/03/kub3master-ts/src/ui/bom-commit.api.ts
  * Module: BOM UI
  * Layer: Application boundary
- * Responsibility: authorize MASTER editors and accept only raw specification context for Safe Commit.
+ * Responsibility: require BOM_EDIT and accept only raw specification context for Safe Commit.
  */
 import { commitBOM, resumeBOMCommit, type BOMCommitResult } from '../modules/bom/commit/safe-commit.service';
-import { SpreadsheetConfig } from '../infrastructure/spreadsheets/SpreadsheetConfig';
+import { requirePermission } from '../security/production-authorization';
 function authorize(): void {
-  const email = Session.getActiveUser().getEmail().trim().toLowerCase();
-  if (!email) throw new Error('BOM_ACCESS_DENIED: не вдалося підтвердити користувача');
-  const file = DriveApp.getFileById(SpreadsheetConfig.MASTER.id);
-  const users = [file.getOwner(), ...file.getEditors()].filter(Boolean);
-  if (!users.some(user => user!.getEmail().toLowerCase() === email)) throw new Error('BOM_ACCESS_DENIED: потрібні права редактора MASTER');
+  requirePermission('BOM_EDIT');
 }
 function object(value: unknown, allowed: string[]): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !allowed.includes(key))) throw new Error('Непідтримані поля запиту BOM');

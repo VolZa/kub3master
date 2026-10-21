@@ -16,7 +16,7 @@ export function testP1Materials() {
   const materialDS = new GoogleSheetsMaterialDataSource(sheetProvider);
   const materialRepo = new MaterialRepository(materialDS.getRows());
 
-  const explorer = new BOMExplorerService(elementRepo, bomRepo);
+  const explorer = new BOMExplorerService(elementRepo, bomRepo, materialRepo);
 
   const materials = new BOMMaterialsService(explorer, materialRepo);
 

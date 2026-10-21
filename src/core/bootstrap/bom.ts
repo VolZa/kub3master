@@ -9,6 +9,7 @@ export function createBOMServices(repositories: Repositories) {
   const explorer = new BOMExplorerService(
     repositories.elements,
     repositories.bom,
+    repositories.materials,
   );
 
   const materials = new BOMMaterialsService(explorer, repositories.materials);

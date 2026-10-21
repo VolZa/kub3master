@@ -25,10 +25,19 @@ export class BOMMaterialsService {
     node: BOMTreeNode,
     result: Map<string, MaterialRequirement>,
   ): void {
+    if (node.element.type === 'material') {
+      const material = this.materialRepo.findById(node.element.id);
+      if (!material) throw new Error(`Canonical Material not found: ${node.element.id}`);
+      this.addRequirement(result, material.id, node.totalQty, node.unit);
+      return;
+    }
     if (node.element.type === 'part') {
       const materialId = node.element.parentMaterialID;
 
-      if (materialId) {
+      // The explicit edge already supplies consumption for this Part's Material.
+      const explicitMaterial = node.children.some(child =>
+        child.element.type === 'material' && child.element.id === materialId);
+      if (materialId && !explicitMaterial) {
         const material = this.materialRepo.findById(materialId);
 
         if (material) {
@@ -39,17 +48,7 @@ export class BOMMaterialsService {
             (node.totalQty * (length / 1000) * weightPerMeter).toFixed(3),
           );
 
-          const existing = result.get(material.id);
-
-          if (existing) {
-            existing.qty += qtyKg;
-          } else {
-            result.set(material.id, {
-              materialId: material.id,
-              qty: qtyKg,
-              unit: material.baseUnit,
-            });
-          }
+          this.addRequirement(result, material.id, qtyKg, material.baseUnit);
         }
       }
     }
@@ -60,5 +59,13 @@ export class BOMMaterialsService {
     node.children.forEach((child) => {
       this.collectMaterials(child, result);
     });
+  }
+
+  private addRequirement(result: Map<string, MaterialRequirement>, materialId: string, qty: number, unit: string): void {
+    const existing = result.get(materialId);
+    if (existing) {
+      if (existing.unit !== unit) throw new Error(`Conflicting units for Material: ${materialId}`);
+      existing.qty += qty;
+    } else result.set(materialId, { materialId, qty, unit });
   }
 }

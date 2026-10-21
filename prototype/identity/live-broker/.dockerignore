@@ -1,0 +1,7 @@
+node_modules
+test
+.env*
+*.log
+credentials*
+client_secret*
+README.md

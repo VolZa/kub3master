@@ -1,187 +1,25 @@
-// src\index.ts
+// Production composition only. Every registered RPC handler is permission guarded.
+// Tests, migrations and manual admin probes stay in source, outside this composition.
 import { onOpen } from './main';
 import { openFormTable, openForm, includeBOMCommitClient_ } from './ui/openForm';
-import { doGet, createManufacturingFromWeb, getManufacturingHouseOptions, getManufacturingProductOptions, getManufacturingPlacementOptions } from './ui/webApp';
-import { rebuildManufacturingState, createManufacturingFromBuffer } from './app/entrypoints/manufacturing.entrypoints';
+import { doGet, createManufacturingFromWeb, getManufacturingHouseOptions, getManufacturingProductOptions, getManufacturingPlacementOptions, generateMaterialConsumptionReportWeb } from './ui/webApp';
+import { getCurrentMaterialReportWeb, saveMaterialConsumptionReportWeb } from './ui/saved-report-web';
+import { listSavedMaterialReportsWeb, renameSavedMaterialReportWeb, deleteSavedMaterialReportWeb } from './ui/archive-management-web';
 import { submitBOM, resumeBOM, runTableParser, buildBOMFromText } from './ui/bom-commit.api';
+import { handleProductionEdit_, handleKrabsEdit_ } from './modules/productionJournal/productionJournal.service';
 import { register } from './core/register';
-import {
-  handleProductionEdit_,
-  handleKrabsEdit_,
-} from 'modules/productionJournal/productionJournal.service';
-import { testBOMExplorer } from './modules/bom/tests/test.bom-explorer';
-import { testBOMTree } from './modules/bom/tests/testBOMTree';
-import { testMaterials } from './modules/bom/tests/test-materials';
-import { testProductionRequirement } from './modules/bom/tests/test-production';
-import { testProductReport } from './modules/reports/tests/testProductReport';
-import { getElementRepository } from './app/factories/element.factory';
-import { getCatalogRepository } from './app/factories/catalog.factory';
-import { getMaterialRepository } from './app/factories/material.factory';
-import { getMaterialBatchRepository } from './app/factories/materialBatch.factory';
-
-import { debugProjectContext } from './debug/debug-project-context';
-import { testP1BOM } from './modules/bom/tests/testP1BOM';
-import { testP1Materials } from 'modules/bom/tests/testP1Materials';
-
-import { generateProjectMaterialMatrixReport } from './modules/project/generateProjectMaterialMatrixReport';
-import { diagnoseProductP1 } from './modules/bom/tests/diagnose-product-bom';
-
-import { testManufacturingResolver } from './modules/manufacturing/tests/testManufacturingResolver';
-import { testManufacturingProcessor } from 'modules/manufacturing/tests/testManufacturingProcessor';
-
-import { manufacturingInitialMigration } from 'modules/manufacturing/migration/manufacturingInitialMigration';
-import { testManufacturingDomainMapper } from 'modules/manufacturing/tests/testManufacturingDomainMapper';
-import { testManufacturingSyncStateRepository } from 'modules/manufacturing/tests/testManufacturingSyncStateRepository';
-import { testManufacturingSynchronizationAnalyze } from 'modules/manufacturingSync/tests/manufacturing-synchronization.test';
-import { testManufacturingSynchronizationExecute } from 'modules/manufacturingSync/tests/manufacturing-synchronization-execute.test';
-import { testManufacturingSynchronizationApplication } from 'modules/manufacturingSync/tests/manufacturing-synchronization-application.test';
-import { testManufacturingSynchronizationCancel } from 'modules/manufacturingSync/tests/manufacturing-synchronization-cancel.test';
-import { testManufacturingSynchronizationMove } from 'modules/manufacturingSync/tests/manufacturing-synchronization-move.test';
-import { testManufacturingSynchronizationDetach } from 'modules/manufacturingSync/tests/manufacturing-synchronization-detach.test';
-import { testManufacturingSynchronizationDetachAnalyze } from 'modules/manufacturingSync/tests/manufacturing-synchronization-detach-analyze.test';
-import { testManufacturingSynchronizationDetachIntegration } from 'modules/manufacturingSync/tests/manufacturing-synchronization-detach-integration.test';
-import { testManufacturingSynchronizationBatchAnalyze } from 'modules/manufacturingSync/tests/manufacturing-synchronization-batch-analyze.test';
-import { testManufacturingSynchronizationBatchExecute } from 'modules/manufacturingSync/tests/manufacturing-synchronization-batch-execute.test';
-import { testManufacturingSynchronizationBatchRepeat } from 'modules/manufacturingSync/tests/manufacturing-synchronization-batch-repeat.test';
-import { testManufacturingRepositorySave } from 'modules/manufacturing/tests/manufacturing-repository-save.test';
-import { testManufacturingInputValidator } from 'modules/manufacturingSync/tests/manufacturing-input-validator.test';
-import { testManufacturingIdGenerator } from 'modules/manufacturing/tests/manufacturing-id-generator.test';
-
-import { testManufacturingCreationService } from 'modules/manufacturing/tests/manufacturing-creation-service.test';
-import { testManufacturingCreationApplicationService } from 'modules/manufacturing/tests/manufacturing-creation-application-service.test';
-import { testManufacturingInputBufferDebug } from 'modules/manufacturing/tests/manufacturing-input-buffer-debug.test';
-import { testManufacturingInputBufferMapper } from 'modules/manufacturing/tests/manufacturing-input-buffer-mapper.test';
-import { testGoogleSheetsManufacturingBufferReader } from 'modules/manufacturing/tests/google-sheets-manufacturing-buffer-reader.test';
-import { testManufacturingBufferCreationApplicationService } from 'modules/manufacturing/tests/manufacturing-buffer-creation-application-service.test';
-import { testCreateManufacturingFromBuffer } from 'modules/manufacturing/tests/create-manufacturing-from-buffer.test';
-import { testManufacturingWebInputMapper } from 'modules/manufacturing/tests/manufacturing-web-input-mapper.test';
-import { testManufacturingHouseOptionsService } from 'modules/manufacturing/tests/manufacturing-house-options.service.test';
-import { testManufacturingProductOptionsService } from 'modules/manufacturing/tests/manufacturing-product-options.service.test';
-import { testManufacturingPlacementOptionsService } from 'modules/manufacturing/tests/manufacturing-placement-options.service.test';
-import { testManufacturingWebOptionsApi } from 'modules/manufacturingSync/tests/manufacturing-web-options-api.test';
-import { testManufacturingPlacementRebuildExecute } from 'modules/manufacturing/tests/manufacturing-placement-rebuild.test';
-import { bomMaterialRequirementsIntegrationTest } from 'modules/bom/tests/bom-material-requirements.integration.test';
-import { testBOMCompletenessChecker } from 'modules/bom/tests/bom-completeness-checker.test';
-import { getBOMRepository } from './app/factories/bom.factory';
-import { testAuditAllProducts } from './modules/bom/tests/bom-products-audit.test';
-import { testExpandProductP31 } from './modules/bom/tests/bom-expansion.test';
-import {
-  testProductSpecificationReport,
-  testProductSpecificationReportP31,
-} from './modules/reports/product-specification/product-specification-report.service.test';
-import { testRoundQuantity } from './utils/quantity/quantity-rounding.test';
-import { testBOMVerticalReportP31 } from './modules/reports/bom-vertical/bom-vertical-report.service.test';
-import { testMaterialConsumptionReportP31 } from './modules/reports/material-consumption/material-consumption-report.service.test';
-import { testMaterialBatchOptions } from './modules/material-batch/material-batch.repository.test';
-import { testReportFilter } from './modules/reports/report-filter.test';
-import { testReportFilterService } from './modules/reports/tests/report-filter.service.test';
-
-function testDiagnoseProductP1(): void {
-  diagnoseProductP1();
-}
-function testGenerateProjectMaterialMatrixReport(): void {
-  generateProjectMaterialMatrixReport('1');
-}
-
+import { requireWrapperPermission } from './security/production-authorization';
 function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit) {
+  requireWrapperPermission('onEdit');
   if (!e.range || !e.value) return;
-
   const sheet = e.range.getSheet();
-
-  if (
-    sheet.getName() === '01_Виготовлення' &&
-    e.range.getA1Notation() === 'A2'
-  ) {
-    handleProductionEdit_();
-    return;
-  }
-
-  if (sheet.getName() === '03_Краби' && e.range.getA1Notation() === 'A2') {
-    handleKrabsEdit_();
-    return;
-  }
+  if (sheet.getName() === '01_Виготовлення' && e.range.getA1Notation() === 'A2') { handleProductionEdit_(); return; }
+  if (sheet.getName() === '03_Краби' && e.range.getA1Notation() === 'A2') handleKrabsEdit_();
 }
-
-// 🔥 РЕЄСТРАЦІЯ ВСЬОГО
 register({
-  onOpen,
-  onEdit,
-  openFormTable,
-  openForm,
-  includeBOMCommitClient_,
-  submitBOM,
-  resumeBOM,
-  doGet,
-  createManufacturingFromWeb,
-  getManufacturingHouseOptions,
-  getManufacturingProductOptions,
-  getManufacturingPlacementOptions,
-  rebuildManufacturingState,
-  createManufacturingFromBuffer,
-  buildBOMFromText,
-  testBOMExplorer,
-  testBOMTree,
-  testMaterials,
-  runTableParser,
-  testProductionRequirement,
-  testProductReport,
-  debugProjectContext,
-  testP1BOM,
-  testP1Materials,
-
-  testDiagnoseProductP1,
-  testGenerateProjectMaterialMatrixReport,
-  testManufacturingResolver,
-  testManufacturingProcessor,
-  manufacturingInitialMigration,
-  testManufacturingDomainMapper,
-  // testManufacturingDataSource,
-  // testManufacturingMapper,
-  testManufacturingSyncStateRepository,
-  testManufacturingSynchronizationAnalyze,
-  testManufacturingSynchronizationExecute,
-  testManufacturingSynchronizationApplication,
-  testManufacturingSynchronizationCancel,
-  testManufacturingSynchronizationMove,
-  testManufacturingSynchronizationDetach,
-  testManufacturingSynchronizationDetachAnalyze,
-  testManufacturingSynchronizationDetachIntegration,
-  testManufacturingSynchronizationBatchAnalyze,
-  testManufacturingSynchronizationBatchExecute,
-  testManufacturingSynchronizationBatchRepeat,
-  testManufacturingRepositorySave,
-  testManufacturingInputValidator,
-  testManufacturingIdGenerator,
-
-  // Одноразовий інтеграційний тест — вже виконаний.
-  // testManufacturingCreationStructure,
-
-  // Тимчасова діагностика формули — більше не потрібна.
-  // testManufacturingCreationFormulaDebug,
-  testManufacturingCreationService,
-  // testManufacturingCreationApplicationService,
-  testManufacturingInputBufferDebug,
-  testManufacturingInputBufferMapper,
-
-  testGoogleSheetsManufacturingBufferReader,
-  testManufacturingBufferCreationApplicationService,
-  testCreateManufacturingFromBuffer,
-  testManufacturingWebInputMapper,
-  testManufacturingHouseOptionsService,
-  testManufacturingProductOptionsService,
-  testManufacturingPlacementOptionsService,
-  testManufacturingWebOptionsApi,
-  testManufacturingPlacementRebuildExecute,
-  bomMaterialRequirementsIntegrationTest,
-  testBOMCompletenessChecker,
-  testAuditAllProducts,
-  testExpandProductP31,
-  testProductSpecificationReport,
-  testProductSpecificationReportP31,
-  testRoundQuantity,
-  testBOMVerticalReportP31,
-  testMaterialConsumptionReportP31,
-  testMaterialBatchOptions,
-  testReportFilter,
-  testReportFilterService,
+  onOpen, onEdit, openForm, openFormTable, includeBOMCommitClient_, doGet,
+  submitBOM, resumeBOM, runTableParser, buildBOMFromText,
+  createManufacturingFromWeb, getManufacturingHouseOptions, getManufacturingProductOptions, getManufacturingPlacementOptions,
+  generateMaterialConsumptionReportWeb, getCurrentMaterialReportWeb, saveMaterialConsumptionReportWeb,
+  listSavedMaterialReportsWeb, renameSavedMaterialReportWeb, deleteSavedMaterialReportWeb,
 });

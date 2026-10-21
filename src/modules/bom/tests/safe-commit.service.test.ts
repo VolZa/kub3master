@@ -9,6 +9,8 @@ import { createHash } from 'node:crypto';
 import { SafeCommitService } from '../commit/safe-commit.service';
 import * as safeCommitExports from '../commit/safe-commit.service';
 import { submitBOM } from '../../../ui/bom-commit.api';
+import * as authorization from '../../../security/production-authorization';
+import { verifiedIdentity } from '../../../security/permission-service';
 import { openCommitOperationJournal, commitDigest } from '../commit/commit-operation-journal';
 import { ELEMENT_COLUMNS, MasterFreshElementStore } from '../commit/fresh-element-store';
 import { mapElementRowToDomain } from '../../elements/element.mapper';
@@ -298,6 +300,10 @@ it('retries original input when a large manifest lost acknowledgment before any 
   expect(service().commitBOM(large, 'Large').status).toBe('COMMITTED'); expect(elements).toHaveLength(3);
 });
 it('trusted UI route serializes submissions, preserves foreign duplicate slots and old Parts', () => {
+  const identity = verifiedIdentity('https://accounts.google.com', 'isolated-ui-owner', Date.now() + 60000);
+  const auth = new authorization.HandlerAuthorization({ current: () => identity }, { find: () => ({ issuer: identity.issuer,
+    subject: identity.subject, active: true, roles: ['ERP_OWNER'], authorizationVersion: 1 }) });
+  vi.spyOn(authorization, 'requirePermission').mockImplementation(permission => { auth.require(permission); });
   vi.stubGlobal('Session', { getActiveUser: () => ({ getEmail: () => 'owner@example.com' }) });
   vi.stubGlobal('DriveApp', { getFileById: (id: string) => { expect(id).toBe(SpreadsheetConfig.MASTER.id); return { getOwner: () => ({ getEmail: () => 'owner@example.com' }), getEditors: () => [] }; } });
   const app = service(); vi.spyOn(safeCommitExports, 'commitBOM').mockImplementation((raw, id) => app.commitBOM(raw, id));

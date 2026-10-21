@@ -1,3 +1,4 @@
+import { getMaterialRepository } from '../../../app/factories/material.factory';
 // src/modules/bom/tests/testBOMExplorer.ts
 
 import { GoogleSheetsElementRepository } from '../../elements/element.repository';
@@ -13,7 +14,7 @@ export function testBOMExplorer() {
 
   const bomRepo = new GoogleSheetsBOMRepository();
 
-  const service = new BOMExplorerService(elementRepo, bomRepo);
+  const service = new BOMExplorerService(elementRepo, bomRepo, getMaterialRepository());
 
   const product = elementRepo.findByCode('П-1.1', '6'); // Specify the projectDocumentID if needed
 

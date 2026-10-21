@@ -11,12 +11,19 @@ import { insertBOMRows, replaceBOMForParent, deleteBOMTree, deleteBOMByParentId 
 import { buildBOMFromTable } from '../modules/bom/bom.service';
 import { SpreadsheetConfig } from '../infrastructure/spreadsheets/SpreadsheetConfig';
 import { withLegacyBOMCompatibilityForTests } from '../modules/bom/legacy-save-quarantine';
+import { HandlerAuthorization, requirePermission } from '../security/production-authorization';
+import { verifiedIdentity } from '../security/permission-service';
+vi.mock('../security/production-authorization', async importOriginal => ({ ...await importOriginal<typeof import('../security/production-authorization')>(), requirePermission: vi.fn() }));
 vi.mock('../modules/bom/commit/safe-commit.service', () => ({ commitBOM: vi.fn(), resumeBOMCommit: vi.fn() }));
 const request = { operationID: 'BOM_test', projectDocumentID: '9', parentInput: 'Плита; П-1; опис', specification: 'Стержень; ГСк-1; 3\nАрматура; R_12_A500C_L400; 4' };
 let email: string;
 const forbidden = vi.fn(), file = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks(); email = 'editor@example.com';
+  const identity = verifiedIdentity('https://accounts.google.com', 'isolated-bom-user', Date.now() + 60000);
+  const auth = new HandlerAuthorization({ current: () => email ? identity : undefined }, { find: () => ['owner@example.com', 'editor@example.com'].includes(email)
+    ? { issuer: identity.issuer, subject: identity.subject, active: true, roles: ['ERP_OWNER'], authorizationVersion: 1 } : undefined });
+  vi.mocked(requirePermission).mockImplementation(permission => { auth.require(permission); });
   vi.stubGlobal('Session', { getActiveUser: () => ({ getEmail: () => email }) });
   file.mockImplementation(id => { expect(id).toBe(SpreadsheetConfig.MASTER.id); return { getOwner: () => ({ getEmail: () => 'owner@example.com' }), getEditors: () => [{ getEmail: () => 'editor@example.com' }] }; });
   vi.stubGlobal('DriveApp', { getFileById: file });
@@ -45,12 +52,12 @@ it('rejects old payloads lacking document/OperationID instead of creating new co
 });
 it('resume is authorized independently of knowledge of the operation ID', () => {
   expect(resumeBOM('BOM_test').status).toBe('ALREADY_APPLIED'); expect(resumeBOMCommit).toHaveBeenCalledWith('BOM_test');
-  email = 'viewer@example.com'; expect(() => resumeBOM('BOM_test')).toThrow('BOM_ACCESS_DENIED'); expect(resumeBOMCommit).toHaveBeenCalledTimes(1);
+  email = 'viewer@example.com'; expect(() => resumeBOM('BOM_test')).toThrow('ACCESS_DENIED'); expect(resumeBOMCommit).toHaveBeenCalledTimes(1);
 });
 it.each(['', 'viewer@example.com'])('rejects unidentified/unauthorized %s before all service calls', value => {
-  email = value; expect(() => submitBOM(request)).toThrow('BOM_ACCESS_DENIED'); expect(() => buildBOMFromText(request)).toThrow('BOM_ACCESS_DENIED'); expect(commitBOM).not.toHaveBeenCalled();
+  email = value; expect(() => submitBOM(request)).toThrow('ACCESS_DENIED'); expect(() => buildBOMFromText(request)).toThrow('ACCESS_DENIED'); expect(commitBOM).not.toHaveBeenCalled();
 });
-it('allows identified MASTER owner without relying on effective deployment identity', () => {
+it('allows explicit ERP_OWNER from isolated identity/repository, not Drive ownership', () => {
   email = 'owner@example.com'; expect(submitBOM(request).status).toBe('COMMITTED');
 });
 it.each(['PreparedBOM', 'SafeBOMPlan', 'bindings', 'createdParts', 'AffectedParentIDs', 'commentChanges', 'rows'])('rejects client-controlled internal %s', key => {

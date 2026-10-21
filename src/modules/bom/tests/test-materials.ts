@@ -18,7 +18,7 @@ export function testMaterials() {
 
   const materialRepo = new MaterialRepository(materialDS.getRows());
 
-  const explorer = new BOMExplorerService(elementRepo, bomRepo);
+  const explorer = new BOMExplorerService(elementRepo, bomRepo, materialRepo);
 
   const service = new BOMMaterialsService(explorer, materialRepo);
 

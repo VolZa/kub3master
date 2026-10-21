@@ -1,0 +1,7 @@
+[
+  "onOpen", "onEdit", "openForm", "openFormTable", "includeBOMCommitClient_", "doGet",
+  "submitBOM", "resumeBOM", "runTableParser", "buildBOMFromText",
+  "createManufacturingFromWeb", "getManufacturingHouseOptions", "getManufacturingProductOptions", "getManufacturingPlacementOptions",
+  "generateMaterialConsumptionReportWeb", "getCurrentMaterialReportWeb", "saveMaterialConsumptionReportWeb",
+  "listSavedMaterialReportsWeb", "renameSavedMaterialReportWeb", "deleteSavedMaterialReportWeb"
+]

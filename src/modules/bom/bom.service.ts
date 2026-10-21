@@ -250,7 +250,7 @@ export function buildBOMFromTable(
     parent.code,
     parent.projectDocumentID || '', // 🔥
     parent.prefix,
-    buildElementName(parent.prefix, parent.code),
+    buildElementName(parent.prefix, parent.name),
     elementRepo,
     catalogHelper,
   );

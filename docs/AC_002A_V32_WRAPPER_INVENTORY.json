@@ -1,0 +1,450 @@
+{
+  "baseline": "immutable v32 API evidence",
+  "count": 74,
+  "entries": [
+    {
+      "name": "getCurrentMaterialReportWeb",
+      "category": "production public",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "saveMaterialConsumptionReportWeb",
+      "category": "production public",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "generateMaterialConsumptionReportWeb",
+      "category": "production public",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "KUB_B2_readOnlyPreflight",
+      "category": "administrative",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "KUB_B2_firstControlledReportWrite",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "onOpen",
+      "category": "production internal",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "onEdit",
+      "category": "production internal",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "openFormTable",
+      "category": "production internal",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "openForm",
+      "category": "production internal",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "includeBOMCommitClient_",
+      "category": "production internal",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "submitBOM",
+      "category": "production public",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "resumeBOM",
+      "category": "production public",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "doGet",
+      "category": "production public",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "createManufacturingFromWeb",
+      "category": "production public",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "getManufacturingHouseOptions",
+      "category": "production public",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "getManufacturingProductOptions",
+      "category": "production public",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "getManufacturingPlacementOptions",
+      "category": "production public",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "rebuildManufacturingState",
+      "category": "administrative",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "createManufacturingFromBuffer",
+      "category": "administrative",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "buildBOMFromText",
+      "category": "production public",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "testBOMExplorer",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testBOMTree",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testMaterials",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "runTableParser",
+      "category": "production public",
+      "localProductionWrapper": true,
+      "action": "retain; AC-002B authorization pending"
+    },
+    {
+      "name": "testProductionRequirement",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testProductReport",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "debugProjectContext",
+      "category": "administrative",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testP1BOM",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testP1Materials",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testDiagnoseProductP1",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testGenerateProjectMaterialMatrixReport",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingResolver",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingProcessor",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "manufacturingInitialMigration",
+      "category": "migration",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingDomainMapper",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingSyncStateRepository",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingSynchronizationAnalyze",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingSynchronizationExecute",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingSynchronizationApplication",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingSynchronizationCancel",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingSynchronizationMove",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingSynchronizationDetach",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingSynchronizationDetachAnalyze",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingSynchronizationDetachIntegration",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingSynchronizationBatchAnalyze",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingSynchronizationBatchExecute",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingSynchronizationBatchRepeat",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingRepositorySave",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingInputValidator",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingIdGenerator",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingCreationService",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingInputBufferDebug",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingInputBufferMapper",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testGoogleSheetsManufacturingBufferReader",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingBufferCreationApplicationService",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testCreateManufacturingFromBuffer",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingWebInputMapper",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingHouseOptionsService",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingProductOptionsService",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingPlacementOptionsService",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingWebOptionsApi",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testManufacturingPlacementRebuildExecute",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "bomMaterialRequirementsIntegrationTest",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testBOMCompletenessChecker",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testAuditAllProducts",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testExpandProductP31",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testProductSpecificationReport",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testProductSpecificationReportP31",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testRoundQuantity",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testBOMVerticalReportP31",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testMaterialConsumptionReportP31",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testMaterialBatchOptions",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testReportFilter",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    },
+    {
+      "name": "testReportFilterService",
+      "category": "test",
+      "localProductionWrapper": false,
+      "action": "isolate from production imports/register; keep source"
+    }
+  ]
+}

@@ -16,7 +16,7 @@ export function testProductionRequirement() {
   const materialDS = new GoogleSheetsMaterialDataSource(sheetProvider);
   const materialRepo = new MaterialRepository(materialDS.getRows());
 
-  const bomExplorer = new BOMExplorerService(elementRepo, bomRepo);
+  const bomExplorer = new BOMExplorerService(elementRepo, bomRepo, materialRepo);
 
   const bomMaterials = new BOMMaterialsService(bomExplorer, materialRepo);
 

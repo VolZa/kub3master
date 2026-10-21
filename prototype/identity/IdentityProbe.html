@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><title>ERP КУБ — isolated identity probe</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script></head><body>
+<p>Ізольований прототип. Не production login. Токени не виводяться й не зберігаються.</p>
+<div id="googleButton"></div><p id="status">BLOCKED: OAuth client та GAS probe handlers не налаштовані.</p>
+<button id="start" disabled>Почати перевірку входу</button>
+<script>
+// Not copied to dist, not included in doGet, no automatic execution.
+// Configure only after separate approval of client/origin and the isolated server adapters.
+function configureIdentityProbe(clientId, approvedOrigin) {
+  if (!clientId || location.origin !== approvedOrigin || !google.accounts) throw new Error('PROBE_NOT_CONFIGURED');
+  const status = document.getElementById('status');
+  document.getElementById('start').disabled = false;
+  document.getElementById('start').onclick = () => {
+    const binding = [...crypto.getRandomValues(new Uint8Array(32))].map(n => n.toString(16).padStart(2, '0')).join('');
+    google.script.run.withFailureHandler(() => { status.textContent = 'FAIL: початок login'; })
+      .withSuccessHandler(challenge => {
+        google.accounts.id.initialize({ client_id: clientId, nonce: challenge.nonce, auto_select: false,
+          callback: response => {
+            google.script.run.withFailureHandler(() => { status.textContent = 'FAIL: перевірка identity'; })
+              .withSuccessHandler(result => { status.textContent = result.status === 'VERIFIED' ? 'VERIFIED — ізольований probe' : 'FAIL'; })
+              .identityProbeComplete({ challengeId: challenge.challengeId, binding, credential: response.credential });
+          } });
+        google.accounts.id.renderButton(document.getElementById('googleButton'), { theme: 'outline', size: 'large' });
+      }).identityProbeBegin({ binding });
+  };
+}
+</script></body></html>

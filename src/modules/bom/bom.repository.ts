@@ -6,7 +6,7 @@ import { SpreadsheetProvider } from '../../infrastructure/spreadsheets/Spreadshe
 import { SpreadsheetKey } from '../../infrastructure/spreadsheets/SpreadsheetKey';
 import { forceText, insertRows } from '../../utils/sheets.utils';
 import { BOMRow } from './model/bom-row.model';
-import { validateBOMHeaders, validateBOMRow } from './commit/physical-bom-schema';
+import { validateBOMHeaders, validateBOMReadRow } from './commit/physical-bom-schema';
 import { assertLegacyBOMCompatibility } from './legacy-save-quarantine';
 
 export function getMasterBOMSheet(): GoogleAppsScript.Spreadsheet.Sheet {
@@ -282,7 +282,7 @@ export function getAllBOMRows(): BOMRow[] {
   }
 
   return values.slice(1).flatMap((physical, index) => {
-    const row = validateBOMRow(physical, index + 2);
+    const row = validateBOMReadRow(physical, index + 2);
     if (!row) return [];
     return [{
     parentId: String(row[0]),

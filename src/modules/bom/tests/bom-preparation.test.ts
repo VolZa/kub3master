@@ -15,6 +15,8 @@ import { CatalogHelper } from '../../catalog/catalog.helper';
 import type { CatalogItem } from '../../catalog/catalog.model';
 import { generateIdByType } from '../../../utils/id';
 import { replaceBOMForParent, insertBOMRows, deleteBOMTree, deleteBOMByParentId } from '../bom.repository';
+import { mapPreparedBOMToPhysicalPlan } from '../commit/physical-bom-mapper';
+import { PHYSICAL_BOM_HEADERS } from '../commit/physical-bom-schema';
 vi.mock('../../../utils/id', () => ({ generateIdByType: vi.fn(() => { throw new Error('ID reservation forbidden'); }) }));
 vi.mock('../bom.repository', () => ({
   replaceBOMForParent: vi.fn(), insertBOMRows: vi.fn(), deleteBOMTree: vi.fn(), deleteBOMByParentId: vi.fn(),
@@ -38,6 +40,7 @@ function setup(rows: ElementRow[] = [root, part], materials: Material[] = [concr
     if (prefix.toLowerCase() === 'плита') return template('product');
     if (prefix.toLowerCase() === 'стержень') return template('part');
     if (prefix.toLowerCase() === 'каркас') return template('assembly');
+    if (prefix.toLowerCase() === 'сітка') return template('assembly');
     if (prefix.toLowerCase() === 'бетон') return template('material');
     if (['арматура', 'кутник', 'полоса'].includes(prefix.toLowerCase())) return template('material', true);
     throw new Error(`Catalog template not found: ${prefix}`);
@@ -117,6 +120,36 @@ describe('read-only Prepare BOM', () => {
     if (!result.ok) throw new Error('plan expected');
     expect(result.prepared.pendingElements[0].row).not.toHaveProperty('ID');
     expect(s.insert).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['Сітка; ВСП-П-2.8; ( верхня )', 'ВСП-П-2.8', 'Сітка ВСП-П-2.8 (верхня)'],
+    ['Сітка; СП-П-2.8; ( нижня )', 'СП-П-2.8', 'Сітка СП-П-2.8 (нижня)'],
+    ['Сітка; СП-П-2.10;', 'СП-П-2.10', 'Сітка СП-П-2.10'],
+    ['Сітка; СП-П-2.10;   ', 'СП-П-2.10', 'Сітка СП-П-2.10'],
+    ['Сітка; СП-П-2.10', 'СП-П-2.10', 'Сітка СП-П-2.10'],
+  ])('preserves parent display name and physical edge codes for %s', (parentInput, code, name) => {
+    const s = setup();
+    const result = prepareBOM({ ...input, parentInput, specification: 'Стержень; EXISTING; 2' }, s.deps);
+    if (!result.ok) throw new Error(JSON.stringify(result));
+    expect(result.prepared.pendingElements).toHaveLength(1);
+    expect(result.prepared.pendingElements[0].row).toMatchObject({ PrefixName: 'Сітка', Code: code, Name: name });
+    const plan = mapPreparedBOMToPhysicalPlan({
+      prepared: result.prepared, writerOperationID: 'parent_name_test', headers: [...PHYSICAL_BOM_HEADERS],
+      existingRows: [], createdParts: [], bindings: [
+        { ref: result.prepared.parent, id: '3000001', code, origin: 'created' },
+        { ref: result.prepared.components[0].ref, id: part.ID, code: part.Code, origin: 'existing' },
+      ],
+    });
+    expect(plan.targetRows).toEqual([['3000001', part.ID, 2, 'шт', '', code, part.Code]]);
+  });
+  it('reuses a parent by Code without renaming its existing display name', () => {
+    const existing: ElementRow = { ...root, Code: 'ВСП-П-2.8', PrefixName: 'Сітка', Type: 'assembly', Name: 'Збережена назва' };
+    const s = setup([existing, part]);
+    const result = prepareBOM({ ...input, parentInput: 'Сітка; ВСП-П-2.8; ( верхня )', specification: 'Стержень; EXISTING; 2' }, s.deps);
+    expect(result).toMatchObject({ ok: true, prepared: {
+      parent: { kind: 'existing-element', element: { id: existing.ID, code: existing.Code, name: existing.Name } },
+      pendingElements: [],
+    } });
   });
   it('deduplicates repeated pending Parts and aggregates edges by parent/child/unit', () => {
     const s = setup([{ ...root, Type: 'assembly', PrefixName: 'каркас' }]);

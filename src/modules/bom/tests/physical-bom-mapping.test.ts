@@ -120,7 +120,7 @@ it.each(['parent', 'child', 'qty', 'unit', 'comment', 'code', 'width', 'formula'
   if (kind === 'child') snapshot[1][1] = 'pending:1';
   if (kind === 'qty') snapshot[1][2] = '1';
   if (kind === 'unit') snapshot[1][3] = '';
-  if (kind === 'comment') snapshot[1][4] = new Date();
+  if (kind === 'comment') snapshot[1][4] = new Date(NaN);
   if (kind === 'code') snapshot[1][5] = '';
   if (kind === 'width') snapshot[1].pop();
   if (kind === 'formula') formulas[1][5] = '=1+1';
@@ -132,4 +132,40 @@ it.each(['CreatedAt', 'extra', 'reordered'])('reader and mapper reject %s schema
   if (kind === 'reordered') [snapshot[0][0], snapshot[0][1]] = [snapshot[0][1], snapshot[0][0]];
   expect(() => getAllBOMRows()).toThrow('schema');
   expect(() => mapPreparedBOMToPhysicalPlan({ ...options(), headers: snapshot[0] })).toThrow('schema');
+});
+
+it.each(['', 'historical note', new Date('2026-10-10T00:00:00Z'), new Date('2026-10-10T07:37:01.123Z')])(
+  'reader supports optional Comment %s without changing Qty or source cells', comment => {
+    snapshot[1][4] = comment;
+    const qty = snapshot[1][2];
+    const result = getAllBOMRows();
+    expect(result[0].comment).toBe(comment instanceof Date ? comment.toISOString() : comment);
+    expect(result[0].qty).toBe(qty);
+    expect(typeof result[0].qty).toBe('number');
+    expect(snapshot[1][4]).toBe(comment);
+  },
+);
+
+it('physically reads a synthetic 797-row BOM with 45 native date comments without mutations', () => {
+  const dates: Date[] = [];
+  snapshot.splice(1);
+  for (let i = 0; i < 797; i++) {
+    const comment = i < 45 ? new Date(Date.UTC(2026, 9, 10, 7, 37, i)) : i % 2 ? '' : 'note';
+    if (comment instanceof Date) dates.push(comment);
+    snapshot.push(['4000000', String(2000000 + i), 0.123456789 + i, 'кг', comment, 'P', `C${i}`]);
+  }
+  formulas = snapshot.map(r => r.map(() => ''));
+  const before = snapshot.map(r => r.slice());
+  const result = getAllBOMRows();
+  expect(result).toHaveLength(797);
+  expect(result.filter(r => /^2026-/.test(r.comment ?? ''))).toHaveLength(45);
+  expect(result[0].qty).toBe(0.123456789);
+  expect(snapshot).toEqual(before);
+  expect(snapshot[1][4]).toBe(dates[0]);
+});
+
+it.each([0, -1, NaN, Infinity, '2'])('date Comment does not bypass invalid Qty %s', qty => {
+  snapshot[1][4] = new Date('2026-10-10T07:37:01Z');
+  snapshot[1][2] = qty;
+  expect(() => getAllBOMRows()).toThrow('Invalid/partial');
 });

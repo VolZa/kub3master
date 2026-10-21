@@ -82,7 +82,7 @@ describe('BOMMaterialsService — П-1', () => {
       },
       {
         parentId: '2021',
-        childId: '3401',
+        childId: '3201',
         qty: 1.317,
         unit: 'м3',
       },
@@ -425,12 +425,6 @@ describe('BOMMaterialsService — П-1', () => {
     );
 
     // Concrete element
-    add(
-      element('3401', 'material', 'C_20_25', {
-        baseUnit: 'м3',
-        parentMaterialID: '3201',
-      }),
-    );
 
     /*
      * ---------------------------------------------------------
@@ -592,7 +586,7 @@ describe('BOMMaterialsService — П-1', () => {
 
     const bomRepo = new InMemoryBOMRepository(rows);
 
-    const explorer = new BOMExplorerService(elementRepo, bomRepo);
+    const explorer = new BOMExplorerService(elementRepo, bomRepo, materialRepo);
 
     const service = new BOMMaterialsService(explorer, materialRepo);
 

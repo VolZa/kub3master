@@ -1,8 +1,8 @@
 // src\modules\bom\model\bom-tree-node.model.ts
-import { ElementFull } from '../../elements/element.model';
+import type { BOMEntity } from './bom-node.model';
 
 export interface BOMTreeNode {
-  element: ElementFull;
+  element: BOMEntity;
 
   qty: number;
   unit: string;

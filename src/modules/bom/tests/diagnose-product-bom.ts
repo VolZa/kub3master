@@ -20,7 +20,7 @@ export function diagnoseProductP1(): void {
     );
   }
 
-  const bomExplorer = new BOMExplorerService(elementRepository, bomRepository);
+  const bomExplorer = new BOMExplorerService(elementRepository, bomRepository, materialRepository);
 
   const tree = bomExplorer.getTree(product.id);
 

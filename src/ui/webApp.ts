@@ -9,6 +9,17 @@
  * ==========================================================
  */
 import { ManufacturingWebInput } from '../modules/manufacturing/types/manufacturing-web-input';
+import { requireWrapperPermission } from '../security/production-authorization';
+import { runMaterialReportWeb } from './material-report-web';
+import { getCurrentReportOutput } from '../app/factories/current-report-output.factory';
+
+export function generateMaterialConsumptionReportWeb(input: unknown) {
+  requireWrapperPermission('generateMaterialConsumptionReportWeb');
+  return runMaterialReportWeb(input, {
+    houseExists: code => !!getHouseRepository().findByCode(code),
+    output: getCurrentReportOutput,
+  });
+}
 import { ManufacturingWebInputMapper } from '../modules/manufacturing/mapping/manufacturingWebInputMapper';
 import { getManufacturingCreationApplicationService } from '../app/factories/manufacturing-creation.factory';
 
@@ -20,6 +31,7 @@ import { ManufacturingProductOptionsService } from '../modules/manufacturing/ser
 import { ManufacturingPlacementOptionsService } from '../modules/manufacturing/services/manufacturing-placement-options.service';
 
 export function doGet(): GoogleAppsScript.HTML.HtmlOutput {
+  requireWrapperPermission('doGet');
   return HtmlService.createHtmlOutputFromFile('Manufacturing').setTitle(
     'ERP КУБ — Виготовлення',
   );
@@ -50,6 +62,7 @@ export function testManufacturingWeb(
 export function createManufacturingFromWeb(
   webInput: Readonly<ManufacturingWebInput>,
 ): string {
+  requireWrapperPermission('createManufacturingFromWeb');
   const input = ManufacturingWebInputMapper.mapToInput(webInput);
 
   const service = getManufacturingCreationApplicationService();
@@ -60,12 +73,14 @@ export function createManufacturingFromWeb(
 }
 
 export function getManufacturingHouseOptions() {
+  requireWrapperPermission('getManufacturingHouseOptions');
   const service = new ManufacturingHouseOptionsService(getHouseRepository());
 
   return service.getOptions();
 }
 
 export function getManufacturingProductOptions(houseCode: string) {
+  requireWrapperPermission('getManufacturingProductOptions');
   const service = new ManufacturingProductOptionsService(
     getPlacementRepository(),
   );
@@ -77,6 +92,7 @@ export function getManufacturingPlacementOptions(
   houseCode: string,
   productCode: string,
 ) {
+  requireWrapperPermission('getManufacturingPlacementOptions');
   const service = new ManufacturingPlacementOptionsService(
     getPlacementRepository(),
   );

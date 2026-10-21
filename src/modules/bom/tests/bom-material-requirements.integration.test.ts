@@ -43,6 +43,7 @@ export function bomMaterialRequirementsIntegrationTest(): void {
   const bomExplorerService = new BOMExplorerService(
     elementRepository,
     bomRepository,
+    materialRepository,
   );
 
   const bomMaterialsService = new BOMMaterialsService(

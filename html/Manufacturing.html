@@ -86,6 +86,17 @@
         margin-bottom: 14px;
       }
 
+      .loss-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .loss-grid input {
+        min-width: 0;
+      }
+
       label {
         display: block;
         margin-bottom: 5px;
@@ -259,7 +270,7 @@
            РЕЖИМ: ЗВІТ
            ==================================================== -->
 
-      <div id="reportView" class="view">
+      <div id="reportView" class="view" style="display: none">
         <h2>Звіт</h2>
         <p class="subtitle">Виробничі звіти</p>
 
@@ -309,21 +320,24 @@
             onchange="handleReportCalculationMethodChange()"
           >
             <option value="normative">Нормативна</option>
-            <option value="batch-based">Batch-based</option>
+            <option value="batch-based" disabled>Batch-based — ще не реалізовано</option>
           </select>
         </div>
 
-        <div class="field">
-          <label for="reportLossPercent"> Нормативні втрати, % </label>
-
-          <input
-            id="reportLossPercent"
-            type="number"
-            min="0"
-            max="100"
-            step="0.1"
-            value="7"
-          />
+        <p class="subtitle">Нормативні втрати, %</p>
+        <div class="loss-grid">
+          <div>
+            <label for="lossRebar">Арматура</label>
+            <input id="lossRebar" type="number" min="0" max="100" step="any" required />
+          </div>
+          <div>
+            <label for="lossRolled">Прокат</label>
+            <input id="lossRolled" type="number" min="0" max="100" step="any" required />
+          </div>
+          <div>
+            <label for="lossConcrete">Бетон</label>
+            <input id="lossConcrete" type="number" min="0" max="100" step="any" required />
+          </div>
         </div>
 
         <div class="field">
@@ -334,10 +348,22 @@
           </select>
         </div>
 
-        <button class="button" type="button" onclick="buildReportWebInput()">
+        <button id="generateReportButton" class="button" type="button" onclick="buildReportWebInput()" disabled>
           ✓ СФОРМУВАТИ
         </button>
 
+        <p id="reportStatus" role="status" aria-live="polite"></p>
+        <a id="reportLink" target="_blank" rel="noopener noreferrer" hidden>ВІДКРИТИ ЗВІТ</a>
+        <button id="saveReportButton" class="button" type="button" onclick="saveCurrentMaterialReport()" disabled>ЗБЕРЕГТИ ЗВІТ</button>
+        <p id="saveReportStatus" role="status" aria-live="polite"></p>
+        <a id="savedReportLink" target="_blank" rel="noopener noreferrer" hidden>ВІДКРИТИ ЗБЕРЕЖЕНИЙ ЗВІТ</a>
+        <h3>Збережені звіти</h3>
+        <button id="refreshArchiveButton" type="button" onclick="refreshSavedReports()">ОНОВИТИ СПИСОК</button>
+        <p id="archiveStatus" role="status" aria-live="polite"></p>
+        <div style="overflow-x: auto">
+          <table><thead><tr><th>Назва звіту</th><th>Будинок</th><th>Виріб</th><th>Період</th><th>Дата збереження</th><th>Дії</th></tr></thead>
+          <tbody id="savedReportsBody"></tbody></table>
+        </div>
         <div
           id="reportDebug"
           style="
@@ -373,6 +399,7 @@
          ====================================================== -->
 
     <script>
+      setActiveMode('manufacturing');
       // ======================================================
       // Перемикання режимів
       // ======================================================
@@ -650,6 +677,10 @@
       //       .getManufacturingHouseOptions();
       //   }
       function loadReportHouseOptions() {
+        reportHousesLoading = true;
+        reportOptionsError = false;
+        document.getElementById('reportHouseCode').disabled = true;
+        updateReportButton();
         google.script.run
           .withSuccessHandler((options) => {
             console.log('REPORT house options:', options);
@@ -680,8 +711,14 @@
             console.log('REPORT house select options:', select.options.length);
 
             resetReportProductOptions();
+            reportHousesLoading = false;
+            select.disabled = false;
+            updateReportButton();
           })
           .withFailureHandler((error) => {
+            reportHousesLoading = false;
+            reportOptionsError = true;
+            updateReportButton();
             console.error('REPORT house options error:', error);
 
             alert('Помилка завантаження будинків для звіту: ' + error.message);
@@ -704,17 +741,23 @@
       }
 
       function handleReportHouseChange() {
+        const requestId = ++reportProductRequestId;
         const houseCode = document.getElementById('reportHouseCode').value;
 
         const productSelect = document.getElementById('reportProductCode');
 
         resetReportProductOptions();
+        reportProductsLoading = false;
+        reportOptionsError = false;
 
         if (houseCode === '') {
+          updateReportButton();
           return;
         }
 
         productSelect.disabled = true;
+        reportProductsLoading = true;
+        updateReportButton();
 
         const loadingOption = document.createElement('option');
 
@@ -726,6 +769,7 @@
 
         google.script.run
           .withSuccessHandler((options) => {
+            if (requestId !== reportProductRequestId || document.getElementById('reportHouseCode').value !== houseCode) return;
             productSelect.innerHTML = '';
 
             const allOption = document.createElement('option');
@@ -745,9 +789,15 @@
             }
 
             productSelect.disabled = false;
+            reportProductsLoading = false;
+            updateReportButton();
           })
           .withFailureHandler((error) => {
+            if (requestId !== reportProductRequestId || document.getElementById('reportHouseCode').value !== houseCode) return;
             resetReportProductOptions();
+            reportProductsLoading = false;
+            reportOptionsError = true;
+            updateReportButton();
 
             alert('Помилка завантаження виробів для звіту: ' + error.message);
           })
@@ -757,19 +807,22 @@
       function handleReportCalculationMethodChange() {
         const method = document.getElementById('reportCalculationMethod').value;
 
-        const lossInput = document.getElementById('reportLossPercent');
+        const lossInputs = ['lossRebar', 'lossRolled', 'lossConcrete'].map(
+          (id) => document.getElementById(id),
+        );
 
         if (method === 'normative') {
-          lossInput.disabled = false;
+          lossInputs.forEach((input) => { input.disabled = false; });
           return;
         }
 
         if (method === 'batch-based') {
-          lossInput.disabled = false;
+          lossInputs.forEach((input) => { input.disabled = false; });
         }
       }
 
       function buildReportWebInput() {
+        if (reportSubmitting || saveReportSubmitting || reportHousesLoading || reportProductsLoading || reportOptionsError) return;
         const houseCode = document.getElementById('reportHouseCode').value;
 
         const productCode = document.getElementById('reportProductCode').value;
@@ -783,10 +836,25 @@
         const calculationMethod = document.getElementById(
           'reportCalculationMethod',
         ).value;
+        if (calculationMethod !== 'normative') {
+          alert('NOT_IMPLEMENTED: підтримується лише нормативний метод.');
+          return;
+        }
 
-        const lossPercent = Number(
-          document.getElementById('reportLossPercent').value,
-        );
+        const lossPercents = {};
+        for (const [group, id, label] of [
+          ['rebar', 'lossRebar', 'Арматура'],
+          ['rolled', 'lossRolled', 'Прокат'],
+          ['concrete', 'lossConcrete', 'Бетон'],
+        ]) {
+          const raw = document.getElementById(id).value.trim();
+          const value = Number(raw);
+          if (raw === '' || !Number.isFinite(value) || value < 0 || value > 100) {
+            alert(`${label}: вкажіть відсоток втрат від 0 до 100 (0 — без втрат).`);
+            return;
+          }
+          lossPercents[group] = value;
+        }
 
         const format = document.getElementById('reportFormat').value;
 
@@ -794,12 +862,6 @@
           alert(
             'Дата початку періоду не може бути пізнішою за дату завершення.',
           );
-
-          return;
-        }
-
-        if (Number.isNaN(lossPercent) || lossPercent < 0 || lossPercent > 100) {
-          alert('Вкажіть коректний відсоток втрат від 0 до 100.');
 
           return;
         }
@@ -815,20 +877,61 @@
 
           calculationMethod,
 
-          lossPercent,
+          lossPercents,
 
           format,
         };
 
-        console.log('ReportWebInput:', webInput);
-
-        const debugElement = document.getElementById('reportDebug');
-
-        debugElement.style.display = 'block';
-
-        debugElement.textContent = JSON.stringify(webInput, null, 2);
-
-        alert('Параметри звіту сформовані.');
+        reportSubmitting = true;
+        ++reportStateRequest;
+        updateSaveReportButton();
+        updateReportButton();
+        const status = document.getElementById('reportStatus');
+        const link = document.getElementById('reportLink');
+        link.hidden = true;
+        link.removeAttribute('href');
+        status.textContent = 'Формування звіту...';
+        const finish = () => { reportSubmitting = false; updateReportButton(); updateSaveReportButton(); };
+        const unknown = () => {
+          finish();
+          status.textContent = 'Результат невизначений. Перевірте REPORTING перед новим запуском. Автоматичного повтору немає.';
+        };
+        let settled = false;
+        const timeout = setTimeout(() => { settled = true; unknown(); }, 360000);
+        try {
+        google.script.run
+          .withSuccessHandler((result) => {
+            clearTimeout(timeout);
+            if (settled) return;
+            settled = true;
+            finish();
+            if (result && result.status === 'OK' && /^https:\/\/docs\.google\.com\/spreadsheets\/d\/1Vy--GaVoUdP17Yd2PztUtXAcaf1krskxm5qvidQsoPc\/edit#gid=\d+$/.test(result.url)) {
+              status.textContent = 'Звіт успішно сформовано.';
+              if (result.cleanup === 'WARNING') {
+                status.textContent += ' Потрібна перевірка службового аркуша REPORTING після cleanup. Повторне формування не потрібне.';
+              }
+              link.href = result.url;
+              link.hidden = false;
+              currentReportSheetId = result.sheetId;
+              updateSaveReportButton();
+            } else if (result && result.status === 'EMPTY') {
+              status.textContent = 'За вибраними параметрами немає виготовлених виробів.';
+            } else if (result && result.status === 'ERROR') {
+              status.textContent = `${result.code}: ${result.message}`;
+            } else unknown();
+          })
+          .withFailureHandler(() => {
+            clearTimeout(timeout);
+            if (settled) return;
+            settled = true;
+            unknown();
+          })
+          .generateMaterialConsumptionReportWeb(webInput);
+        } catch (error) {
+          clearTimeout(timeout);
+          settled = true;
+          unknown();
+        }
       }
 
       // ============================================================
@@ -836,7 +939,113 @@
       // ============================================================
 
       loadHouseOptions();
+      let reportHousesLoading = true;
+      let reportProductsLoading = false;
+      let reportOptionsError = false;
+      let reportSubmitting = false;
+      let currentReportSheetId;
+      let saveReportSubmitting = false;
+      let reportStateRequest = 0;
+      let reportProductRequestId = 0;
+      function updateReportButton() {
+        document.getElementById('generateReportButton').disabled = reportSubmitting || saveReportSubmitting || reportHousesLoading || reportProductsLoading || reportOptionsError;
+      }
       loadReportHouseOptions();
+      function updateSaveReportButton() {
+        document.getElementById('saveReportButton').disabled = saveReportSubmitting || reportSubmitting || !Number.isSafeInteger(currentReportSheetId);
+      }
+      function loadCurrentReportState() {
+        const request = ++reportStateRequest;
+        google.script.run.withSuccessHandler((result) => {
+          if (request !== reportStateRequest) return;
+          currentReportSheetId = result && result.status === 'OK' ? result.sheetId : undefined;
+          updateSaveReportButton();
+          if (result && result.status === 'ERROR') document.getElementById('saveReportStatus').textContent = `${result.code}: ${result.message || 'Стан звіту недоступний.'}`;
+        }).withFailureHandler(() => {
+          if (request !== reportStateRequest) return;
+          currentReportSheetId = undefined; updateSaveReportButton();
+          document.getElementById('saveReportStatus').textContent = 'Не вдалося завантажити стан поточного звіту.';
+        }).getCurrentMaterialReportWeb();
+      }
+      function saveCurrentMaterialReport() {
+        if (saveReportSubmitting || reportSubmitting || !Number.isSafeInteger(currentReportSheetId)) return;
+        const sourceSheetId = currentReportSheetId;
+        saveReportSubmitting = true; updateSaveReportButton(); updateReportButton();
+        const status = document.getElementById('saveReportStatus');
+        const link = document.getElementById('savedReportLink');
+        link.hidden = true;
+        status.textContent = 'Збереження звіту...';
+        let settled = false;
+        const finish = () => { saveReportSubmitting = false; updateSaveReportButton(); updateReportButton(); };
+        const unknown = () => { finish(); status.textContent = 'Результат збереження невизначений. Перевірте REPORTING; автоматичного повтору немає.'; };
+        const timer = setTimeout(() => { settled = true; unknown(); }, 360000);
+        try {
+          google.script.run.withSuccessHandler((result) => {
+            clearTimeout(timer); if (settled) return; settled = true; finish();
+            if (result && ['OK', 'ALREADY_SAVED'].includes(result.status) && /^MC_\d{6,}$/.test(result.reportId) && /^https:\/\/docs\.google\.com\/spreadsheets\/d\/1Vy--GaVoUdP17Yd2PztUtXAcaf1krskxm5qvidQsoPc\/edit#gid=\d+$/.test(result.url)) {
+              status.textContent = `${result.status === 'ALREADY_SAVED' ? 'Уже збережено' : 'Звіт збережено'}: ${result.reportId}`;
+              link.href = result.url; link.hidden = false;
+            } else if (result && result.status === 'ERROR') {
+              status.textContent = `${result.code}: ${result.message || 'Збереження не виконано.'}`;
+              if (result.code === 'STALE_CURRENT_REPORT') { currentReportSheetId = undefined; updateSaveReportButton(); }
+            } else unknown();
+          }).withFailureHandler(() => { clearTimeout(timer); if (settled) return; settled = true; unknown(); }).saveMaterialConsumptionReportWeb({ sourceSheetId });
+        } catch (error) { clearTimeout(timer); settled = true; unknown(); }
+      }
+      loadCurrentReportState();
+      const archiveBusy = new Set();
+      let archiveListLoading = false;
+      function refreshSavedReports() {
+        if (archiveListLoading) return;
+        archiveListLoading = true;
+        document.getElementById('refreshArchiveButton').disabled = true;
+        const status = document.getElementById('archiveStatus');
+        status.textContent = 'Завантаження архіву...';
+        const done = () => { archiveListLoading = false; document.getElementById('refreshArchiveButton').disabled = false; };
+        google.script.run.withSuccessHandler(result => {
+          done();
+          if (!result || result.status !== 'OK') { status.textContent = `${result && result.code}: ${result && result.message}`; return; }
+          const body = document.getElementById('savedReportsBody'); body.innerHTML = '';
+          status.textContent = result.reports.length ? '' : 'Збережених звітів немає.';
+          const date = value => value ? value.slice(0, 10).split('-').reverse().join('-') : '—';
+          for (const report of result.reports) {
+            const tr = document.createElement('tr');
+            for (const value of [report.sheetName, report.houseCode, report.productCode, `${date(report.dateFrom)} — ${date(report.dateTo)}`, date(report.savedAt)]) {
+              const td = document.createElement('td'); td.textContent = value; tr.appendChild(td);
+            }
+            const actions = document.createElement('td');
+            if (report.state === 'ACTIVE' && /^https:\/\/docs\.google\.com\/spreadsheets\/d\/1Vy--GaVoUdP17Yd2PztUtXAcaf1krskxm5qvidQsoPc\/edit#gid=\d+$/.test(report.url)) {
+              const open = document.createElement('a'); open.textContent = 'ВІДКРИТИ'; open.href = report.url; open.target = '_blank'; open.rel = 'noopener noreferrer'; actions.appendChild(open);
+              const buttons = [];
+              for (const action of ['rename', 'delete']) {
+                const button = document.createElement('button'); button.textContent = action === 'rename' ? 'ПЕРЕЙМЕНУВАТИ' : 'ВИДАЛИТИ';
+                button.disabled = archiveBusy.has(report.reportId);
+                button.addEventListener('click', () => {
+                  if (archiveBusy.has(report.reportId)) return;
+                  let newName;
+                  if (action === 'rename') { newName = prompt(`Нова назва ${report.reportId}`, report.sheetName); if (newName === null) return; }
+                  if (!confirm(`${action === 'rename' ? 'Перейменувати' : 'Видалити'} «${report.sheetName}» (${report.reportId})?`)) return;
+                  archiveBusy.add(report.reportId); buttons.forEach(b => { b.disabled = true; });
+                  status.textContent = 'Виконання операції...'; let settled = false;
+                  const finish = () => { archiveBusy.delete(report.reportId); buttons.forEach(b => { b.disabled = false; }); };
+                  const unknown = () => { finish(); status.textContent = 'Результат невизначений. Перевірте REPORTING; автоматичного повтору немає.'; };
+                  const timer = setTimeout(() => { settled = true; unknown(); }, 360000);
+                  const runner = google.script.run.withSuccessHandler(result => {
+                    clearTimeout(timer); if (settled) return; settled = true; finish();
+                    if (result && result.status === 'OK') refreshSavedReports();
+                    else status.textContent = `${result && result.code}: ${result && result.message}`;
+                  }).withFailureHandler(() => { clearTimeout(timer); if (settled) return; settled = true; unknown(); });
+                  if (action === 'rename') runner.renameSavedMaterialReportWeb({ reportId: report.reportId, sheetId: report.sheetId, newName });
+                  else runner.deleteSavedMaterialReportWeb({ reportId: report.reportId, sheetId: report.sheetId });
+                });
+                buttons.push(button); actions.appendChild(button);
+              }
+            } else actions.textContent = report.diagnostic || 'Архів потребує перевірки.';
+            tr.appendChild(actions); body.appendChild(tr);
+          }
+        }).withFailureHandler(() => { done(); status.textContent = 'Не вдалося завантажити архів. Повторної зміни не виконувалося.'; }).listSavedMaterialReportsWeb();
+      }
+      refreshSavedReports();
     </script>
   </body>
 </html>

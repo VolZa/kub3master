@@ -3,22 +3,37 @@
     "target": "ES2019",
     "lib": ["ES2019"],
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "strict": true,
     "rootDir": "src",
     "types": ["node", "google-apps-script"],
     "esModuleInterop": true,
     "sourceMap": true,
-    "baseUrl": "./src",
-    "paths": {
-      "domain/*": ["domain/*"],
-      "technology/*": ["technology/*"],
-      "core/*": ["core/*"],
-      "shared/*": ["shared/*"]
-    }
-  }
-}
 
+    "paths": {
+      "domain/*": ["./src/domain/*"],
+      "technology/*": ["./src/technology/*"],
+      "core/*": ["./src/core/*"],
+      "shared/*": ["./src/shared/*"],
+      "modules/*": ["./src/modules/*"],
+      "utils/*": ["./src/utils/*"],
+      "config/*": ["./src/config/*"],
+      "services/*": ["./src/services/*"],
+      "app/*": ["./src/app/*"],
+      "infrastructure/*": ["./src/infrastructure/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["legacy", "dist", "node_modules"]
+}
+// Було : "moduleResolution": "node",
+//  "baseUrl": "./src",
+//     "paths": {
+//       "domain/*": ["domain/*"],
+//       "technology/*": ["technology/*"],
+//       "core/*": ["core/*"],
+//       "shared/*": ["shared/*"]
+//     }
 //"module": "CommonJS"
 
 //** Перевірити чи не потрібно змінити на node16, бо тоді можна буде використовувати імпорти з розширенням .js, що потрібно для імпорту файлів з папки dist після компіляції. Але це може викликати проблеми з деякими бібліотеками, які не підтримують цей режим. Потрібно протестувати і перевірити сумісність. **//

@@ -97,6 +97,15 @@ describe('explicit MASTER Elements', () => {
     expect(new GoogleSheetsElementRepository().findById('2000010')).toMatchObject({ type: 'part', diameter: 10, className: 'A500', length: 1500 });
     untouched();
   });
+  it('preserves a parent suffix in the physical Name column and fresh mapped readback', () => {
+    const repo = new GoogleSheetsElementRepository();
+    const row: ElementRow = { ...product, ID: '4000014', Code: 'ВСП-П-2.8', PrefixName: 'Сітка', Name: 'Сітка ВСП-П-2.8 (верхня)' };
+    repo.insert(row);
+    expect(append.mock.calls[0][0].slice(1, 4)).toEqual(["'ВСП-П-2.8", 'Сітка', row.Name]);
+    expect(new GoogleSheetsElementRepository().findByCode(row.Code, row.ProjectDocumentID))
+      .toMatchObject({ code: row.Code, prefixName: row.PrefixName, name: row.Name });
+    untouched();
+  });
   it('leaves provider routing for other consumers unchanged', () => {
     new GoogleSheetsElementRepository();
     const provider = new SpreadsheetProvider();

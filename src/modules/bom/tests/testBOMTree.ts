@@ -1,3 +1,4 @@
+import { getMaterialRepository } from '../../../app/factories/material.factory';
 import { GoogleSheetsElementRepository } from '../../elements/element.repository';
 import { BOMTreeNode } from '../model/bom-tree-node.model';
 import { GoogleSheetsBOMRepository } from '../repositories/google-sheets-bom.repository';
@@ -6,7 +7,7 @@ export function testBOMTree() {
   const elementRepo = new GoogleSheetsElementRepository();
   const bomRepo = new GoogleSheetsBOMRepository();
 
-  const service = new BOMExplorerService(elementRepo, bomRepo);
+  const service = new BOMExplorerService(elementRepo, bomRepo, getMaterialRepository());
 
   const product = elementRepo.findByCode('П-1.1', '6'); // Specify the projectDocumentID if needed
 

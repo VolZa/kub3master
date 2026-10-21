@@ -18,6 +18,8 @@ export function buildName(
 
 // name.builder.ts
 
-export function buildElementName(prefix?: string, code?: string): string {
-  return [prefix?.trim(), code?.trim()].filter(Boolean).join(' ');
+export function buildElementName(prefix?: string, name?: string): string {
+  return [prefix?.trim(), name?.trim()].filter(Boolean).join(' ')
+    .replace(/\(\s+/g, '(')
+    .replace(/\s+\)/g, ')');
 }

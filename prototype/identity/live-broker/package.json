@@ -1,0 +1,9 @@
+{
+  "name": "kub-isolated-identity-live-broker",
+  "version": "0.0.1",
+  "private": true,
+  "description": "AC-002B.4 isolated broker prototype; no production ERP integration",
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node --test test/*.test.cjs", "start": "node server.cjs" },
+  "dependencies": { "google-auth-library": "11.3.1" }
+}

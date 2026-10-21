@@ -7,6 +7,20 @@
 import { normalizeIntegerId } from '../../../utils/id.logic';
 export const PHYSICAL_BOM_HEADERS = ['ParentID', 'ChildID', 'Qty', 'Unit', 'Comment', 'ParentCode', 'ChildCode'] as const;
 export type PhysicalBOMRow = [string, string, number, string, string, string, string];
+
+/** Read compatibility only: historical Comment cells can contain native Sheets dates.
+ * Preserve the instant as UTC ISO text in memory; never rewrite the source cell.
+ * Write-plan validation remains strictly string-only for Comment.
+ */
+export function validateBOMReadRow(row: unknown[], physicalRow = 0): PhysicalBOMRow | null {
+  const comment = row[4];
+  if (comment instanceof Date && Number.isFinite(comment.getTime())) {
+    const normalized = row.slice();
+    normalized[4] = comment.toISOString();
+    return validateBOMRow(normalized, physicalRow);
+  }
+  return validateBOMRow(row, physicalRow);
+}
 export function validateBOMHeaders(headers: unknown[]): void {
   if (headers.length !== 7 || PHYSICAL_BOM_HEADERS.some((header, index) => headers[index] !== header)) {
     throw new Error('Unsupported 01_BOM schema: expected ParentID, ChildID, Qty, Unit, Comment, ParentCode, ChildCode; no extra columns supported');

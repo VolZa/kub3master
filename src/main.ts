@@ -1,5 +1,7 @@
 // src\main.ts
+import { requireWrapperPermission } from './security/production-authorization';
 export function onOpen(): void {
+  requireWrapperPermission('onOpen');
   const ui = SpreadsheetApp.getUi();
 
   ui.createMenu('ERP КУБ')
@@ -13,26 +15,7 @@ export function onOpen(): void {
         .addItem('📥 Імпорт специфікації', 'openFormTable'),
     )
 
-    // ===========================
-    // BOM
-    // ===========================
-    .addSubMenu(
-      ui
-        .createMenu('🔗 BOM')
-        .addItem('🔍 Аудит усіх Product', 'testAuditAllProducts'),
-    )
-
-    // ===========================
-    // Виробництво
-    // ===========================
-    .addSubMenu(
-      ui
-        .createMenu('📥 Виробництво')
-        .addItem(
-          '🔄 Повна синхронізація виробництва',
-          'rebuildManufacturingState',
-        ),
-    )
+    // Manual audit/rebuild actions are isolated from production registration in AC-002A.
 
     // ===========================
     // Розробка

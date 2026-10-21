@@ -106,7 +106,7 @@ export function prepareBOM(input: BOMPreparationInput, deps: BOMPreparationDepen
       if (!['product', 'assembly', 'part'].includes(type)) throw new Error('Invalid parent Catalog type');
       requireText(template.category, 'Parent category');
       parent = planElement(['identity', input.projectDocumentID ?? '', type, parsed.code], {
-        Code: parsed.code, PrefixName: parsed.prefix, Name: buildElementName(parsed.prefix, parsed.code),
+        Code: parsed.code, PrefixName: parsed.prefix, Name: buildElementName(parsed.prefix, parsed.name),
         Type: type, ProjectDocumentID: input.projectDocumentID ?? '', Category: template.category,
         ProfileType: template.profileType ?? '', BaseUnit: 'шт', IsActive: true, Comment: '',
       });

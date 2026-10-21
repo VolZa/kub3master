@@ -21,6 +21,8 @@ function gasEntrypoints() {
     }
     visit(source);
     if (!names.length || new Set(names).size !== names.length) throw new Error('Invalid GAS entrypoint list');
+    const allowed = JSON.parse(fs.readFileSync('gas-production-entrypoints.json', 'utf8'));
+    if (JSON.stringify([...names].sort()) !== JSON.stringify([...allowed].sort())) throw new Error('Production entrypoint allowlist mismatch');
     const chunk = bundle['Code.gs'];
     chunk.code += '\n' + names.map(name => `function ${name}() { return __kubGasHandlers_.${name}.apply(null, arguments); }`).join('\n') + '\n';
   } };

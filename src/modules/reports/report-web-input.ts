@@ -22,6 +22,24 @@ export type ReportType =
 
 export type ReportFormat = 'google-sheet';
 
+export interface MaterialConsumptionReportWebRequest {
+  reportType: 'material-consumption';
+  calculationMethod: 'normative';
+  format: 'google-sheet';
+  houseCode?: string;
+  productCode?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  lossPercents: MaterialLossPercents;
+}
+
+/** Additive allowance: TotalQty = BaseQty * (1 + LossPercent / 100).
+ * rebar -> rebar; plate/angle/pipe -> rolled; concrete_mix -> concrete.
+ * wire and cement have no implicit loss group. Values must be explicit, 0..100.
+ */
+export type { MaterialLossPercents as LossPercents } from '../../domain/materials/material-loss.model';
+import type { MaterialLossPercents } from '../../domain/materials/material-loss.model';
+
 export interface ReportWebInput {
   /**
    * Область даних, для яких формується звіт.
@@ -58,6 +76,8 @@ export interface ReportWebInput {
    * Основа розрахунку витрат матеріалів.
    */
   consumptionBasis: ConsumptionBasis;
+
+  lossPercents: MaterialLossPercents;
 
   /**
    * Тип звіту.

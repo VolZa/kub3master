@@ -16,6 +16,7 @@ import { Material } from '../../../domain/materials/material.model';
 import { TableRowInput } from '../model/table-row-input.model';
 import { generateIdByType } from '../../../utils/id';
 import { MaterialBatchRepository } from '../../../domain/materials/material-batch.repository';
+import { parseParent } from '../parsers/parseParent';
 
 const stored = vi.hoisted(() => ({ rows: [] as any[][] }));
 vi.mock('../bom.repository', () => ({
@@ -165,5 +166,28 @@ describe('direct Material creation in BOM', () => {
     expect(result.operatorMessage?.severity).toBe('ERROR');
     expect(result.operatorMessage?.text).toContain('Material not found in 05_Materials: C_20_25');
     expect(s.insert).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['Сітка; ВСП-П-2.8; ( верхня )', 'ВСП-П-2.8', 'Сітка ВСП-П-2.8 (верхня)'],
+    ['Сітка; СП-П-2.8; ( нижня )', 'СП-П-2.8', 'Сітка СП-П-2.8 (нижня)'],
+    ['Сітка; СП-П-2.10;', 'СП-П-2.10', 'Сітка СП-П-2.10'],
+  ])('preserves the parent name through the guarded legacy call site: %s', (text, code, name) => {
+    const s = setup();
+    const catalog = { resolveTemplate: () => ({ type: 'assembly', supportsLength: false, category: 'steel' }) } as unknown as CatalogHelper;
+    const parent = { ...parseParent(text), projectDocumentID: 'DOC' };
+    const bomRepo = {
+      getChildrenRows: (id: string) => stored.rows.filter(row => row[0] === id)
+        .map(row => ({ parentId: row[0], childId: row[1], qty: row[2], unit: row[3] })),
+      getParentsRows: () => [],
+    };
+    const args: Parameters<typeof legacyBuildBOMFromTable> = [parent, [{ ...input, code: concrete.code }], s.repo, catalog, s.materialRepo,
+      {} as MaterialBatchRepository, bomRepo];
+    expect(() => legacyBuildBOMFromTable(...args)).toThrow('LEGACY_BOM_SAVE_DISABLED');
+    expect(s.insert).not.toHaveBeenCalled();
+    expect(buildBOMFromTable(...args).errorCount).toBe(0);
+    expect(s.repo.findById('4001')).toMatchObject({ prefixName: 'Сітка', code, name });
+    expect(stored.rows[0].slice(5)).toEqual([code, concrete.code]);
+    expect(buildBOMFromTable(...args).errorCount).toBe(0);
+    expect(s.insert).toHaveBeenCalledTimes(1);
   });
 });
