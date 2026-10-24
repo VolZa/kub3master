@@ -1,3 +1,5 @@
+> Historical stage snapshot: role names below predate the ADMIN / MANAGER migration. Current rules: [role matrix](AC_002B_ROLE_MATRIX.md). Original stage results are unchanged.
+
 # AC-002B.3 — Google Identity Integration Feasibility
 
 Дата перевірки: 2026-10-21. Лише локальний design/prototype. Production v32 незмінна.

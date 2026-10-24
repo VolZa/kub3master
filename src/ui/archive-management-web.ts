@@ -1,13 +1,14 @@
 import { SavedReportsManagement, type ArchiveAction, type ArchivePolicy } from '../infrastructure/reporting/archive-management';
 import { GasArchiveManagementStore } from '../infrastructure/reporting/gas-archive-management-store';
 import { requirePermission, requireWrapperPermission } from '../security/production-authorization';
+import { isRole } from '../security/permission-service';
 
 /** Server-resolved identity only. Request fields and hidden buttons never grant permission. */
 export class ArchiveRolePolicy implements ArchivePolicy {
   constructor(private readonly identity: () => { email: string; roles: readonly string[] } | undefined) {}
   authorize(_action: ArchiveAction) {
     const user = this.identity();
-    if (!user?.email || !user.roles.some(r => r === 'ERP_OWNER' || r === 'WORKSHOP_MANAGER')) throw new Error('ARCHIVE_ACCESS_DENIED');
+    if (!user?.email || !Array.isArray(user.roles) || !user.roles.length || !user.roles.every(isRole)) throw new Error('ARCHIVE_ACCESS_DENIED');
   }
 }
 /** Central permission policy; production identity remains unconfigured and denies access. */

@@ -1,3 +1,5 @@
+> Historical stage snapshot: role names below predate the ADMIN / MANAGER migration. Current rules: [role matrix](AC_002B_ROLE_MATRIX.md). Original stage results are unchanged.
+
 # AC-002B.2 — Production Identity & Session Design
 
 Дата: 2026-10-21. Лише локальний прототип і design review. v32 незмінна.

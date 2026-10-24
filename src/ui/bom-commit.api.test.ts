@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.clearAllMocks(); email = 'editor@example.com';
   const identity = verifiedIdentity('https://accounts.google.com', 'isolated-bom-user', Date.now() + 60000);
   const auth = new HandlerAuthorization({ current: () => email ? identity : undefined }, { find: () => ['owner@example.com', 'editor@example.com'].includes(email)
-    ? { issuer: identity.issuer, subject: identity.subject, active: true, roles: ['ERP_OWNER'], authorizationVersion: 1 } : undefined });
+    ? { issuer: identity.issuer, subject: identity.subject, active: true, roles: ['ADMIN'], authorizationVersion: 1 } : undefined });
   vi.mocked(requirePermission).mockImplementation(permission => { auth.require(permission); });
   vi.stubGlobal('Session', { getActiveUser: () => ({ getEmail: () => email }) });
   file.mockImplementation(id => { expect(id).toBe(SpreadsheetConfig.MASTER.id); return { getOwner: () => ({ getEmail: () => 'owner@example.com' }), getEditors: () => [{ getEmail: () => 'editor@example.com' }] }; });
@@ -57,7 +57,7 @@ it('resume is authorized independently of knowledge of the operation ID', () => 
 it.each(['', 'viewer@example.com'])('rejects unidentified/unauthorized %s before all service calls', value => {
   email = value; expect(() => submitBOM(request)).toThrow('ACCESS_DENIED'); expect(() => buildBOMFromText(request)).toThrow('ACCESS_DENIED'); expect(commitBOM).not.toHaveBeenCalled();
 });
-it('allows explicit ERP_OWNER from isolated identity/repository, not Drive ownership', () => {
+it('allows explicit ADMIN from isolated identity/repository, not Drive ownership', () => {
   email = 'owner@example.com'; expect(submitBOM(request).status).toBe('COMMITTED');
 });
 it.each(['PreparedBOM', 'SafeBOMPlan', 'bindings', 'createdParts', 'AffectedParentIDs', 'commentChanges', 'rows'])('rejects client-controlled internal %s', key => {

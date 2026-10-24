@@ -20,7 +20,7 @@ class Store implements ArchiveManagementStore {
   deleteIndex(e: ArchiveEntry) { if (this.fail === 'index') throw new Error('index'); this.rows = this.rows.filter(r => r.reportId !== e.reportId); }
   finish(o: ArchiveOperation) { if (this.fail === 'finish') throw new Error('finish'); this.operations.set(o.entry.reportId, { ...o, state: 'COMPLETE' }); }
 }
-const policy = new ArchiveRolePolicy(() => ({ email: 'verified@example.com', roles: ['ERP_OWNER'] }));
+const policy = new ArchiveRolePolicy(() => ({ email: 'verified@example.com', roles: ['ADMIN'] }));
 it('lists empty/one/multiple archives and opens verified exact gid only', () => {
   const s = new Store(), service = new SavedReportsManagement(s, policy);
   expect(service.list()[0]).toMatchObject({ state: 'ACTIVE', url: expect.stringContaining('#gid=101') });
@@ -71,10 +71,10 @@ it('blocks unregistered/system sheets even with forged index name', () => {
 it('honors shared busy lock and both future archive roles; denies unidentified/unprivileged roles', () => {
   const s = new Store(); s.held = true;
   expect(() => new SavedReportsManagement(s, policy).list()).toThrow('REPORT_BUSY');
-  for (const role of ['ERP_OWNER', 'WORKSHOP_MANAGER']) for (const action of ['list', 'open', 'save', 'rename', 'delete'] as const) {
+  for (const role of ['ADMIN', 'MANAGER']) for (const action of ['list', 'open', 'save', 'rename', 'delete'] as const) {
     expect(() => new ArchiveRolePolicy(() => ({ email: 'verified@example.com', roles: [role] })).authorize(action)).not.toThrow();
   }
-  for (const user of [undefined, { email: '', roles: ['ERP_OWNER'] }, { email: 'x', roles: ['VIEWER'] }, { email: 'x', roles: ['TECHNOLOGIST'] }]) {
+  for (const user of [undefined, { email: '', roles: ['ADMIN'] }, { email: 'x', roles: ['VIEWER'] }, { email: 'x', roles: ['TECHNOLOGIST'] }]) {
     expect(() => new ArchiveRolePolicy(() => user).authorize('delete')).toThrow('ARCHIVE_ACCESS_DENIED');
   }
 });

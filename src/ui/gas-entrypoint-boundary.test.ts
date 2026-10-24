@@ -34,8 +34,8 @@ it('built GAS exposes only explicit wrappers; internal BOM scopes, receipts and 
   for (const name of internal) expect(context.__kubGasHandlers_[name]).toBeUndefined();
   for (const name of publicNames) expect(context[name]).toBeTypeOf('function');
   for (const name of publicNames) {
-    expect(() => context[name]({ credential: 'forged', email: 'owner@example.com', roles: ['ERP_OWNER'], range: {} })).toThrow('ACCESS_DENIED');
-    expect(() => context.__kubGasHandlers_[name]({ roles: ['ERP_OWNER'] })).toThrow('ACCESS_DENIED');
+    expect(() => context[name]({ credential: 'forged', email: 'owner@example.com', roles: ['ADMIN'], range: {} })).toThrow('ACCESS_DENIED');
+    expect(() => context.__kubGasHandlers_[name]({ roles: ['ADMIN'] })).toThrow('ACCESS_DENIED');
   }
   for (const name of ['verifiedIdentity', 'HandlerAuthorization', 'authorizeHandlers', 'requirePermission', 'IdentityPrototype', 'SessionPrototype', 'PropertyUserRepository', 'LoginBridgePrototype', 'bridgeReadyMessage', 'BrokerAssertionPrototype']) expect(context[name]).toBeUndefined();
   expect(code).not.toContain('google-account-A');
@@ -46,6 +46,11 @@ it('built GAS exposes only explicit wrappers; internal BOM scopes, receipts and 
   expect(code).not.toContain('KUB_BRIDGE_READY');
   expect(code).not.toContain('isolated-assertion-account');
   expect(code).not.toContain('google-auth-library');
+  for (const name of ['TestReset', 'createGasTestReset', 'TEST_RESET', 'testReset']) {
+    expect(context[name]).toBeUndefined(); expect(context.__kubGasHandlers_[name]).toBeUndefined();
+  }
+  expect(code).not.toContain('KUB_TEST_ENV_V1');
+  expect(code).not.toContain('KUB_TEST_INSTALLATION_V1');
   expect(code).not.toContain('KUB_SECURITY_USERS_V1'); // Unconfigured prototype adapters stay outside production graph.
   expect(effects).toEqual([]);
 }, 20000);

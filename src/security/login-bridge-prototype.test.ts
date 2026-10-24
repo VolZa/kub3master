@@ -24,7 +24,7 @@ function setup() {
   const identity = new IdentityPrototype(challengeStore, verifier, 'bridge-offline-client', () => now);
   const records = new Map<string, SessionRecord>();
   const sessions = new SessionPrototype({ find: (iss, sub) => ['bridge-offline-owner', 'bridge-offline-manager'].includes(sub) ? {
-    issuer: iss, subject: sub, active: true, roles: [sub === 'bridge-offline-owner' ? 'ERP_OWNER' : 'WORKSHOP_MANAGER'], authorizationVersion: 1,
+    issuer: iss, subject: sub, active: true, roles: [sub === 'bridge-offline-owner' ? 'ADMIN' : 'MANAGER'], authorizationVersion: 1,
   } : undefined }, { create: (k, v) => { records.set(k, v); }, read: k => records.get(k), revoke: k => { records.delete(k); } },
   { create() {}, consume: () => false }, { secret: () => randomBytes(32).toString('hex'), sha256: hash }, () => now);
   const redeem = vi.fn((id: string, p: string) => {
@@ -68,6 +68,6 @@ it('postMessage origin/source/transaction are all exact; a browser identity asse
   expect(bridgeReadyMessage(valid, origin, popup, id)).toBe(true);
   for (const event of [{ ...valid, origin: origin + '.attacker.test' }, { ...valid, source: {} },
     { ...valid, data: { type: 'KUB_BRIDGE_READY', transactionId: 'other' } },
-    { ...valid, data: { ...valid.data, roles: ['ERP_OWNER'] } }]) expect(bridgeReadyMessage(event, origin, popup, id)).toBe(false);
+    { ...valid, data: { ...valid.data, roles: ['ADMIN'] } }]) expect(bridgeReadyMessage(event, origin, popup, id)).toBe(false);
   expect(bridgeReadyMessage(valid, '*', popup, id)).toBe(false);
 });

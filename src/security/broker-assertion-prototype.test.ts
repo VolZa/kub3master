@@ -19,7 +19,7 @@ function setup() {
     transactionId: tx.id, nonce: tx.nonce, proofHash: tx.proofHash });
   const verifier = new BrokerAssertionPrototype(signature, issuer, audience, () => tx, replay, () => now);
   const user: User = { issuer: 'https://accounts.google.com', subject: 'isolated-assertion-account', active: true,
-    roles: ['WORKSHOP_MANAGER'], authorizationVersion: 1 };
+    roles: ['MANAGER'], authorizationVersion: 1 };
   const users = { find: () => user };
   return { verifier, signature, signer, assertion, tx, replay, user, users,
     boundary: new SecurityBoundary(verifier, new PermissionService(users, () => now)),
@@ -44,7 +44,7 @@ it.each(['issuer', 'audience', 'nonce', 'transaction', 'proof', 'expiry'] as con
 });
 it('rejects tampering, replay of assertion and a new assertion for an already consumed transaction', () => {
   const s = setup(), assertion = s.assertion();
-  const parts = assertion.split('.'); parts[1] = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(parts[1], 'base64url').toString()), roles: ['ERP_OWNER'] })).toString('base64url');
+  const parts = assertion.split('.'); parts[1] = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(parts[1], 'base64url').toString()), roles: ['ADMIN'] })).toString('base64url');
   expect(() => s.verifier.verify(parts.join('.'))).toThrow('ACCESS_DENIED');
   s.verifier.verify(assertion);
   expect(() => s.verifier.verify(assertion)).toThrow('ACCESS_DENIED');
@@ -62,5 +62,5 @@ it('revoked/unknown user and workshop BOM permission fail despite a valid broker
 it('unavailable assertion replay store fails closed; no fallback identity', () => {
   const s = setup(); s.replay.consume.mockImplementation(() => { throw Error('store-unavailable'); });
   expect(() => s.verifier.verify(s.assertion())).toThrow('ACCESS_DENIED');
-  expect(() => s.verifier.verify({ email: 'owner', roles: ['ERP_OWNER'] })).toThrow('ACCESS_DENIED');
+  expect(() => s.verifier.verify({ email: 'owner', roles: ['ADMIN'] })).toThrow('ACCESS_DENIED');
 });

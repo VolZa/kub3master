@@ -1,3 +1,5 @@
+> Historical stage snapshot: role names below predate the ADMIN / MANAGER migration. Current rules: [role matrix](AC_002B_ROLE_MATRIX.md). Original stage results are unchanged.
+
 # AC-002A — local security foundation and isolated identity POC
 
 Role refinement: full-privilege ERP_OWNER replaces the initial TECHNOLOGIST concept. TECHNOLOGIST is

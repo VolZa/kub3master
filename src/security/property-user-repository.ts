@@ -1,4 +1,4 @@
-import type { Role, User, UserRepository } from './permission-service';
+import { isRole, type Role, type User, type UserRepository } from './permission-service';
 export interface DirectoryUser extends User { email: string }
 export interface PropertyReader { getProperty(key: string): string | null }
 /** Read-only adapter port for ScriptProperties; no GAS access at module load or real records supplied. */
@@ -15,7 +15,7 @@ export class PropertyUserRepository implements UserRepository {
       for (const row of doc.users) {
         if (!row || row.issuer !== 'https://accounts.google.com' || typeof row.subject !== 'string' || !row.subject ||
           typeof row.email !== 'string' || typeof row.active !== 'boolean' || !Array.isArray(row.roles) ||
-          !row.roles.every((r: unknown) => ['ERP_OWNER', 'WORKSHOP_MANAGER', 'TECHNOLOGIST'].includes(r as string)) ||
+          !row.roles.every(isRole) ||
           new Set(row.roles).size !== row.roles.length || !Number.isSafeInteger(row.authorizationVersion) || row.authorizationVersion < 0) return fail();
         const key = JSON.stringify([row.issuer, row.subject]);
         if (keys.has(key)) return fail(); keys.add(key);

@@ -1,19 +1,20 @@
-import { PermissionService, type Permission, type UserIdentity, type UserRepository } from './permission-service';
+import { PermissionService, type Permission, type UserIdentity, type UserRepository, type SecurityEnvironment } from './permission-service';
 export interface IdentityProvider { current(): UserIdentity | undefined }
 /** null is an explicit policy hold, not an implicit permission for the owner. */
 export const wrapperPermissions = Object.freeze({
   onOpen: 'BOM_EDIT', onEdit: null, openForm: 'BOM_EDIT', openFormTable: 'BOM_EDIT', includeBOMCommitClient_: 'BOM_EDIT', doGet: 'REPORT_VIEW',
   submitBOM: 'BOM_EDIT', resumeBOM: 'BOM_EDIT', runTableParser: 'BOM_EDIT', buildBOMFromText: 'BOM_EDIT',
   createManufacturingFromWeb: null,
-  getManufacturingHouseOptions: 'REPORT_VIEW', getManufacturingProductOptions: 'REPORT_VIEW', getManufacturingPlacementOptions: 'REPORT_VIEW',
+  getManufacturingHouseOptions: 'MANUFACTURING_VIEW', getManufacturingProductOptions: 'MANUFACTURING_VIEW', getManufacturingPlacementOptions: 'MANUFACTURING_VIEW',
   generateMaterialConsumptionReportWeb: 'REPORT_GENERATE', getCurrentMaterialReportWeb: 'REPORT_VIEW', saveMaterialConsumptionReportWeb: 'REPORT_SAVE',
   listSavedMaterialReportsWeb: 'REPORT_LIST', renameSavedMaterialReportWeb: 'REPORT_RENAME', deleteSavedMaterialReportWeb: 'REPORT_DELETE',
 } satisfies Record<string, Permission | null>);
 
 export class HandlerAuthorization {
   private readonly permissions: PermissionService;
-  constructor(private readonly identity: IdentityProvider, users: UserRepository, now: () => number = Date.now) {
-    this.permissions = new PermissionService(users, now);
+  constructor(private readonly identity: IdentityProvider, users: UserRepository, now: () => number = Date.now,
+    environment: SecurityEnvironment = 'PRODUCTION') {
+    this.permissions = new PermissionService(users, now, environment);
   }
   require(permission: Permission) {
     try { return this.permissions.require(this.identity.current(), permission); }

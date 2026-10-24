@@ -3,6 +3,9 @@ node_modules/
 
 # Build
 dist/
+build/test-admin/
+build/test-readiness/
+build/test-runtime/
 
 # Logs
 npm-debug.log*
@@ -12,6 +15,9 @@ npm-debug.log*
 
 # clasp credentials (ДУЖЕ ВАЖЛИВО)
 .clasp.json
+**/.clasp.json
+.clasprc.json
+**/.clasprc.json
 
 # VSCode (опціонально)
 .vscode/

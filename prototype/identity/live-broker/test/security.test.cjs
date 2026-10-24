@@ -61,7 +61,7 @@ function brokerFixture() {
   return { broker, id, proof, store, denyUser: () => { accepted = false; }, exchanges: () => codeExchanges };
 }
 test('broker transaction binds proof/cookie/state, never accepts a browser role, redeems only once', async () => {
-  const f = brokerFixture(); await f.broker.begin({ id: f.id, nonce, proofHash: hash(f.proof), roles: ['ERP_OWNER'] });
+  const f = brokerFixture(); await f.broker.begin({ id: f.id, nonce, proofHash: hash(f.proof), roles: ['ADMIN'] });
   await assert.rejects(f.broker.bind({ id: f.id, proof: 'e'.repeat(64) }));
   const binding = await f.broker.bind({ id: f.id, proof: f.proof }), state = new URL(binding.url).searchParams.get('state');
   await assert.rejects(f.broker.callback({ state, cookie: 'e'.repeat(64), code: 'code' })); assert.equal(f.exchanges(), 0);

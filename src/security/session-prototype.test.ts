@@ -7,7 +7,7 @@ import { verifiedIdentity, type User } from './permission-service';
 
 function setup() {
   let now = 1800000000000;
-  const user: User = { issuer: 'https://accounts.google.com', subject: 'session-offline-A', active: true, roles: ['ERP_OWNER'], authorizationVersion: 1 };
+  const user: User = { issuer: 'https://accounts.google.com', subject: 'session-offline-A', active: true, roles: ['ADMIN'], authorizationVersion: 1 };
   const sessions = new Map<string, SessionRecord>(), tickets = new Map<string, RequestTicket>();
   const hash = (s: string) => createHash('sha256').update(s).digest('hex');
   const service = new SessionPrototype({ find: (iss, sub) => iss === user.issuer && sub === user.subject ? user : undefined }, {
@@ -42,7 +42,7 @@ it.each(['expired', 'inactive', 'version', 'role', 'logout', 'unknown'] as const
   if (mode === 'expired') s.advance(900_000);
   if (mode === 'inactive') s.user.active = false;
   if (mode === 'version') s.user.authorizationVersion++;
-  if (mode === 'role') s.user.roles = ['TECHNOLOGIST'];
+  if (mode === 'role') s.user.roles = [];
   if (mode === 'logout') s.service.logout(p.session);
   const session = mode === 'unknown' ? 'b'.repeat(64) : p.session;
   expect(() => s.service.invoke(session, p.ticket, p.expiresAt, 'REPORT_SAVE', s.payloadHash, effect)).toThrow('ACCESS_DENIED');
@@ -51,9 +51,9 @@ it.each(['expired', 'inactive', 'version', 'role', 'logout', 'unknown'] as const
 it('rejects fabricated identity and role claims; workshop receives reporting only', () => {
   const s = setup();
   expect(() => s.service.issue(JSON.parse(JSON.stringify(s.identity)))).toThrow('ACCESS_DENIED');
-  s.user.roles = ['WORKSHOP_MANAGER']; const p = s.prepare();
+  s.user.roles = ['MANAGER']; const p = s.prepare();
   expect(() => s.service.ticket(p.session, 'BOM_EDIT', s.payloadHash)).toThrow('ACCESS_DENIED');
-  expect(() => s.service.ticket({ session: p.session, roles: ['ERP_OWNER'] }, 'REPORT_SAVE', s.payloadHash)).toThrow('ACCESS_DENIED');
+  expect(() => s.service.ticket({ session: p.session, roles: ['ADMIN'] }, 'REPORT_SAVE', s.payloadHash)).toThrow('ACCESS_DENIED');
 });
 it('rejects payload/permission/ticket substitution, ticket expiry and cross-session use', () => {
   const s = setup(), p = s.prepare(), other = s.login(); const effect = vi.fn();
@@ -90,7 +90,7 @@ it('reuses existing challenge controller: invalid token creates no session; chal
 it('directory reads stable subject, never grants by email, and returns immutable roles', () => {
   const s = setup(), row = { ...s.user, email: 'informational@example.invalid' };
   const repo = new PropertyUserRepository({ getProperty: () => JSON.stringify({ version: 1, users: [row] }) });
-  expect(repo.find(s.user.issuer, s.user.subject)?.roles).toEqual(['ERP_OWNER']);
+  expect(repo.find(s.user.issuer, s.user.subject)?.roles).toEqual(['ADMIN']);
   expect(repo.find(s.user.issuer, row.email)).toBeUndefined();
   expect(Object.isFrozen(repo.find(s.user.issuer, s.user.subject)?.roles)).toBe(true);
 });

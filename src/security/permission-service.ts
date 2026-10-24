@@ -1,9 +1,17 @@
-/** Application roles; ERP_OWNER is never inferred from Drive ownership or GAS execution identity.
- * TECHNOLOGIST is reserved and has no grants until its permission matrix is approved.
- */
-export type Role = 'ERP_OWNER' | 'WORKSHOP_MANAGER' | 'TECHNOLOGIST';
-export type Permission = 'REPORT_GENERATE' | 'REPORT_VIEW' | 'REPORT_SAVE' | 'REPORT_LIST' | 'REPORT_RENAME' | 'REPORT_DELETE' |
-  'BOM_EDIT' | 'TECHNOLOGY_EDIT' | 'USER_MANAGE';
+/** Application roles only; never inferred from position, Drive ownership or GAS execution identity. */
+export const ROLES = ['ADMIN', 'MANAGER'] as const;
+export type Role = typeof ROLES[number];
+export const isRole = (role: unknown): role is Role => role === 'ADMIN' || role === 'MANAGER';
+export type SecurityEnvironment = 'PRODUCTION' | 'TEST';
+export const REPORT_PERMISSIONS = ['REPORT_GENERATE', 'REPORT_VIEW', 'REPORT_SAVE', 'REPORT_LIST', 'REPORT_RENAME', 'REPORT_DELETE'] as const;
+/** Explicit grants only. Defining these permissions does NOT enable a held/unintegrated RPC. */
+export const OPERATIONAL_PERMISSIONS = [
+  'MANUFACTURING_VIEW', 'MANUFACTURING_CREATE', 'MANUFACTURING_SYNC_ANALYZE', 'MANUFACTURING_SYNC_EXECUTE',
+  'PLANNING_VIEW', 'PLANNING_CREATE_DRAFT', 'PLANNING_ADD_PLACEMENT', 'PLANNING_REMOVE_PLACEMENT',
+  'PLANNING_APPROVE', 'PLANNING_REOPEN', 'PLANNING_SCHEDULE_PLACEMENT',
+] as const;
+export const PERMISSIONS = [...REPORT_PERMISSIONS, ...OPERATIONAL_PERMISSIONS, 'BOM_EDIT', 'TECHNOLOGY_EDIT', 'USER_MANAGE'] as const;
+export type Permission = typeof PERMISSIONS[number];
 export interface UserIdentity { readonly issuer: 'https://accounts.google.com'; readonly subject: string; readonly expiresAt: number }
 export interface User { issuer: string; subject: string; active: boolean; roles: readonly Role[]; authorizationVersion: number }
 export interface UserRepository { find(issuer: string, subject: string): Readonly<User> | undefined }
@@ -14,15 +22,17 @@ export function verifiedIdentity(issuer: string, subject: string, expiresAt: num
   if (issuer !== 'https://accounts.google.com' || !subject || !Number.isFinite(expiresAt)) throw new Error('ACCESS_DENIED');
   const identity: UserIdentity = Object.freeze({ issuer, subject, expiresAt }); verifiedIdentities.add(identity); return identity;
 }
-const reportPermissions: readonly Permission[] = ['REPORT_GENERATE', 'REPORT_VIEW', 'REPORT_SAVE', 'REPORT_LIST', 'REPORT_RENAME', 'REPORT_DELETE'];
 export class PermissionService {
-  constructor(private readonly users: UserRepository, private readonly now: () => number = Date.now) {}
+  constructor(private readonly users: UserRepository, private readonly now: () => number = Date.now,
+    private readonly environment: SecurityEnvironment = 'PRODUCTION') {}
   require(identity: UserIdentity | undefined, permission: Permission): Readonly<User> {
-    if (!identity || !verifiedIdentities.has(identity) || identity.expiresAt <= this.now()) throw new Error('ACCESS_DENIED');
+    if (!['PRODUCTION', 'TEST'].includes(this.environment) || !(PERMISSIONS as readonly string[]).includes(permission) ||
+      !identity || !verifiedIdentities.has(identity) || identity.expiresAt <= this.now()) throw new Error('ACCESS_DENIED');
     const user = this.users.find(identity.issuer, identity.subject);
-    if (!user?.active || !Array.isArray(user.roles) || user.issuer !== identity.issuer || user.subject !== identity.subject) throw new Error('ACCESS_DENIED');
-    const granted = user.roles.includes('ERP_OWNER') && [...reportPermissions, 'BOM_EDIT', 'TECHNOLOGY_EDIT', 'USER_MANAGE'].includes(permission) ||
-      user.roles.includes('WORKSHOP_MANAGER') && reportPermissions.includes(permission);
+    if (user?.active !== true || !Array.isArray(user.roles) || !user.roles.length || !user.roles.every(isRole) ||
+      new Set(user.roles).size !== user.roles.length || user.issuer !== identity.issuer || user.subject !== identity.subject) throw new Error('ACCESS_DENIED');
+    const granted = user.roles.includes('ADMIN') || this.environment === 'PRODUCTION' && user.roles.includes('MANAGER') &&
+      ([...REPORT_PERMISSIONS, ...OPERATIONAL_PERMISSIONS] as readonly string[]).includes(permission);
     if (!granted) throw new Error('ACCESS_DENIED');
     return user;
   }

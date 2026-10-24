@@ -19,30 +19,30 @@ function isolated(role: Role) {
 }
 it('maps all 20 exact production wrapper names with no implicit permission fallback', () => {
   expect(Object.keys(wrapperPermissions).sort()).toEqual(JSON.parse(readFileSync('gas-production-entrypoints.json', 'utf8')).sort());
-  const { auth } = isolated('ERP_OWNER');
+  const { auth } = isolated('ADMIN');
   expect(() => auth.wrapper('unknownHandler')).toThrow('ACCESS_DENIED');
   expect(() => auth.wrapper('toString')).toThrow('ACCESS_DENIED');
 });
-it.each(['ERP_OWNER', 'WORKSHOP_MANAGER', 'TECHNOLOGIST'] as const)('%s reaches only explicitly permitted handlers', role => {
-  const fixture = isolated(role);
+it.each(['ADMIN', 'MANAGER', 'TECHNOLOGIST'] as const)('%s reaches only explicitly permitted handlers', role => {
+  const fixture = isolated(role as Role); // Legacy value is intentional adversarial input, not a valid Role.
   for (const [name, permission] of Object.entries(wrapperPermissions)) {
-    const allowed = permission !== null && (role === 'ERP_OWNER' || role === 'WORKSHOP_MANAGER' && permission.startsWith('REPORT_'));
+    const allowed = permission !== null && (role === 'ADMIN' || role === 'MANAGER' && !['BOM_EDIT', 'TECHNOLOGY_EDIT', 'USER_MANAGE'].includes(permission));
     fixture.calls.mockClear();
-    if (allowed) { expect(fixture.handlers[name]({ roles: ['ERP_OWNER'] })).toMatchObject({ status: 'BUSINESS_HANDLER_REACHED' }); expect(fixture.calls).toHaveBeenCalledTimes(1); }
-    else { expect(() => fixture.handlers[name]({ roles: ['ERP_OWNER'] })).toThrow('ACCESS_DENIED'); expect(fixture.calls).not.toHaveBeenCalled(); }
+    if (allowed) { expect(fixture.handlers[name]({ roles: ['ADMIN'] })).toMatchObject({ status: 'BUSINESS_HANDLER_REACHED' }); expect(fixture.calls).toHaveBeenCalledTimes(1); }
+    else { expect(() => fixture.handlers[name]({ roles: ['ADMIN'] })).toThrow('ACCESS_DENIED'); expect(fixture.calls).not.toHaveBeenCalled(); }
   }
 });
 it('unknown/unverified identity is denied before repository or handler effects', () => {
   const repository = { find: vi.fn() }, operation = vi.fn();
   const auth = new HandlerAuthorization({ current: () => undefined }, repository);
   const handlers = authorizeHandlers({ saveMaterialConsumptionReportWeb: operation }, auth);
-  expect(() => handlers.saveMaterialConsumptionReportWeb({ email: 'owner@example.com', roles: ['ERP_OWNER'] })).toThrow('ACCESS_DENIED');
+  expect(() => handlers.saveMaterialConsumptionReportWeb({ email: 'owner@example.com', roles: ['ADMIN'] })).toThrow('ACCESS_DENIED');
   expect(repository.find).not.toHaveBeenCalled(); expect(operation).not.toHaveBeenCalled();
 });
 it('revoked roles and inactive users are rechecked for every direct invocation', () => {
-  const s = isolated('WORKSHOP_MANAGER'); s.handlers.saveMaterialConsumptionReportWeb({});
+  const s = isolated('MANAGER'); s.handlers.saveMaterialConsumptionReportWeb({});
   s.user.roles = []; expect(() => s.handlers.saveMaterialConsumptionReportWeb({})).toThrow('ACCESS_DENIED');
-  s.user.roles = ['ERP_OWNER']; s.user.active = false; expect(() => s.handlers.submitBOM({})).toThrow('ACCESS_DENIED');
+  s.user.roles = ['ADMIN']; s.user.active = false; expect(() => s.handlers.submitBOM({})).toThrow('ACCESS_DENIED');
   expect(s.calls).toHaveBeenCalledTimes(1);
 });
 it('provider/repository failure is ACCESS_DENIED with no business callback', () => {

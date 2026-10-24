@@ -1,3 +1,5 @@
+> Historical stage snapshot: role names below predate the ADMIN / MANAGER migration. Current rules: [role matrix](AC_002B_ROLE_MATRIX.md). Original stage results are unchanged.
+
 # AC-002B.1 — local server permission integration
 
 ## State
