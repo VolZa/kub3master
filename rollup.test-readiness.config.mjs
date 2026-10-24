@@ -8,11 +8,13 @@ const wrappers = {
   KUB_TEST_probeSheetsApi: 'probeSheetsApi',
   KUB_TEST_adminIdentity: 'adminIdentity',
   KUB_TEST_readOnlyPreflight: 'readOnlyPreflight',
+  KUB_TEST_sourceMetadataInventory: 'sourceMetadataInventory',
 };
 const allowed = new Set([
   'src/admin/test-reset/readiness-entrypoints.ts', 'src/admin/test-reset/readiness-target.ts',
   'src/admin/test-reset/admin-identity.ts', 'src/admin/test-reset/admin-preflight.ts',
   'src/admin/test-reset/sheets-api-risk-adapter.ts',
+  'src/admin/test-reset/source-metadata-inventory.ts',
   'src/admin/test-reset/spreadsheet-risk-inspector.ts', 'src/admin/test-reset/test-configuration.ts',
   'src/admin/test-reset/test-sources.ts', 'src/security/permission-service.ts',
   'src/security/property-user-repository.ts', 'src/infrastructure/spreadsheets/SpreadsheetConfig.ts',

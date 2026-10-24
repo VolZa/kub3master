@@ -3,6 +3,8 @@ import { TestAdminDiagnostics, requireTestInstallation } from './admin-preflight
 import { TEST_RESET_SOURCES } from './test-sources';
 import { TEST_READINESS_SCRIPT_ID } from './readiness-target';
 import { sheetsApiRiskInspector, SHEETS_READ_URL } from './sheets-api-risk-adapter';
+import { inspectSourceMetadata } from './source-metadata-inventory';
+import { ROLES } from './test-configuration';
 
 function context() {
   const properties = PropertiesService.getScriptProperties();
@@ -39,6 +41,15 @@ export function probeIdentity() { return report('IDENTITY_PROBE', () => {
 }); }
 export function adminIdentity() { return report('ADMIN_IDENTITY', () => context().admin.identity()); }
 export function readOnlyPreflight() { return report('READ_ONLY_PREFLIGHT', () => context().admin.preflightForReadiness()); }
+
+export function sourceMetadataInventory() { return report('SOURCE_METADATA_INVENTORY', () => {
+  const { admin, runtime } = context();
+  admin.identity(); // Existing verified identity + isolated TEST ADMIN/USER_MANAGE, no identity log.
+  const sources = ROLES.map(role => inspectSourceMetadata(runtime, role, TEST_RESET_SOURCES[role].id));
+  admin.identity(); // Revocation/installation failures suppress the whole report, just as preflight does.
+  return { operation: 'SOURCE_METADATA_INVENTORY', status: sources.every(source => source.status === 'PASS') ? 'PASS' : 'BLOCKED',
+    resetAllowed: false, sources };
+}); }
 
 /** Independent control request. No Sheets response headers/body or identity are reported. */
 export function probeSheetsApi() {

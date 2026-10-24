@@ -26,14 +26,15 @@ node scripts/check-test-readiness-target.cjs 1WSR8kYywtuohfUGmCvg3nO4Fz6Y5uxpWBd
 clasp.cmd -P targets/test-readiness/.clasp.json status
 ```
 
-Bundle має рівно чотири top-level editor-функції без суфікса `_`, щоб Apps Script Editor виявив їх для ручного запуску:
+Bundle має рівно п'ять top-level editor-функцій без суфікса `_`, щоб Apps Script Editor виявив їх для ручного запуску:
 
 - `KUB_TEST_probeIdentity()` — отримує підтверджені Google `issuer`, `sub` і email для ручного enrollment; не авторизує і нічого не записує.
 - `KUB_TEST_adminIdentity()` — вимагає активного запису `ADMIN` у `KUB_TEST_USERS_V1` і permission `USER_MANAGE`.
 - `KUB_TEST_readOnlyPreflight()` — повторно вимагає `ADMIN / USER_MANAGE`, читає три production-джерела і повертає діагностику. У readiness-only build scripts, triggers та external connections залишаються `UNKNOWN`, тому reset не дозволяється.
 - `KUB_TEST_probeSheetsApi()` — вимагає `ADMIN / USER_MANAGE` і перевіряє лише HTTP-статус GET до незалежної діагностичної таблиці; не читає її body/headers.
+- `KUB_TEST_sourceMetadataInventory()` — незалежна metadata-only інвентаризація трьох джерел під тими самими ADMIN guards; не читає клітинки й не впливає на preflight/reset. [Формат і обмеження](TEST_READINESS_SOURCE_METADATA_INVENTORY.md).
 
-Apps Script трактує ім'я із завершальним `_` як private і приховує таку функцію від клієнта; у завантаженій збірці це також прибрало всі функції зі списку ручного запуску редактора. Тому readiness wrappers мають публічні імена. Кожна функція відхиляє будь-які аргументи, перевіряє фактичний TEST Script ID, installation marker і відсутність Web App URL. Identity probe не створює користувача й не призначає роль; решта трьох функцій вимагають `ADMIN / USER_MANAGE`.
+Apps Script трактує ім'я із завершальним `_` як private і приховує таку функцію від клієнта; у завантаженій збірці це також прибрало всі функції зі списку ручного запуску редактора. Тому readiness wrappers мають публічні імена. Кожна функція відхиляє будь-які аргументи, перевіряє фактичний TEST Script ID, installation marker і відсутність Web App URL. Identity probe не створює користувача й не призначає роль; решта чотирьох функцій вимагають `ADMIN / USER_MANAGE`.
 
 Публічне ім'я теоретично робить wrapper видимим для `google.script.run`, але bundle не має HTML, `doGet`, `doPost` або Web App deployment, тому в поточному проєкті немає HtmlService-клієнта. Apps Script API також не може виконати функцію без окремого API executable deployment, спільного standard Cloud project і належного OAuth token ([Apps Script API execution requirements](https://developers.google.com/apps-script/api/how-tos/execute)). Створення будь-якого deployment залишається стоп-умовою. Правило private-функцій описане в [Apps Script HTML service communication guide](https://developers.google.com/apps-script/guides/html/communication#private_functions).
 
@@ -105,7 +106,7 @@ Whitelist і всі п'ять OAuth scopes залишено без змін. О�
    збігатися з MASTER, OPERATIONAL або REPORTING. Назва таблиці через API не читається:
    власник сам звіряє, що property вказує саме на незалежну діагностичну таблицю.
 2. Зберегти чинний TEST installation marker і enrollment активного ADMIN.
-   Оновити редактор; список Run function тепер містить чотири функції.
+   Оновити редактор; список Run function тепер містить п'ять функцій.
 3. Вручну запустити `KUB_TEST_probeSheetsApi()` без аргументів.
 4. Очікуваний результат має рівно чотири поля, наприклад:
    `{"operation":"SHEETS_API_PROBE","status":"PASS","httpStatus":200,"resetAllowed":false}`.
@@ -428,7 +429,7 @@ Key: `KUB_TEST_INSTALLATION_V1`
 2. Локально виконати TypeScript, Vitest і `npm run build:test-readiness`. Далі виконати `check-test-readiness-target.cjs` і `clasp ... status`. У push-кандидатах мають бути лише `Code.gs` і `appsscript.json` із `build/test-readiness`.
 3. Перевірити точний Script ID у `targets/test-readiness/.clasp.json`. Лише після окремого дозволу виконати один `clasp.cmd -P targets/test-readiness/.clasp.json push`. Не використовувати production `.clasp.json`.
 4. У Project Settings створити тільки `KUB_TEST_INSTALLATION_V1` з JSON вище. Інші TEST_RESET properties не створювати.
-5. Після повторного upload оновити редактор і переконатися, що список Run function містить рівно `KUB_TEST_probeIdentity`, `KUB_TEST_adminIdentity`, `KUB_TEST_readOnlyPreflight`, `KUB_TEST_probeSheetsApi`.
+5. Після повторного upload оновити редактор і переконатися, що список Run function містить рівно `KUB_TEST_probeIdentity`, `KUB_TEST_adminIdentity`, `KUB_TEST_readOnlyPreflight`, `KUB_TEST_probeSheetsApi`, `KUB_TEST_sourceMetadataInventory`.
 6. В editor вручну запустити `KUB_TEST_probeIdentity()`. На consent screen перевірити назву й TEST-проєкт, погодити лише перелічені read-only scopes. Якщо Google просить додатковий scope, скасувати consent.
 7. У execution log очікувати `status: PASS`, `operation: IDENTITY_PROBE`, Google issuer, subject, email, `rolesAssigned:false`, `authorizationGranted:false`, `resetAllowed:false`. За `BLOCKED`, помилки UserInfo або невідповідності акаунта зупинитися.
 8. Незалежно звірити акаунт і вручну створити `KUB_TEST_USERS_V1` за наведеною схемою. Це є окремою адміністративною дією; bundle не може зробити enrollment.

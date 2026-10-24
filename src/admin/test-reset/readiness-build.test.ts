@@ -18,7 +18,7 @@ const SCOPES = [
   'https://www.googleapis.com/auth/drive.readonly',
   'https://www.googleapis.com/auth/spreadsheets.readonly',
 ].sort();
-const GLOBALS = ['KUB_TEST_adminIdentity', 'KUB_TEST_probeIdentity', 'KUB_TEST_probeSheetsApi', 'KUB_TEST_readOnlyPreflight'].sort();
+const GLOBALS = ['KUB_TEST_adminIdentity', 'KUB_TEST_probeIdentity', 'KUB_TEST_probeSheetsApi', 'KUB_TEST_readOnlyPreflight', 'KUB_TEST_sourceMetadataInventory'].sort();
 const EXPECTED_READINESS_MANIFEST = {
   timeZone: 'Europe/Kyiv', runtimeVersion: 'V8', exceptionLogging: 'NONE',
   dependencies: { enabledAdvancedServices: [{ userSymbol: 'Sheets', serviceId: 'sheets', version: 'v4' }] },
@@ -79,7 +79,7 @@ function runtime(code: string, response: unknown = { sub: 'bootstrap-subject-001
 }
 
 describe('TEST readiness-only build', () => {
-  it('has exact scopes, four manual globals and no mutation/reset surface', async () => {
+  it('has exact scopes, five manual globals and no mutation/reset surface', async () => {
     const { code, manifest } = await build();
     expect([...manifest.oauthScopes].sort()).toEqual(SCOPES);
     expect(manifest.urlFetchWhitelist).toEqual(['https://openidconnect.googleapis.com/v1/userinfo', 'https://sheets.googleapis.com/v4/spreadsheets/']);
@@ -105,6 +105,55 @@ describe('TEST readiness-only build', () => {
       expect(readFileSync(path, 'utf8')).toBe(before[index]);
       expect(JSON.parse(before[index]).dependencies).toEqual({});
     });
+  }, 30000);
+
+  it('exposes guarded metadata-only inventory without changing the existing preflight or reset decision', async () => {
+    const { code } = await build();
+    const fields = 'spreadsheetId,sheets(properties(sheetId,title,sheetType,hidden,gridProperties(rowCount,columnCount)))';
+    for (const mode of ['pass', 'http', 'invalid-grid', 'unauthorized', 'wrong-script', 'revoked'] as const) {
+      const vm = runtime(code); let metadataCalls = 0;
+      if (mode !== 'unauthorized') vm.properties.set(TEST_USERS_KEY, JSON.stringify({ version: 1, users: [{ issuer: 'https://accounts.google.com',
+        subject: 'bootstrap-subject-001', email: 'admin@example.test', active: true, roles: ['ADMIN'], authorizationVersion: 1 }] }));
+      const originalFetch = vm.sandbox.UrlFetchApp.fetch;
+      vm.sandbox.UrlFetchApp.fetch = (url: string, options: any) => {
+        if (!url.endsWith(`?fields=${encodeURIComponent(fields)}`)) return originalFetch(url, options);
+        metadataCalls++;
+        expect(options).toMatchObject({ method: 'get', muteHttpExceptions: true, followRedirects: false, validateHttpsCertificates: true });
+        expect(decodeURIComponent(url)).not.toMatch(/GridData|rowData|values|CellData|includeGridData|ranges/);
+        const id = url.split('/spreadsheets/')[1].split('?')[0];
+        expect(Object.values(TEST_RESET_SOURCES).some(source => source.id === id)).toBe(true);
+        if (mode === 'revoked') vm.properties.delete(TEST_USERS_KEY);
+        const rejected = mode === 'http' && id === TEST_RESET_SOURCES.MASTER.id;
+        return { getResponseCode: () => rejected ? 403 : 200,
+          getHeaders: () => { if (rejected) throw Error('PRIVATE_HEADERS'); return { 'Content-Type': 'application/json' }; },
+          getContentText: () => {
+            if (rejected) throw Error('PRIVATE_BODY');
+            return JSON.stringify({ spreadsheetId: id, sheets: [{ properties: { sheetId: 0, title: 'synthetic', sheetType: 'GRID',
+              hidden: true, gridProperties: { rowCount: mode === 'invalid-grid' ? -1 : 1000, columnCount: 26 } } }] });
+          } };
+      };
+      const preflight = mode === 'pass' ? vm.sandbox.KUB_TEST_readOnlyPreflight() : undefined;
+      vm.logs.length = 0;
+      if (mode === 'wrong-script') vm.setScriptId('another-test-script');
+      const before = JSON.stringify([...vm.properties]), result = vm.sandbox.KUB_TEST_sourceMetadataInventory();
+      expect(result).toMatchObject({ operation: 'SOURCE_METADATA_INVENTORY', status: mode === 'pass' ? 'PASS' : 'BLOCKED', resetAllowed: false });
+      expect(vm.logs).toEqual([JSON.stringify(result)]);
+      expect(metadataCalls).toBe(['unauthorized', 'wrong-script'].includes(mode) ? 0 : 3);
+      if (mode === 'pass') {
+        expect(result.sources).toHaveLength(3);
+        expect(result.sources.every((source: any) => source.status === 'PASS' && source.totalAllocatedCells === 26000 && source.estimatedRequests4096 === 7)).toBe(true);
+        expect(vm.sandbox.KUB_TEST_readOnlyPreflight()).toEqual(preflight);
+        expect(preflight.resetAllowed).toBe(false);
+        expect(preflight.sources.every((source: any) => Object.values(source.dependencies).every(value => value === 'UNKNOWN'))).toBe(true);
+      }
+      if (mode === 'http') expect(result.sources.map((source: any) => source.status)).toEqual(['BLOCKED', 'PASS', 'PASS']);
+      if (mode === 'invalid-grid') expect(result.sources.every((source: any) => source.inspectionDetail === 'GRID_PROPERTIES_INVALID')).toBe(true);
+      if (mode === 'revoked') expect(result.sources).toBeUndefined();
+      else expect(JSON.stringify([...vm.properties])).toBe(before);
+      for (const secret of ['server-oauth-token', 'bootstrap-subject-001', 'admin@example.test', 'PRIVATE_BODY', 'PRIVATE_HEADERS', 'Authorization', 'Bearer'])
+        expect(JSON.stringify(result)).not.toContain(secret);
+      expect(() => vm.sandbox.KUB_TEST_sourceMetadataInventory({ source: 'MASTER' })).toThrow('MANUAL_ONLY');
+    }
   }, 30000);
 
   it('exposes a guarded independent Sheets API probe with exactly four safe output fields', async () => {

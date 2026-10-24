@@ -19,6 +19,7 @@ const expectedGlobals = [
   'KUB_TEST_probeIdentity',
   'KUB_TEST_probeSheetsApi',
   'KUB_TEST_readOnlyPreflight',
+  'KUB_TEST_sourceMetadataInventory',
 ].sort();
 const expectedDependencies = { enabledAdvancedServices: [{ userSymbol: 'Sheets', serviceId: 'sheets', version: 'v4' }] };
 const forbidden = /\b(?:doGet|doPost|onOpen|onEdit|makeCopy|setTrashed|setProperty|setProperties|deleteProperty|deleteAllProperties|createFolder|setValues|appendRow|newTrigger|createTrigger|KUB_TEST_prepare_|KUB_TEST_reviewPending_|KUB_TEST_recordPendingReview_|KUB_TEST_activate_|KUB_TEST_rollback_)\b/;
