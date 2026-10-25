@@ -1,4 +1,4 @@
-# ADMIN Web Identity — Threat Model (Slice 2A)
+# ADMIN Web Identity — Threat Model (Slices 2A / 2B.1)
 
 Scope: Execute as user deploying, visitor authenticated by a future Google OIDC assertion broker,
 two independent ADMIN GAS projects. MASTER/OPERATIONAL remain behind server operations;
@@ -15,7 +15,8 @@ authoritative stores, trusted clock/CSPRNG, current UserRepository and Permissio
 claims and broker bytes remain untrusted until verified. Script editors and the broker are trusted
 security operators; compromising either is outside payload-validation guarantees.
 
-All referenced tests are in `src/admin/web/identity-contracts/contracts.test.ts`, unless stated otherwise.
+The original Slice 2A tests below are in `src/admin/web/identity-contracts/contracts.test.ts`.
+Slice 2B.1 adds `atomic-store-contracts.test.ts` and the local-model status table below.
 
 | Threat / attack scenario | Trust boundary | Mitigation and status | Verification test / future evidence | Residual risk |
 | --- | --- | --- | --- | --- |
@@ -58,3 +59,39 @@ Review contracts/TTL, signature protocol and authoritative store semantics first
 separately approved auth adapters/fixtures; preserve current shell/business/reset holds. Live proof
 requires separate permission, isolated accounts/resources and explicit success/failure evidence.
 **PRODUCTION — NO-GO. TEST_RESET execution — NO-GO. ADMIN deployment — NO-GO.**
+
+## Slice 2B.1 local evidence update
+
+IMPLEMENTED LOCAL MODEL is deliberately different from implemented production protection. No real
+cryptographic verifier, durable DB, broker, session secret issuer, store restore boundary or RPC exists.
+Original risk statements requiring real stores/adapters remain applicable despite passing local tests.
+
+| Threat / boundary | IMPLEMENTED LOCAL CONTRACT / MODEL | Verification in atomic-store-contracts.test.ts | Remaining MISSING / UNVERIFIED |
+| --- | --- | --- | --- |
+| Algorithm/key confusion, substituted broker bytes | Exact RS256 protected header, strict V1 payload, original signing bytes, context-scoped key rules | Algorithms, extensions, exact schema, unknown keys, duplicate escaped JSON keys, invalid UTF-8/base64url | Actual JOSE/RSA/key-strength checks; port authenticity and key custody |
+| Forged cryptographic evidence | Structural JWS cannot mint runtime proof; injected trusted verifier and private construction capability required | False/throwing port, casts/JSON/spreads/prototype grafts, constructor forgery | Compromised trusted verifier can still lie; fake signatures in tests prove no cryptography |
+| Environment / Script ID / audience substitution | Exact context match in profile, key lookup and every atomic command | Profile/key/store mismatch tests; unknown context fails closed | Authenticated external service identity, isolated DB/IAM namespaces, live cross-project replay |
+| Assertion / transaction replay | Atomic model commit reserves both IDs and creates one grant/receipt | Same assertion, same transaction with new assertion, same assertion ID across transactions | Real durable uniqueness/CAS and tombstone retention under process failure |
+| Grant replay / concurrent consumers | Authoritative grant state plus one state swap for consume+session+receipt | Simultaneous acceptance/issuance, duplicate same-command delivery | Multi-worker/process tests, durable DB transaction and unknown-commit recovery |
+| Partial write / lost response | Snapshot rollback; AFTER_COMMIT returns OUTCOME_UNKNOWN while preserving receipt | Fault after each staged write; receipt recovery; wrong command digest | Real backend crash, network timeout, ambiguous commit and retry semantics |
+| Stale time or policy after I/O | Clock read after verifier and before commit; expiry/key/directory rechecks | Verifier delay, commit delay, grant/transaction expiry, key compromise and issuer changes | Real clocks, network latency, policy distribution and operational skew handling |
+| Signing-key rotation / compromise | Versioned signing/verification intervals; compromise/revokedAt override status; issued-session provenance checks are separate from new assertion verification | Verify-only overlap, planned window expiry/retirement without session loss, new-key rotation, grant/session compromise tests | Managed secrets, emergency rollout, live rotation; retain historical context-bound policy records through session lifetimes |
+| Role change / access revocation | Active issuer+subject/current version at issuance/lookup; CAS session revocation | Version changes before/at commit, inactive user, stale capabilities and revoked session | Real directory/DB are separate services; no cross-store atomic snapshot or cancellation of in-flight business work |
+| Forged persisted session | Model-owned private-field capability rechecks current authoritative record | Copies, JSON, cross-model capability, stale/revoked record | Durable restore adapter has no implementation; plain DB JSON must not become proof by cast |
+| Bearer theft / response loss | Store receives digest only, never returns raw bearer; receipts do not authenticate | Digest-only record, absence of roles/permissions and raw credential | CSPRNG, digest adapter, browser delivery, XSS protection and orphan-session recovery |
+| Resource exhaustion / unsafe cleanup | Explicit capacities, bounded eligible cleanup, no live eviction | Receipt/grant/session/per-user capacity; retention and batch limits | Real quotas, storage costs, indexing, cleanup workers and admission/rate limits |
+
+Browser DTOs remain unchanged and reject trusted fields. Model commands are server-only contracts,
+not a new login API. They do not connect to PermissionService or production authorization. Key policy
+checks do not perform Google account authentication or propagate Google sign-out events.
+
+Session TTL remains independent of assertion TTL and planned key verification expiry, capped by upstream
+authentication proof. Planned retirement blocks new assertions, while existing sessions retain their own
+expiry. Compromise/revocation, unknown key/context or changed broker issuer still deny session use.
+Key provenance identifies affected grants/sessions; real bulk persistent revocation is not implemented.
+Capacity limits are fixture
+policy, not approved production settings. Real process loss invalidates all in-memory guarantees.
+
+Next gate: review the profile, key-policy/receipt semantics and local model; then separately authorize
+real adapter work and distributed fault tests. Production/readiness targets and ADMIN RPC/build import
+allowlists remain unchanged. No OAuth/broker/Firestore setup or deployment is performed.

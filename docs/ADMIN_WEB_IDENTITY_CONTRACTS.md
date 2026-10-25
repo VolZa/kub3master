@@ -1,6 +1,6 @@
-# ADMIN Web Identity — Contracts (Slice 2A)
+# ADMIN Web Identity — Contracts (Slices 2A / 2B.1)
 
-Status: **LOCAL CONTRACTS & TESTS ONLY**. No real login, crypto adapter, broker endpoint,
+Status: **LOCAL CONTRACTS, REFERENCE MODEL & TESTS ONLY**. No real login, crypto adapter, broker endpoint,
 session persistence, OAuth configuration or GAS RPC integration. PRODUCTION, TEST_RESET execution
 and ADMIN deployment remain **NO-GO**. This document records slice decisions, not a new ADR.
 
@@ -212,3 +212,211 @@ node scripts/check-admin-target.cjs
 ```
 
 No commit, push/deploy, OAuth credentials, Google login, Script Properties/Sheets mutation or TEST_RESET.
+
+## Slice 2B.1 — signed assertion application profile
+
+The preceding sections document the preserved Slice 2A primitives. The new profile is stricter:
+legacy HS256/RS256 types are NOT a wire-level acceptance policy for the new protocol. No old prototype,
+security guard, PermissionService, GAS entrypoint, RPC allowlist, manifest or Rollup target is changed.
+
+IMPLEMENTED LOCALLY:
+
+- `signed-assertion-profile.ts`: standard Compact JWS structural validation and an explicit trusted
+  signature-verification port. Structural success alone NEVER creates verified identity.
+- `strict-json.ts`: bounded UTF-8/base64url decoding and JSON parsing with decoded duplicate-key
+  detection (including escaped aliases). Arrays, excessive nesting, invalid UTF-8, malformed JSON,
+  noncanonical base64url trailing bits and trailing input fail closed. No cryptographic algorithm.
+- `signing-key-policy.ts`: versioned, context-scoped rotation/verification policy, without key material.
+- `atomic-store-contracts.ts`: server commands, persistent record/receipt shapes and atomic outcomes.
+- `session-store-contracts.ts`: digest-only session records, key provenance, revisions and capacity policy.
+- `atomic-store-reference-model.ts`: in-memory optimistic serializable model; NEVER a production store.
+- `atomic-store-contracts.test.ts`: local structural/provenance/race/fault-injection tests.
+
+Protected header has EXACTLY `typ: "kub-admin-login+jws"`, `alg: "RS256"`, and a known `kid`.
+All header fields are protected. `none`, HS256, `crit`, `b64`, `jku`, `jwk`, `x5u`, extra fields,
+detached/multiple signatures and other extensions are rejected. Profile permits 256–512 byte RSA
+signature encodings; actual key type/strength/signature validation belongs to the absent JOSE adapter.
+Whole Compact JWS is at most 8192 ASCII characters. No compression or key fetching is implemented.
+
+Payload has EXACTLY:
+
+```text
+protocolVersion = 1, purpose = ADMIN_WEB_LOGIN_V1,
+issuer, applicationAudience, environment, expectedScriptId,
+assertionId, transactionId, identityIssuer = https://accounts.google.com, subject,
+nonce, browserProofBinding,
+authenticatedAt, authenticationExpiresAt, issuedAt, expiresAt
+```
+
+All times remain Unix milliseconds, not JWT NumericDate seconds. This is JWS with an application JSON
+payload, not a claim to implement registered JWT iat/exp semantics. The adapter verifies the ORIGINAL
+`encodedHeader + "." + encodedPayload` bytes; no JSON canonicalization or decode/re-encode signature
+check is allowed. Reordering JSON members does not alter structural meaning but does alter signed bytes.
+There are no email, roles, permissions, resource IDs or browser-selected policy fields.
+
+`verifySignedAssertion` calls an explicitly injected `ProfileSignatureVerificationPort`, accepts only
+literal `true`, then reads the trusted clock AGAIN and repeats structural/time checks. It creates
+private-field runtime evidence and uses the unchanged Slice 2A verifier boundary to create legacy
+evidence. The normalization removes protocolVersion only AFTER the stricter V1 profile validates it.
+Fake ports accepting synthetic signatures in tests are not evidence of cryptographic verification.
+The port is trusted server injection, never an RPC argument. Browser proof hash ownership remains
+the future broker/channel adapter's responsibility; equality of a 64-hex binding is not proof of possession.
+
+## Key lifecycle
+
+Policy version is 1, with one pinned brokerIssuer and 1–8 key rules. Each rule contains exact context,
+keyId, RS256, signing/verification half-open intervals, ACTIVE/VERIFY_ONLY/RETIRED/REVOKED status,
+revokedAt and compromised. Duplicate context+key IDs and inconsistent intervals are rejected.
+Signing interval must lie inside verification interval. No private/public key material is stored here.
+
+ACTIVE and VERIFY_ONLY keys can verify assertions issued within their signing interval. VERIFY_ONLY
+does not authorize new signing; no signer is implemented. RETIRED denies new assertion verification;
+REVOKED, non-null revokedAt, or compromised deny both new admission and existing session use.
+Compromise overrides every previous status. All lookup is context-scoped;
+token metadata cannot choose a different algorithm, environment, audience, Script ID or key origin.
+
+Rotation: provision a new verification key, switch signing, retain the old rule VERIFY_ONLY, then retire.
+Grant redemption still checks the verification window. Already-issued sessions use a separate
+sessionProvenanceKey check: planned verification expiry and RETIRED do not shorten their lifetime.
+Retain the old context-bound policy/provenance record until its sessions expire; a missing key record
+fails closed. Broker issuer, key context, historical signing interval, compromise and revocation remain
+checked. Compromise/revocation blocks related grants/sessions, identifiable by their signing-key
+provenance. This is NOT automatic Google logout, bulk persistent revocation or security-event handling.
+Real key custody, policy distribution, RSA verification, library selection and live rotation are MISSING.
+
+## Atomic store boundary and durable receipts
+
+All commands are SERVER-ONLY, never browser DTOs. Required fields: application context, operationId,
+commandDigest, expectedRevision, decisionTime. Acceptance carries runtime verified assertion evidence.
+Issuance carries grantId, credentialDigest and expectedAuthorizationVersion; identity comes from the
+stored grant and the user comes from a trusted directory port. Extra roles/permissions/identity fields fail.
+Actual directory adapters must project their current user into issuer/subject/active/authorizationVersion;
+do not pass browser fields or infer permissions from this projection.
+
+Expected revision means transaction revision for acceptance and grant revision for issuance. Outcome
+lookup uses null revision and the ORIGINAL command digest. Its decision time is a fresh trusted time.
+Digest material uses a fixed ordered JSON array of operation kind, context, operation ID, revision,
+decision time and all semantic command fields. A trusted SHA-256 port must hash those exact bytes;
+no digest implementation is supplied in runtime modules. The model recomputes and compares it.
+
+Outcomes: COMMITTED, REPLAY, EXPIRED, CONFLICT, CONTEXT_MISMATCH, UNAVAILABLE, OUTCOME_UNKNOWN,
+plus fail-closed INVALID and CAPACITY_EXCEEDED. No raw exceptions or private API bodies are returned.
+
+`acceptAssertionAndCreateGrant`: in ONE transaction, consume authoritative transaction, reserve unique
+assertion replay marker, insert at most one grant and one receipt. Nonce/proof/context/expiry must match.
+`consumeGrantAndCreateSession`: in ONE transaction, consume authoritative AVAILABLE grant, insert
+at most one digest-only session and one receipt. The legacy available-state helper is used only AFTER
+the authoritative model grant has been checked AVAILABLE; it never restores a consumed grant.
+
+Exactly one successful new consumer means one committed state transition. A duplicate request may
+return the same COMMITTED receipt with recovered=true; it is not another consumer or business execution.
+Different digest for the same live operation ID fails CONFLICT. IDs and store namespaces must be unique
+within context; an external adapter must authenticate the calling application AND enforce the full
+environment/audience/Script ID binding. Model instances each own a fixed context and separate maps.
+
+Receipts store context, operation ID, command digest, operation kind, resulting lookup ID, accepted
+decision time (committedAt), revision and retainUntil. No raw credential or assertion body is retained
+in receipts. In the model committedAt is the trusted decision time of the winning operation, not a
+database timestamp proving the exact wall-clock instant of the synchronous state swap.
+
+After response loss, OUTCOME_UNKNOWN MUST NOT be interpreted as rollback. `getOperationOutcome`
+returns the committed receipt only for matching context/ID/digest; absence remains OUTCOME_UNKNOWN
+because an operation may be in flight or its receipt retention may have elapsed. It never creates state.
+Retry exactly the same command only while its trusted decision time is valid; otherwise query outcome
+with fresh time and original digest. A committed grant is never reset to AVAILABLE after a timeout.
+
+No receipt/session credential replay via URL. If the browser loses the newly issued bearer, digest-only
+persistence cannot recover it: use a new login, revoke an identifiable orphan or let it expire. Do not
+create a second session for the spent grant. Receipts are server recovery metadata, not authentication
+capabilities; copying a receipt cannot authorize a session or protected RPC.
+
+## Reference model guarantees and limits
+
+The model snapshots all maps, stages writes, yields at a controlled beforeCommit scheduling point,
+checks a model-wide epoch, rechecks current clock/key policy/directory, then swaps the entire state
+synchronously. Conflicts abort. Disjoint concurrent writes may conservatively conflict too; retry
+requires fresh orchestration, not assumptions based on stale snapshots. Same-command duplicate
+delivery can recover an existing receipt without another write. Rollback discards every staged map.
+
+Faults can be injected after transaction/assertion/grant/session/receipt writes, before commit, or after
+commit. Before-commit failures expose no partial state. After-commit response loss retains all state.
+Live objects are checked again after a scheduling delay; expiration, key compromise, authorization
+version changes and unavailable storage block issuance. Time is explicit, monotonic, server-controlled;
+the model requires command decisionTime to equal its trusted clock when execution begins.
+
+Session expiration = min(redemption decision time + 15m, signed upstream authentication expiry),
+independent of the 20s assertion TTL and planned key verification expiry. No roles are copied into sessions.
+Session credentials are supplied only as digests at the store boundary; schema cannot prove a caller
+hashed a secret. The future crypto/orchestration adapter must ensure 256-bit CSPRNG secrets and real
+digests. No entropy source, raw credential creation or browser delivery is implemented here.
+
+Session records include revision, grant ID, signing issuer/key/algorithm/assertion provenance and
+ACTIVE/REVOKED status. Model capabilities have private-field ownership and recheck authoritative
+record identity, expiry, directory version and key policy. Casts, JSON copies, capabilities from another
+model, revoked/stale records fail. Grant evidence is retained privately in memory, not serialized or
+rehydrated from JSON. A REAL durable restore adapter is still MISSING and requires separate review.
+
+Capacity is explicit: transaction/grant/session/receipt totals, live sessions per issuer+subject,
+receipt retention and cleanup batch size. No production limits are selected by this slice; test values
+are fixtures. Capacity pressure denies new admissions, never evicts live state to permit a replay.
+Cleanup removes only expired eligible records in bounded batches. It does not extend validity.
+Grant/transaction/marker retention includes their live expiry plus receiptRetentionMs; receipts are
+retained through linked-object expiry plus that interval. Admission remains bounded if cleanup stalls.
+
+THIS IS NOT DURABLE OR DISTRIBUTED ATOMICITY. Process loss destroys the model. It has no persistent
+CAS, transactions across services, authenticated network channel, production capacity proof or live
+revocation delivery. Its fixture seeding/fault/scheduling methods MUST NEVER become GAS RPCs.
+PropertiesService directory and a future external session DB do not share a transaction: the model
+rechecks current directory at commit and on every lookup, but cannot prove real cross-store snapshot
+isolation. PermissionService still must authorize every protected business RPC after session resolution.
+
+## Slice 2B.2 gates
+
+Separately approve the real verifier/backend, maintained JOSE library, key custody/rotation, trusted
+clock/CSPRNG/digest adapters, transactional DB, store capability restoration and authenticated channel.
+Then run independent-worker CAS/replay tests, crash/timeout/unknown-commit fault injection, cleanup
+capacity tests and PRODUCTION/TEST cross-project probes against isolated resources. No library install,
+OAuth setup, Firestore setup, scope/whitelist change, broker deployment or target integration is part
+of Slice 2B.1. ADMIN shell stays BLOCKED / NOT_CONFIGURED / NOT_CONNECTED / resetAllowed:false.
+
+## Slice 2B.1 local validation results
+
+Baseline: feature/bom-logic, HEAD b8ac7ab, clean tree before implementation.
+Original implementation checks: TypeScript --noEmit PASS; identity suite 211 PASS
+(112 preserved + 99 new); full Vitest 63 files / 1633 PASS using local Node 22.16.0. ADMIN target checker:
+both targets PASS / NOT_CONFIGURED, only doGet/getAdminBootstrap, deploymentAllowed:false,
+resetAllowed:false. No production/readiness build output is written by this validation.
+
+In-memory Rollup Code.gs SHA-256 matches the baseline:
+
+```text
+production 88eb2e583ca8dec204d7f525dccb515bb4a72df06a3de0cb51f7084d99e2e54d
+readiness  eb01e23a2d83da6839eea1b3aabcb5dd1bdec6cd9dedf8ac42764b1e3a922dc7
+```
+
+All 824 baseline files were checked: only these two identity documents changed; seven new files
+were added under identity-contracts. Existing Slice 2A modules/tests, security prototypes, permission
+service, authorization, GAS entrypoints, build targets and source configuration remain byte-identical.
+The original local implementation used no Git commit/push, GAS deployment, Google resources,
+OAuth setup or persistent store setup.
+
+## Acceptance correction — session lifetime and planned key rotation
+
+Acceptance review found two local coupling errors: session construction capped expiresAt with
+verificationNotAfter, and session lookup reused the assertion verification-window check. Both were
+corrected within Slice 2B.1. Session creation now keeps the unchanged Slice 2A session plan. Lookup
+checks authoritative session provenance separately from eligibility to verify a NEW assertion/grant.
+This does not add login, durable restore, crypto, storage, RPCs or new authority sources.
+
+Regression tests cover the exact verification-window boundary, ACTIVE/VERIFY_ONLY/RETIRED policy,
+rotation to a new key, session continuity via existing store capabilities, original session/upstream
+expiration, and fail-closed compromise, revocation, unknown key, context and broker issuer. Assertion
+verification remains blocked after the old verification window or retirement. Real persistent indexing
+and bulk revocation of related grants/sessions remain a separately approved adapter concern.
+
+Acceptance verification repeated from HEAD b8ac7ab: TypeScript --noEmit PASS; identity suite 221 PASS
+(112 Slice 2A + 109 Slice 2B.1, including 10 acceptance regressions); full Vitest 63 files / 1643 PASS;
+ADMIN checker both targets PASS; git diff --check PASS. In-memory production/readiness Code.gs
+SHA-256 still equals the baseline hashes above. Only the nine approved Slice 2B.1 files are included
+in the local checkpoint. Production/readiness sources, security prototypes, ADMIN entrypoints and
+RPC/build allowlists are unchanged. No Slice 2B.2 implementation or external setup is included.
