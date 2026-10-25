@@ -1,0 +1,23 @@
+<script>
+(() => {
+  const tabs = Array.from(document.querySelectorAll('[data-section]'));
+  const sections = ['MASTER', 'MANUFACTURING', 'ADMINISTRATION'];
+  tabs.forEach(tab => tab.addEventListener('click', () => {
+    const selected = tab.dataset.section;
+    if (!sections.includes(selected)) return;
+    tabs.forEach(item => item.setAttribute('aria-selected', String(item === tab)));
+    sections.forEach(id => { document.getElementById(id).hidden = id !== selected; });
+  }));
+  const failure = () => { document.getElementById('bootstrapStatus').textContent = 'Стан застосунку не підтверджено. Функції залишаються недоступними.'; };
+  try {
+    google.script.run.withSuccessHandler(result => {
+      const environment = document.getElementById('environment').textContent.trim();
+      if (!result || !['PRODUCTION', 'TEST'].includes(result.environment) || environment !== 'ADMIN ' + result.environment ||
+        result.applicationStatus !== 'BLOCKED' || result.generationStatus !== 'NOT_CONNECTED' || result.resetAllowed !== false ||
+        !['NOT_CONFIGURED', 'INVALID', 'SCRIPT_ID_MISMATCH', 'CONFIGURED'].includes(result.configurationStatus)) { failure(); return; }
+      document.getElementById('configurationStatus').textContent = result.configurationStatus;
+      document.getElementById('bootstrapStatus').textContent = 'Бізнес-функції та TEST_RESET недоступні.';
+    }).withFailureHandler(failure).getAdminBootstrap();
+  } catch { failure(); }
+})();
+</script>

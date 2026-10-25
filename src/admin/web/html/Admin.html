@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ERP КУБ — ADMIN</title>
+  <style>
+    * { box-sizing: border-box; } body { margin: 0; background: #f4f6fa; color: #17243a; font: 16px/1.5 Arial, sans-serif; }
+    header, main { max-width: 1000px; margin: auto; padding: 24px; } header { border-bottom: 1px solid #ccd4df; }
+    h1 { margin: 0 0 12px; font-size: 24px; } .badge { display: inline-block; padding: 5px 12px; border-radius: 6px; font-weight: bold; }
+    .production { background: #ffe1c1; color: #753500; } .test { background: #dcecff; color: #064878; }
+    .state { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 16px 0; } nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    button, .switch { padding: 10px 16px; border: 1px solid #9eafc4; border-radius: 6px; background: white; color: inherit; font: inherit; }
+    nav button[aria-selected="true"] { background: #17243a; color: white; } button:disabled { color: #596575; cursor: not-allowed; }
+    section { padding: 24px; border: 1px solid #d6deea; border-radius: 10px; background: white; } section[hidden] { display: none; }
+    .notice { padding: 12px; border-left: 4px solid #947100; background: #fff6d7; } li { margin: 8px 0; }
+    a:focus-visible, button:focus-visible { outline: 3px solid #286ac0; outline-offset: 3px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ERP КУБ</h1>
+    <span class="badge <?= environmentClass ?>" id="environment"><?= environmentLabel ?></span>
+    <div class="state" aria-live="polite">
+      <span>Застосунок: <strong id="applicationStatus">BLOCKED</strong></span>
+      <span>Конфігурація: <strong id="configurationStatus"><?= configurationStatus ?></strong></span>
+      <span>TEST generation: <strong id="generationStatus">NOT_CONNECTED</strong></span>
+    </div>
+    <? if (switchUrl) { ?>
+      <a class="switch" id="environmentSwitch" href="<?= switchUrl ?>"><?= switchLabel ?></a>
+    <? } else { ?>
+      <button id="environmentSwitch" type="button" disabled><?= switchLabel ?></button>
+    <? } ?>
+  </header>
+  <main>
+    <p class="notice">Функції ще не підключені. Перегляд приватних даних і зміни недоступні.</p>
+    <nav aria-label="Розділи ADMIN" role="tablist">
+      <button id="tab-master" role="tab" aria-controls="MASTER" aria-selected="true" data-section="MASTER">MASTER</button>
+      <button id="tab-manufacturing" role="tab" aria-controls="MANUFACTURING" aria-selected="false" data-section="MANUFACTURING">Виробництво</button>
+      <button id="tab-administration" role="tab" aria-controls="ADMINISTRATION" aria-selected="false" data-section="ADMINISTRATION">Адміністрування</button>
+    </nav>
+    <!-- ADMIN_MASTER -->
+    <!-- ADMIN_MANUFACTURING -->
+    <!-- ADMIN_ADMINISTRATION -->
+    <p id="bootstrapStatus" role="status"></p>
+  </main>
+  <!-- ADMIN_CLIENT -->
+</body>
+</html>

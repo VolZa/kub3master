@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "environment": "PRODUCTION",
+  "scriptIds": { "PRODUCTION": null, "TEST": null },
+  "environmentUrls": { "PRODUCTION": null, "TEST": null }
+}
