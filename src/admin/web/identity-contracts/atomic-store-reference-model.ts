@@ -4,9 +4,13 @@ import { transitionLoginTransaction, availableGrantState, planGrantRedemption } 
 import { createTrustedLoginGrant, readTrustedLoginGrant } from './verification';
 import { readSignedAssertion, assertSignedAssertionLive } from './signed-assertion-profile';
 import { signingKeyPolicy, verificationKey, sessionProvenanceKey, type SigningKeyPolicy } from './signing-key-policy';
-import { atomicCommandMaterial, type AtomicCommand, type AtomicOutcome, type AtomicStatus, type AtomicLoginStorePort,
+import { atomicOperationDescriptor, type VerifiedOperationReceipt, type AtomicCommand, type AtomicOutcome, type AtomicStatus, type AtomicLoginStorePort,
   type AcceptAssertionCommand, type ConsumeGrantCommand, type OperationLookup, type OperationReceipt, type GrantRecord,
-  type VersionedLoginTransaction, type CommandDigestPort } from './atomic-store-contracts';
+  type VersionedLoginTransaction } from './atomic-store-contracts';
+import { CHANNEL, type BodyDigestPort, type ChannelExpectation } from '../channel-contracts/contracts';
+import { expectation } from '../channel-contracts/channel-policy';
+import { inspectReceipt } from '../channel-contracts/recovery';
+import { inspectRecoveryDescriptor } from '../operation-contracts';
 import { type StoredSession, type TrustedStoredSession, type SessionStorePort, type SessionLookup, type SessionLookupOutcome,
   type RevokeSessionCommand, type CurrentDirectoryUser, type SessionCapacityPolicy } from './session-store-contracts';
 
@@ -14,22 +18,23 @@ export type ReferenceFault = 'UNAVAILABLE' | 'AFTER_TRANSACTION' | 'AFTER_ASSERT
   'AFTER_SESSION' | 'AFTER_RECEIPT' | 'BEFORE_COMMIT' | 'AFTER_COMMIT';
 export interface ReferenceModelPorts {
   readonly context: IdentityApplicationContext;
+  readonly backendOrigin: string;
   readonly clock: () => number;
   readonly keyPolicy: () => SigningKeyPolicy;
   readonly directory: (issuer: string, subject: string) => CurrentDirectoryUser | undefined;
-  readonly digest: CommandDigestPort;
+  readonly digest: BodyDigestPort;
   readonly capacity: SessionCapacityPolicy;
   /** Test-controlled scheduling point AFTER snapshot work, BEFORE compare/commit. */
   readonly beforeCommit?: () => Promise<void>;
 }
-class Denied { constructor(readonly status: Exclude<AtomicStatus, 'COMMITTED'>) {} }
-function deny(status: Exclude<AtomicStatus, 'COMMITTED'>): never { throw new Denied(status); }
+class Denied { constructor(readonly status: Exclude<AtomicStatus, 'COMMITTED' | 'REJECTED'>) {} }
+function deny(status: Exclude<AtomicStatus, 'COMMITTED' | 'REJECTED'>): never { throw new Denied(status); }
 const revision = (v: unknown): number => {
   if (!Number.isSafeInteger(v) || (v as number) < 0) return invalid(); return v as number;
 };
 const outcome = (error: unknown): AtomicOutcome => ({ status: error instanceof Denied ? error.status : 'INVALID' });
-const lookupKeys = ['context', 'credentialDigest', 'decisionTime'];
-const baseKeys = ['context', 'operationId', 'commandDigest', 'expectedRevision', 'decisionTime'];
+const lookupKeys = ['context', 'credentialDigest'];
+const baseKeys = ['context', 'protocolVersion', 'backendOrigin', 'operationId', 'commandDigest', 'expectedRevision', 'commandCreatedAt'];
 const sessionCapability = Object.freeze({});
 class StoredEvidence {
   readonly #owner: object;
@@ -37,6 +42,16 @@ class StoredEvidence {
     if (capability !== sessionCapability) invalid(); this.#owner = owner; Object.freeze(this);
   }
   static read(value: unknown, owner: object): Readonly<StoredSession> {
+    if (!value || typeof value !== 'object' || !(#owner in value) || value.#owner !== owner) return invalid(); return value.record;
+  }
+}
+const receiptCapability = Object.freeze({});
+class ReceiptEvidence {
+  readonly #owner: object;
+  constructor(capability: unknown, owner: object, readonly record: Readonly<OperationReceipt>) {
+    if (capability !== receiptCapability) invalid(); this.#owner = owner; Object.freeze(this);
+  }
+  static read(value: unknown, owner: object): Readonly<OperationReceipt> {
     if (!value || typeof value !== 'object' || !(#owner in value) || value.#owner !== owner) return invalid(); return value.record;
   }
 }
@@ -53,15 +68,17 @@ interface State {
  * Session/grant provenance is request/process-local; this is NOT a durable restore adapter. */
 export class AtomicStoreReferenceModel implements AtomicLoginStorePort, SessionStorePort {
   private readonly expected: Readonly<IdentityApplicationContext>;
+  private readonly target: Readonly<ChannelExpectation>;
   private readonly limits: Readonly<SessionCapacityPolicy>;
   private readonly owner = Object.freeze({});
   private state: State = { transactions: new Map(), assertions: new Map(), grants: new Map(), sessions: new Map(), receipts: new Map() };
   private epoch = 0;
-  private lastDecision = 0;
+  private lastObservedAt = 0;
   private fault: ReferenceFault | undefined;
   private unavailable = false;
   constructor(private readonly ports: ReferenceModelPorts) {
     this.expected = context(ports.context);
+    this.target = expectation({ ...this.expected, backendOrigin: ports.backendOrigin });
     const p = record(ports.capacity, ['maxTransactions', 'maxGrants', 'maxSessions', 'maxReceipts', 'maxSessionsPerSubject', 'receiptRetentionMs', 'cleanupBatchSize']);
     for (const value of Object.values(p)) if (!Number.isSafeInteger(value) || (value as number) <= 0) invalid();
     this.limits = Object.freeze({ ...ports.capacity });
@@ -75,23 +92,29 @@ export class AtomicStoreReferenceModel implements AtomicLoginStorePort, SessionS
   }
   setAvailable(available: boolean): void { this.unavailable = !available; }
   failNext(fault: ReferenceFault): void { this.fault = fault; }
-  private time(decisionTime: number): number {
+  private time(): number {
     if (this.unavailable) deny('UNAVAILABLE');
-    const now = timestamp(this.ports.clock()); timestamp(decisionTime);
-    if (decisionTime !== now || now < this.lastDecision) deny('INVALID'); return now;
+    const now = timestamp(this.ports.clock());
+    if (now < this.lastObservedAt) deny('INVALID');
+    // Also remember reads/denied decisions: rollback must never revive expired state.
+    // This process-local clock guard does not mutate any business maps or receipts.
+    this.lastObservedAt = now; return now;
   }
   private application(value: IdentityApplicationContext): void {
     try { matchContext(value, this.expected); } catch { deny('CONTEXT_MISMATCH'); }
   }
   private base(command: AtomicCommand): number {
     this.application(command.context); hex(command.operationId); hex(command.commandDigest); revision(command.expectedRevision);
-    return this.time(command.decisionTime);
+    const now = this.time(), created = timestamp(command.commandCreatedAt);
+    if (command.protocolVersion !== 1 || command.backendOrigin !== this.target.backendOrigin) deny('CONTEXT_MISMATCH');
+    if (created - now > CHANNEL.futureSkewMs || now - created >= CHANNEL.commandAgeMs) deny('EXPIRED');
+    return now;
   }
   private prior(command: AtomicCommand | OperationLookup): AtomicOutcome | undefined {
     const prior = this.state.receipts.get(command.operationId);
-    if (!prior) return undefined;
+    if (!prior || prior.retainUntil <= this.time()) return undefined;
     if (prior.commandDigest !== command.commandDigest) deny('CONFLICT');
-    return { status: 'COMMITTED', receipt: prior, recovered: true };
+    return { status: prior.outcome, receipt: this.receiptEvidence(prior), recovered: true };
   }
   private snapshot(): State {
     return { transactions: new Map(this.state.transactions), assertions: new Map(this.state.assertions),
@@ -99,12 +122,27 @@ export class AtomicStoreReferenceModel implements AtomicLoginStorePort, SessionS
   }
   private checkpoint(fault: ReferenceFault | undefined, point: ReferenceFault): void { if (fault === point) deny('UNAVAILABLE'); }
   private checkDigest(command: AcceptAssertionCommand | ConsumeGrantCommand): void {
-    if (hex(this.ports.digest.digest(atomicCommandMaterial(command))) !== command.commandDigest) deny('CONFLICT');
+    if (atomicOperationDescriptor(command, this.ports.digest).commandDigest !== command.commandDigest) deny('CONFLICT');
   }
-  private receipt(snapshot: State, command: AtomicCommand, kind: OperationReceipt['kind'], objectId: string, until: number) {
+  private receiptEvidence(receipt: Readonly<OperationReceipt>): VerifiedOperationReceipt {
+    // Private owner evidence, NOT a remote signature or durable rehydration.
+    return new ReceiptEvidence(receiptCapability, this.owner, receipt) as unknown as VerifiedOperationReceipt;
+  }
+  readOperationReceipt(value: unknown, expected: OperationLookup): Readonly<OperationReceipt> {
+    const descriptor = inspectRecoveryDescriptor(expected, this.target, this.ports.digest);
+    const stored = ReceiptEvidence.read(value, this.owner);
+    if (this.state.receipts.get(stored.operationId) !== stored) return invalid();
+    const receipt = inspectReceipt(stored, descriptor, this.time());
+    if (receipt.outcome === 'COMMITTED' && (receipt.objectId !== descriptor.expectedObjectId ||
+      receipt.revision !== descriptor.expectedRevision + 1)) return invalid();
+    return receipt;
+  }
+  private receipt(snapshot: State, command: AtomicCommand, kind: OperationReceipt['operationKind'], objectId: string, until: number, now: number) {
     if (snapshot.receipts.size >= this.limits.maxReceipts) deny('CAPACITY_EXCEEDED');
     const result: Readonly<OperationReceipt> = Object.freeze({ ...this.expected, operationId: command.operationId,
-      commandDigest: command.commandDigest, kind, objectId, committedAt: command.decisionTime,
+      commandDigest: command.commandDigest, operationKind: kind, objectId, commandCreatedAt: command.commandCreatedAt,
+      backendDecisionAt: now, databaseCommittedAt: Object.freeze({ status: 'UNAVAILABLE' as const, value: null }),
+      outcome: 'COMMITTED', receiptId: command.operationId, code: null,
       revision: command.expectedRevision + 1, retainUntil: addTime(until, this.limits.receiptRetentionMs) });
     revision(result.revision); snapshot.receipts.set(command.operationId, result); return result;
   }
@@ -116,16 +154,18 @@ export class AtomicStoreReferenceModel implements AtomicLoginStorePort, SessionS
     if (epoch !== this.epoch) {
       const prior = this.prior(command); if (prior) return prior; deny('CONFLICT');
     }
-    const now = timestamp(this.ports.clock()); if (now < command.decisionTime || now < this.lastDecision) deny('INVALID');
+    const now = this.time(); if (now < receipt.backendDecisionAt) deny('INVALID');
     recheck(now);
     // Sole commit point. Any earlier throw discards ALL staged maps/receipt changes.
-    this.state = snapshot; this.epoch++; this.lastDecision = now;
+    this.state = snapshot; this.epoch++;
     if (fault === 'AFTER_COMMIT') return { status: 'OUTCOME_UNKNOWN' };
-    return { status: 'COMMITTED', receipt, recovered: false };
+    return { status: 'COMMITTED', receipt: this.receiptEvidence(receipt), recovered: false };
   }
   async acceptAssertionAndCreateGrant(command: AcceptAssertionCommand): Promise<AtomicOutcome> {
     try {
-      record(command, [...baseKeys, 'assertion']); const now = this.base(command);
+      record(command, [...baseKeys, 'assertion']); this.application(command.context);
+      command = Object.freeze({ ...command, context: context(command.context) });
+      const now = this.base(command);
       const data = readSignedAssertion(command.assertion, this.expected); this.checkDigest(command);
       const prior = this.prior(command); if (prior) return prior;
       const tx = this.state.transactions.get(data.claims.transactionId);
@@ -151,7 +191,7 @@ export class AtomicStoreReferenceModel implements AtomicLoginStorePort, SessionS
         grantId: g.grantId, transactionId: g.transactionId, assertionId: g.assertionId, revision: 0, status: 'AVAILABLE',
         consumedAt: null, issuedAt: g.issuedAt, expiresAt: g.expiresAt, signingKey }) }));
       this.checkpoint(fault, 'AFTER_GRANT');
-      const receipt = this.receipt(snapshot, command, 'ACCEPT_ASSERTION', g.grantId, Math.max(tx.record.expiresAt, g.expiresAt));
+      const receipt = this.receipt(snapshot, command, 'ACCEPT_ASSERTION', g.grantId, Math.max(tx.record.expiresAt, g.expiresAt), now);
       this.checkpoint(fault, 'AFTER_RECEIPT');
       return await this.commit(snapshot, epoch, command, receipt, fault, at => {
         if (at >= tx.record.expiresAt || at >= data.claims.expiresAt || at >= g.expiresAt) deny('EXPIRED');
@@ -177,7 +217,9 @@ export class AtomicStoreReferenceModel implements AtomicLoginStorePort, SessionS
   }
   async consumeGrantAndCreateSession(command: ConsumeGrantCommand): Promise<AtomicOutcome> {
     try {
-      record(command, [...baseKeys, 'grantId', 'credentialDigest', 'expectedAuthorizationVersion']); const now = this.base(command);
+      record(command, [...baseKeys, 'grantId', 'credentialDigest', 'expectedAuthorizationVersion']); this.application(command.context);
+      command = Object.freeze({ ...command, context: context(command.context) });
+      const now = this.base(command);
       hex(command.grantId); hex(command.credentialDigest); revision(command.expectedAuthorizationVersion); this.checkDigest(command);
       const prior = this.prior(command); if (prior) return prior;
       const grant = this.state.grants.get(command.grantId); if (!grant) deny('CONFLICT');
@@ -199,7 +241,7 @@ export class AtomicStoreReferenceModel implements AtomicLoginStorePort, SessionS
       const session: Readonly<StoredSession> = Object.freeze({ ...plan.sessionPlan, sessionId: command.credentialDigest,
         status: 'ACTIVE', revokedAt: null, revision: 0, grantId: command.grantId, signingKey: provenance });
       snapshot.sessions.set(command.credentialDigest, session); this.checkpoint(fault, 'AFTER_SESSION');
-      const receipt = this.receipt(snapshot, command, 'ISSUE_SESSION', command.credentialDigest, session.expiresAt);
+      const receipt = this.receipt(snapshot, command, 'ISSUE_SESSION', command.credentialDigest, session.expiresAt, now);
       this.checkpoint(fault, 'AFTER_RECEIPT');
       return await this.commit(snapshot, epoch, command, receipt, fault, at => {
         if (at >= grant.record.expiresAt || at >= session.expiresAt) deny('EXPIRED');
@@ -208,15 +250,20 @@ export class AtomicStoreReferenceModel implements AtomicLoginStorePort, SessionS
       });
     } catch (error) { return outcome(error); }
   }
-  getOperationOutcome(command: OperationLookup): AtomicOutcome {
+  async getOperationOutcome(command: OperationLookup): Promise<AtomicOutcome> {
     try {
-      record(command, baseKeys); this.application(command.context);
-      if (command.expectedRevision !== null) invalid(); hex(command.operationId); hex(command.commandDigest); this.time(command.decisionTime);
-      return this.prior(command) || { status: 'OUTCOME_UNKNOWN' };
+      this.application(command);
+      this.time();
+      const prior = this.state.receipts.get(hex(command.operationId));
+      if (prior && prior.commandDigest !== hex(command.commandDigest)) deny('CONFLICT');
+      const descriptor = inspectRecoveryDescriptor(command, this.target, this.ports.digest);
+      this.time(); const result = this.prior(descriptor);
+      if (result?.status === 'COMMITTED' || result?.status === 'REJECTED') this.readOperationReceipt(result.receipt, descriptor);
+      return result || { status: 'OUTCOME_UNKNOWN' };
     } catch (error) { return outcome(error); }
   }
   private readLookup(command: SessionLookup) {
-    this.application(command.context); hex(command.credentialDigest); const now = this.time(command.decisionTime);
+    this.application(command.context); hex(command.credentialDigest); const now = this.time();
     const s = this.state.sessions.get(command.credentialDigest); if (!s) invalid();
     const u = this.user(s.identityIssuer, s.identitySubject, s.authorizationVersion);
     const { revision: _rev, grantId: _grant, signingKey: key, ...legacy } = s;
@@ -231,23 +278,23 @@ export class AtomicStoreReferenceModel implements AtomicLoginStorePort, SessionS
   }
   /** Model-specific capability reader rechecks current record/version/directory/key policy.
    * A cast, JSON copy, capability from another model or stale record cannot restore trust. */
-  readTrustedSession(value: unknown, decisionTime: number): Readonly<StoredSession> {
+  readTrustedSession(value: unknown): Readonly<StoredSession> {
     const stored = StoredEvidence.read(value, this.owner);
-    const current = this.readLookup({ context: this.expected, credentialDigest: stored.sessionId, decisionTime });
+    const current = this.readLookup({ context: this.expected, credentialDigest: stored.sessionId });
     if (current !== stored) return invalid(); return current;
   }
   revokeSession(command: RevokeSessionCommand): 'REVOKED' | 'CONFLICT' | 'BLOCKED' | 'UNAVAILABLE' {
     try {
       record(command, [...lookupKeys, 'expectedRevision']); this.application(command.context); hex(command.credentialDigest);
-      const now = this.time(command.decisionTime), s = this.state.sessions.get(command.credentialDigest);
+      const now = this.time(), s = this.state.sessions.get(command.credentialDigest);
       if (!s || s.status !== 'ACTIVE' || now < s.issuedAt) return 'BLOCKED';
       if (s.revision !== revision(command.expectedRevision)) return 'CONFLICT';
       this.state.sessions.set(s.sessionId, Object.freeze({ ...s, status: 'REVOKED', revokedAt: now, revision: revision(s.revision + 1) }));
-      this.epoch++; this.lastDecision = now; return 'REVOKED';
+      this.epoch++; return 'REVOKED';
     } catch { return this.unavailable ? 'UNAVAILABLE' : 'BLOCKED'; }
   }
-  cleanup(decisionTime: number): number {
-    const now = this.time(decisionTime); let removed = 0;
+  cleanup(): number {
+    const now = this.time(); let removed = 0;
     const remove = <T>(map: Map<string, T>, expired: (value: T) => boolean) => {
       for (const [key, value] of map) if (removed < this.limits.cleanupBatchSize && expired(value)) { map.delete(key); removed++; }
     };
@@ -256,7 +303,7 @@ export class AtomicStoreReferenceModel implements AtomicLoginStorePort, SessionS
     remove(this.state.assertions, until => until <= now);
     remove(this.state.grants, g => addTime(g.record.expiresAt, this.limits.receiptRetentionMs) <= now);
     remove(this.state.transactions, t => addTime(t.record.expiresAt, this.limits.receiptRetentionMs) <= now);
-    if (removed) { this.epoch++; this.lastDecision = now; } return removed;
+    if (removed) this.epoch++; return removed;
   }
   /** Counts only, never records, credentials or identity values. Local assertions only. */
   inspect() { return Object.freeze({ transactions: this.state.transactions.size,

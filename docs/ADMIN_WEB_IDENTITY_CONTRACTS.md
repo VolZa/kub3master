@@ -287,19 +287,21 @@ Real key custody, policy distribution, RSA verification, library selection and l
 ## Atomic store boundary and durable receipts
 
 All commands are SERVER-ONLY, never browser DTOs. Required fields: application context, operationId,
-commandDigest, expectedRevision, decisionTime. Acceptance carries runtime verified assertion evidence.
+protocolVersion, backendOrigin, commandDigest, expectedRevision and immutable commandCreatedAt.
+Acceptance carries private runtime verified assertion evidence plus its exact original Compact JWS.
 Issuance carries grantId, credentialDigest and expectedAuthorizationVersion; identity comes from the
 stored grant and the user comes from a trusted directory port. Extra roles/permissions/identity fields fail.
 Actual directory adapters must project their current user into issuer/subject/active/authorizationVersion;
 do not pass browser fields or infer permissions from this projection.
 
-Expected revision means transaction revision for acceptance and grant revision for issuance. Outcome
-lookup uses null revision and the ORIGINAL command digest. Its decision time is a fresh trusted time.
-Digest material uses a fixed ordered JSON array of operation kind, context, operation ID, revision,
-decision time and all semantic command fields. A trusted SHA-256 port must hash those exact bytes;
-no digest implementation is supplied in runtime modules. The model recomputes and compares it.
+Expected revision means transaction revision for acceptance and grant revision for issuance. The shared
+`operation-contracts.ts` profile deterministically encodes all business preconditions into the original
+body. Its separate byte-oriented SHA-256 port hashes the body and existing COMMAND_V1 framed metadata.
+There is no legacy digest fallback. Browser proof/session credential UTF-8 text hashing is unchanged.
+The model recomputes the semantic digest. Recovery uses the ORIGINAL descriptor, including body digest,
+expected revision/object and original command time; it does not carry the assertion body or a caller clock.
 
-Outcomes: COMMITTED, REPLAY, EXPIRED, CONFLICT, CONTEXT_MISMATCH, UNAVAILABLE, OUTCOME_UNKNOWN,
+Outcomes: COMMITTED, REJECTED (only with verified receipt evidence), REPLAY, EXPIRED, CONFLICT, CONTEXT_MISMATCH, UNAVAILABLE, OUTCOME_UNKNOWN,
 plus fail-closed INVALID and CAPACITY_EXCEEDED. No raw exceptions or private API bodies are returned.
 
 `acceptAssertionAndCreateGrant`: in ONE transaction, consume authoritative transaction, reserve unique
@@ -314,16 +316,20 @@ Different digest for the same live operation ID fails CONFLICT. IDs and store na
 within context; an external adapter must authenticate the calling application AND enforce the full
 environment/audience/Script ID binding. Model instances each own a fixed context and separate maps.
 
-Receipts store context, operation ID, command digest, operation kind, resulting lookup ID, accepted
-decision time (committedAt), revision and retainUntil. No raw credential or assertion body is retained
-in receipts. In the model committedAt is the trusted decision time of the winning operation, not a
-database timestamp proving the exact wall-clock instant of the synchronous state swap.
+Receipts use the existing channel OperationReceipt DTO: context, operation ID/kind/digest,
+commandCreatedAt, backendDecisionAt, databaseCommittedAt, outcome, receiptId, objectId, revision,
+code and retainUntil. The reference model always sets databaseCommittedAt to
+`{ status: "UNAVAILABLE", value: null }`: a committed state swap is confirmed without claiming an
+exact DB wall-clock timestamp. Receipt values do not retain raw credentials, proof, JWS or body.
+The reference model produces only COMMITTED receipts; pre-commit denials remain nonterminal status
+results, not fabricated durable rejection records. The normalized contract also supports authenticated
+REJECTED receipts from a future reviewed backend.
 
-After response loss, OUTCOME_UNKNOWN MUST NOT be interpreted as rollback. `getOperationOutcome`
-returns the committed receipt only for matching context/ID/digest; absence remains OUTCOME_UNKNOWN
-because an operation may be in flight or its receipt retention may have elapsed. It never creates state.
-Retry exactly the same command only while its trusted decision time is valid; otherwise query outcome
-with fresh time and original digest. A committed grant is never reset to AVAILABLE after a timeout.
+After response loss, OUTCOME_UNKNOWN MUST NOT be interpreted as rollback. Async getOperationOutcome
+returns evidence only for a matching retained operation descriptor. Missing/expired receipts remain
+OUTCOME_UNKNOWN and lookup never creates state. The orchestrator never retries a mutation after an
+unknown result; it performs lookup with original operation ID/digest/time and no replacement command.
+A committed grant is never reset to AVAILABLE after timeout.
 
 No receipt/session credential replay via URL. If the browser loses the newly issued bearer, digest-only
 persistence cannot recover it: use a new login, revoke an identifiable orphan or let it expire. Do not
@@ -342,7 +348,10 @@ Faults can be injected after transaction/assertion/grant/session/receipt writes,
 commit. Before-commit failures expose no partial state. After-commit response loss retains all state.
 Live objects are checked again after a scheduling delay; expiration, key compromise, authorization
 version changes and unavailable storage block issuance. Time is explicit, monotonic, server-controlled;
-the model requires command decisionTime to equal its trusted clock when execution begins.
+commandCreatedAt comes from the application clock and backendDecisionAt from the model's independent
+backend clock. No equality is required, including for session reads/revocation/cleanup. Mutation age
+must be <120s, future command skew <=5s. Rechecks at the final state swap still use actual backend time;
+no adapter substitutes client time or invents DB time to make older checks pass.
 
 Session expiration = min(redemption decision time + 15m, signed upstream authentication expiry),
 independent of the 20s assertion TTL and planned key verification expiry. No roles are copied into sessions.
@@ -420,3 +429,39 @@ ADMIN checker both targets PASS; git diff --check PASS. In-memory production/rea
 SHA-256 still equals the baseline hashes above. Only the nine approved Slice 2B.1 files are included
 in the local checkpoint. Production/readiness sources, security prototypes, ADMIN entrypoints and
 RPC/build allowlists are unchanged. No Slice 2B.2 implementation or external setup is included.
+
+## Slice 2C.2a - remote operation compatibility
+
+Baseline: feature/bom-logic / 2c09069, clean tree and empty staging before implementation.
+This is controlled local contract evolution only; no deployment, Google resources or persistent adapter.
+
+Private ReceiptEvidence belongs to one reference-model owner and a current retained record identity.
+`readOperationReceipt` requires that private provenance before validating context, digest, original
+command time, expected revision/object and retention. Casts, JSON/spread/prototype copies, another model
+and cross-environment capabilities do not establish ownership. The opaque interface alone provides no
+runtime authority. The model's private-field evidence is NOT remote cryptographic authentication or
+persistent restoration. Future reviewed response/store readers must enforce those independently.
+
+The new shared body contains exact Compact JWS bytes for ACCEPT_ASSERTION, not decoded/re-serialized
+claims. This is ephemeral command material for future independent remote verification. The existing
+signature port/profile remains mandatory; storing the raw JWS in private verified evidence does not
+create a new verifier, permissive adapter or durable identity source.
+
+Session TTL remains min(backend redemption time + 15m, signed upstream authentication expiry).
+Transaction/assertion/grant TTLs and signing-key policy are unchanged; planned key verification expiry
+does not terminate a session, while compromise/revocation/provenance/user/version failures still deny.
+Strict legacy evidence chronology (`verifiedAt <= backend now`) and session chronology (`issuedAt <=
+application now`) remain fail-closed. A small offset alone does not override these guards; a freshly
+application-verified proof can be blocked by a lagging backend, and an ahead-issued session by the
+application clock until it catches up. Real independent backend verification of the exact JWS and a
+reviewed remote session reader remain integration gates; timestamps must never be forged/normalized.
+
+Receipt recovery does not authenticate a user or permit ERP access. Even COMMITTED + UNAVAILABLE DB
+time requires authoritative current session/user/version/key checks before bearer delivery, followed
+by PermissionService for protected operations. Session credential loss requires a new login; receipts
+cannot reconstruct the bearer or create another session from the spent grant.
+
+Runtime code remains ES2019 with no Node/GAS ambient dependencies. Local tests preserve previous
+atomic/security invariants and add independent clocks, strict timestamp bounds, exact JWS/profile
+binding, private receipt ownership and historical async recovery. They do not prove distributed
+atomicity, durable storage, real signature verification or authenticated remote restoration.

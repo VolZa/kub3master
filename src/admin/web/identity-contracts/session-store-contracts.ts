@@ -37,7 +37,6 @@ export interface CurrentDirectoryUser {
 export interface SessionLookup {
   readonly context: IdentityApplicationContext;
   readonly credentialDigest: string;
-  readonly decisionTime: number;
 }
 export type SessionLookupOutcome = { readonly status: 'FOUND'; readonly session: TrustedStoredSession } |
   { readonly status: 'BLOCKED' | 'UNAVAILABLE' };
@@ -47,5 +46,5 @@ export interface SessionStorePort {
   revokeSession(command: RevokeSessionCommand): 'REVOKED' | 'CONFLICT' | 'BLOCKED' | 'UNAVAILABLE';
   /** Never return expired state as valid while waiting for cleanup. Never delete live receipts.
    * Real implementations need durable revocation/provenance indexes, not an authoritative cache. */
-  cleanup(decisionTime: number): number;
+  cleanup(): number;
 }

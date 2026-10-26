@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { AtomicStoreReferenceModel } from '../identity-contracts/atomic-store-reference-model';
-import { atomicCommandMaterial, type AtomicOutcome, type AtomicStatus, type ConsumeGrantCommand } from '../identity-contracts/atomic-store-contracts';
+import { atomicOperationDescriptor, type AtomicOutcome, type AtomicStatus, type ConsumeGrantCommand } from '../identity-contracts/atomic-store-contracts';
 import { type LoginTransaction, type IdentityApplicationContext, type UnverifiedBrokerAssertion, IDENTITY_TTL } from '../identity-contracts/contracts';
 import { type SigningKeyPolicy, type SigningKeyRule } from '../identity-contracts/signing-key-policy';
 import { type SignedAssertionClaimsV1 } from '../identity-contracts/signed-assertion-profile';
@@ -9,13 +9,17 @@ import { type User, type Permission } from '../../../security/permission-service
 import { composeLocalAuthentication } from './composition';
 import { SignedAssertionVerificationService } from './trusted-verification';
 import { type LocalAuthenticationPorts } from './ports';
+import type { RecoveryDescriptor } from '../operation-contracts';
 import { SessionResolver } from './session-resolver';
 import { SessionAuthorizationAdapter } from './authorization-adapter';
 
 const start = 1_800_000_000_000, rawProof = 'f'.repeat(64), sha = (s: string) => createHash('sha256').update(s).digest('hex');
+const backendOrigin = 'https://auth-test.example.com';
+const byteDigest = { digest: (bytes: readonly number[]) => createHash('sha256').update(Buffer.from(bytes)).digest('hex') };
 const b64 = (s: string) => Buffer.from(s).toString('base64url');
 function fixture(environment: 'PRODUCTION' | 'TEST' = 'TEST') {
   const expected: IdentityApplicationContext = { environment, expectedScriptId: `synthetic-admin-${environment.toLowerCase()}-script-000001`, applicationAudience: `kub:admin:${environment.toLowerCase()}` };
+  let backendOffset = 0;
   let now = start, current: IdentityApplicationContext = expected, sequence = 0;
   let user: Readonly<User> = { issuer: 'https://accounts.google.com', subject: 'synthetic-visitor', active: true, authorizationVersion: 3, roles: ['ADMIN'] };
   let key: SigningKeyRule = { ...expected, keyId: 'synthetic-key-v1', algorithm: 'RS256', signingNotBefore: start - 10_000,
@@ -38,9 +42,9 @@ function fixture(environment: 'PRODUCTION' | 'TEST' = 'TEST') {
   const syntheticSignature = { verify: vi.fn(() => true) }; // Available ONLY in this test file.
   const signed = new SignedAssertionVerificationService(trust, policy, syntheticSignature);
   const verifier = { assertConfigured: () => signed.assertConfigured(), verify: vi.fn((message: unknown, tx: Readonly<LoginTransaction>) => signed.verify(message, tx)) };
-  const model = new AtomicStoreReferenceModel({ context: expected, clock: trust.clock, keyPolicy: policy,
+  const model = new AtomicStoreReferenceModel({ context: expected, backendOrigin, clock: () => now + backendOffset, keyPolicy: policy,
     directory: () => ({ issuer: user.issuer, subject: user.subject, active: user.active, authorizationVersion: user.authorizationVersion }),
-    digest: { digest: sha }, capacity: { maxTransactions: 50, maxGrants: 50, maxSessions: 50, maxReceipts: 100,
+    digest: byteDigest, capacity: { maxTransactions: 50, maxGrants: 50, maxSessions: 50, maxReceipts: 100,
       maxSessionsPerSubject: 10, receiptRetentionMs: 120_000, cleanupBatchSize: 20 } });
   const transactionPort = {
     create: vi.fn(async (tx: Readonly<LoginTransaction>) => {
@@ -60,9 +64,23 @@ function fixture(environment: 'PRODUCTION' | 'TEST' = 'TEST') {
   };
   const users = { find: vi.fn((_issuer: string, _subject: string) => user) };
   const sessionPort = { readSession: vi.fn((c: Parameters<typeof model.readSession>[0]) => model.readSession(c)),
-    revokeSession: (c: Parameters<typeof model.revokeSession>[0]) => model.revokeSession(c), cleanup: (at: number) => model.cleanup(at) };
-  const ports: LocalAuthenticationPorts = { ...trust, transactions: transactionPort, atomic, broker: { receive: source }, verifier,
-    sessions: sessionPort, trustedSessions: { read: (capability, at) => model.readTrustedSession(capability, at) },
+    revokeSession: (c: Parameters<typeof model.revokeSession>[0]) => model.revokeSession(c), cleanup: () => model.cleanup() };
+  // TEST-ONLY process-independent metadata fixture. Not a persistent runtime coordinator.
+  const saved = new Map<string, Readonly<RecoveryDescriptor>>();
+  const recovery = {
+    save: vi.fn(async (descriptor: Readonly<RecoveryDescriptor>) => {
+      const old = saved.get(descriptor.operationId);
+      if (old && JSON.stringify(old) !== JSON.stringify(descriptor)) throw Error('conflict');
+      saved.set(descriptor.operationId, Object.freeze(JSON.parse(JSON.stringify(descriptor))));
+    }),
+    load: vi.fn(async (query: { operationId: string; commandDigest: string }) => {
+      const d = saved.get(query.operationId); return d?.commandDigest === query.commandDigest ? d : undefined;
+    }),
+  };
+  const receipts = { read: vi.fn((capability: unknown, descriptor: RecoveryDescriptor) => model.readOperationReceipt(capability, descriptor)) };
+  const ports: LocalAuthenticationPorts = { ...trust, backendOrigin, commandDigests: byteDigest,
+    receipts, recovery, transactions: transactionPort, atomic, broker: { receive: source }, verifier,
+    sessions: sessionPort, trustedSessions: { read: capability => model.readTrustedSession(capability) },
     users, digest: { digest: sha }, secrets: { secret: () => (++sequence).toString(16).padStart(64, '0') }, keyPolicy: policy };
   const app = composeLocalAuthentication(ports);
   const begin = async () => {
@@ -75,8 +93,9 @@ function fixture(environment: 'PRODUCTION' | 'TEST' = 'TEST') {
     if (result.status !== 'AUTHENTICATED') throw Error('synthetic login failed: ' + result.code);
     return { request, result, credential: { sessionCredential: result.sessionCredential } };
   };
-  return { app, ports, model, atomic, sessionPort, verifier, syntheticSignature, signed, source, transactionPort, transactions, users,
+  return { app, ports, model, atomic, saved, recovery, receipts, sessionPort, verifier, syntheticSignature, signed, source, transactionPort, transactions, users,
     expected, trust, policy, begin, login, time: () => now, user: () => user,
+    setBackendOffset: (offset: number) => { backendOffset = offset; },
     setTime: (at: number) => { now = at; }, setContext: (value: IdentityApplicationContext) => { current = value; },
     setUser: (value: Partial<User>) => { user = { ...user, ...value }; },
     setKey: (value: Partial<SigningKeyRule>) => { key = { ...key, ...value }; },
@@ -145,8 +164,8 @@ describe('local login orchestration (synthetic adapters only)', () => {
   it('rejects grant replay when another consumer wins after assertion acceptance', async () => {
     const f = fixture(); f.onAccepted(async result => {
       if (result.status !== 'COMMITTED') return;
-      const command: ConsumeGrantCommand = { context: f.expected, operationId: 'e'.repeat(64), commandDigest: '', expectedRevision: 0,
-        decisionTime: f.time(), grantId: result.receipt.objectId, credentialDigest: sha('synthetic-other-credential'), expectedAuthorizationVersion: 3 };
+      const command: ConsumeGrantCommand = { context: f.expected, protocolVersion: 1, backendOrigin, operationId: 'e'.repeat(64), commandDigest: '', expectedRevision: 0,
+        commandCreatedAt: f.time(), grantId: result.receipt.record.objectId!, credentialDigest: sha('synthetic-other-credential'), expectedAuthorizationVersion: 3 };
       commandDigestSeal(command);
       expect((await f.model.consumeGrantAndCreateSession(command)).status).toBe('COMMITTED');
     });
@@ -177,7 +196,7 @@ describe('local login orchestration (synthetic adapters only)', () => {
   });
   it.each(['accept', 'issue'] as const)('does not assume rollback when receipt lookup cannot confirm %s commit', async stage => {
     const f = fixture(); if (stage === 'accept') f.model.failNext('AFTER_COMMIT'); else f.onAccepted(() => f.model.failNext('AFTER_COMMIT'));
-    f.atomic.getOperationOutcome.mockReturnValue({ status: 'OUTCOME_UNKNOWN' });
+    f.atomic.getOperationOutcome.mockResolvedValue({ status: 'OUTCOME_UNKNOWN' });
     const result = await f.app.completeLogin(await f.begin()); expect(result).toEqual({ status: 'BLOCKED', code: 'OUTCOME_UNKNOWN' });
     expect(f.model.inspect()).toMatchObject({ consumedTransactions: 1, grants: 1, sessions: stage === 'accept' ? 0 : 1 });
     expect(f.atomic.acceptAssertionAndCreateGrant).toHaveBeenCalledTimes(1);
@@ -199,8 +218,11 @@ describe('local login orchestration (synthetic adapters only)', () => {
   });
   it('does not release a raw credential for a forged COMMITTED receipt without a stored session', async () => {
     const f = fixture(); f.atomic.consumeGrantAndCreateSession.mockImplementation(async c => ({ status: 'COMMITTED', recovered: false,
-      receipt: { ...f.expected, operationId: c.operationId, commandDigest: c.commandDigest, kind: 'ISSUE_SESSION', objectId: c.credentialDigest,
-        committedAt: c.decisionTime, revision: c.expectedRevision + 1, retainUntil: c.decisionTime + 100_000 } }));
+      receipt: { record: { ...f.expected, operationId: c.operationId, commandDigest: c.commandDigest,
+        operationKind: 'ISSUE_SESSION', objectId: c.credentialDigest, commandCreatedAt: c.commandCreatedAt,
+        backendDecisionAt: c.commandCreatedAt, databaseCommittedAt: { status: 'UNAVAILABLE', value: null },
+        outcome: 'COMMITTED', receiptId: c.operationId, code: null,
+        revision: c.expectedRevision + 1, retainUntil: c.commandCreatedAt + 100_000 } } as any }));
     const result = await f.app.completeLogin(await f.begin()); expect(result.status).toBe('BLOCKED'); expect(result).not.toHaveProperty('sessionCredential');
   });
   it('keeps receipt recovery read-only and performs each mutation only once', async () => {
@@ -225,8 +247,152 @@ describe('local login orchestration (synthetic adapters only)', () => {
     });
 });
 
+describe('immutable operations and receipt-only recovery', () => {
+  it.each(['accept', 'issue'] as const)('does not generate another bearer or operation while recovering unknown %s', async stage => {
+    const f = fixture(), secrets = vi.spyOn(f.ports.secrets, 'secret');
+    if (stage === 'accept') f.model.failNext('AFTER_COMMIT'); else f.onAccepted(() => f.model.failNext('AFTER_COMMIT'));
+    f.atomic.getOperationOutcome.mockResolvedValueOnce({ status: 'OUTCOME_UNKNOWN' });
+    expect(await f.app.completeLogin(await f.begin())).toEqual({ status: 'BLOCKED', code: 'OUTCOME_UNKNOWN' });
+    expect(secrets).toHaveBeenCalledTimes(stage === 'accept' ? 3 : 5);
+    const before = secrets.mock.calls.length, saved = [...f.saved.values()], descriptor = saved[saved.length - 1];
+    const query = { operationId: descriptor.operationId, commandDigest: descriptor.commandDigest };
+    const restarted = composeLocalAuthentication(f.ports);
+    expect(await restarted.recoverOperation(query)).toEqual({ status: 'RECOVERED', outcome: 'COMMITTED' });
+    expect(await restarted.recoverOperation(query)).toEqual({ status: 'RECOVERED', outcome: 'COMMITTED' });
+    expect(secrets).toHaveBeenCalledTimes(before);
+    expect(f.atomic.acceptAssertionAndCreateGrant).toHaveBeenCalledTimes(1);
+    expect(f.atomic.consumeGrantAndCreateSession).toHaveBeenCalledTimes(stage === 'accept' ? 0 : 1);
+  });
+  it.each([-50, 1000])('supports distinct application/backend clocks (%s) without rewriting command time', async offset => {
+    const f = fixture(); f.setBackendOffset(offset);
+    if (offset < 0) {
+      const verify = f.verifier.verify.getMockImplementation()!;
+      f.verifier.verify.mockImplementation((message, tx) => { const result = verify(message, tx); f.setTime(start + 100); return result; });
+    } else {
+      f.atomic.consumeGrantAndCreateSession.mockImplementation(async command => {
+        const result = await f.model.consumeGrantAndCreateSession(command); f.setTime(start + 1500); return result;
+      });
+    }
+    const { credential } = await f.login(); expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('AUTHORIZED');
+    const accept = f.atomic.acceptAssertionAndCreateGrant.mock.calls[0][0], descriptor = f.saved.get(accept.operationId)!;
+    const result = await f.model.getOperationOutcome(descriptor);
+    if (result.status !== 'COMMITTED') throw Error('fixture');
+    const receipt = f.model.readOperationReceipt(result.receipt, descriptor);
+    expect(receipt.backendDecisionAt).toBe(accept.commandCreatedAt + offset);
+    expect(receipt.databaseCommittedAt).toEqual({ status: 'UNAVAILABLE', value: null });
+    expect(f.saved.get(accept.operationId)?.commandCreatedAt).toBe(accept.commandCreatedAt);
+  });
+  it('keeps strict future-issued session and verified-evidence chronology fail-closed', async () => {
+    const ahead = fixture(); ahead.setBackendOffset(1000);
+    expect((await ahead.app.completeLogin(await ahead.begin())).status).toBe('BLOCKED');
+    expect(ahead.model.inspect().sessions).toBe(1); // Committed is not authorization.
+    const behind = fixture(); behind.setBackendOffset(-1);
+    expect((await behind.app.completeLogin(await behind.begin())).status).toBe('BLOCKED');
+    expect(behind.model.inspect().grants).toBe(0); // Legacy proof verifiedAt is not rewritten.
+  });
+  it('saves metadata before dispatch and never dispatches if coordination fails', async () => {
+    const f = fixture(); f.recovery.save.mockRejectedValue(Error('PRIVATE_COORDINATOR_FAILURE'));
+    expect(await f.app.completeLogin(await f.begin())).toEqual({ status: 'BLOCKED', code: 'UNAVAILABLE' });
+    expect(f.atomic.acceptAssertionAndCreateGrant).not.toHaveBeenCalled();
+    expect(f.atomic.consumeGrantAndCreateSession).not.toHaveBeenCalled(); expect(f.saved.size).toBe(0);
+  });
+  it('preserves exactly one descriptor through asynchronous unknown-outcome lookup', async () => {
+    const f = fixture(); f.model.failNext('AFTER_COMMIT');
+    f.atomic.getOperationOutcome.mockImplementation(async descriptor => {
+      await Promise.resolve(); f.setTime(start + 10); return f.model.getOperationOutcome(descriptor);
+    });
+    const { result } = await f.login(), command = f.atomic.acceptAssertionAndCreateGrant.mock.calls[0][0];
+    const lookup = f.atomic.getOperationOutcome.mock.calls[0][0];
+    expect(lookup).toEqual(f.saved.get(command.operationId)); expect(lookup.commandDigest).toBe(command.commandDigest);
+    expect(lookup.commandCreatedAt).toBe(command.commandCreatedAt); expect(f.atomic.acceptAssertionAndCreateGrant).toHaveBeenCalledTimes(1);
+    const serialized = JSON.stringify([...f.saved.values()]);
+    for (const secret of [result.sessionCredential, rawProof, command.assertion.data.assertion]) expect(serialized).not.toContain(secret);
+    for (const d of f.saved.values()) for (const key of ['body', 'assertion', 'sessionCredential', 'browserProof']) expect(d).not.toHaveProperty(key);
+  });
+  it.each(['UNAVAILABLE', 'OUTCOME_UNKNOWN'] as const)('never repeats mutation when async lookup returns %s', async status => {
+    const f = fixture(); f.model.failNext('AFTER_COMMIT');
+    f.atomic.getOperationOutcome.mockImplementation(async () => { await Promise.resolve(); return { status }; });
+    expect(await f.app.completeLogin(await f.begin())).toEqual({ status: 'BLOCKED', code: 'OUTCOME_UNKNOWN' });
+    expect(f.atomic.acceptAssertionAndCreateGrant).toHaveBeenCalledTimes(1); expect(f.atomic.consumeGrantAndCreateSession).not.toHaveBeenCalled();
+    expect(f.saved.size).toBe(1); expect(f.model.inspect()).toMatchObject({ consumedTransactions: 1, grants: 1 });
+  });
+  it('treats a thrown lookup as unknown without resubmitting the mutation or leaking errors', async () => {
+    const f = fixture(); f.model.failNext('AFTER_COMMIT'); f.atomic.getOperationOutcome.mockRejectedValue(Error('PRIVATE_LOOKUP_FAILURE'));
+    expect(await f.app.completeLogin(await f.begin())).toEqual({ status: 'BLOCKED', code: 'OUTCOME_UNKNOWN' });
+    expect(f.atomic.acceptAssertionAndCreateGrant).toHaveBeenCalledTimes(1); expect(f.saved.size).toBe(1);
+  });
+  it('recovers after local composition restart using metadata only, with no new admission or credential', async () => {
+    const f = fixture(); f.onAccepted(() => f.model.failNext('AFTER_COMMIT'));
+    f.atomic.getOperationOutcome.mockResolvedValueOnce({ status: 'OUTCOME_UNKNOWN' });
+    const lost = await f.app.completeLogin(await f.begin()); expect(lost.status).toBe('BLOCKED'); expect(lost).not.toHaveProperty('sessionCredential');
+    expect(f.model.inspect().sessions).toBe(1);
+    const descriptor = [...f.saved.values()].find(d => d.operationKind === 'ISSUE_SESSION')!, before = f.model.inspect();
+    const restarted = composeLocalAuthentication(f.ports);
+    const query = { operationId: descriptor.operationId, commandDigest: descriptor.commandDigest };
+    expect(await restarted.recoverOperation(query)).toEqual({ status: 'RECOVERED', outcome: 'COMMITTED' });
+    expect(await restarted.recoverOperation(query)).toEqual({ status: 'RECOVERED', outcome: 'COMMITTED' });
+    expect(f.model.inspect()).toEqual(before); expect(f.atomic.acceptAssertionAndCreateGrant).toHaveBeenCalledTimes(1);
+    expect(f.atomic.consumeGrantAndCreateSession).toHaveBeenCalledTimes(1); expect(f.recovery.save).toHaveBeenCalledTimes(2);
+    // Old grant remains spent even if an operator attempts another session mutation.
+    const issue = f.atomic.consumeGrantAndCreateSession.mock.calls[0][0];
+    const replacement = { ...issue, operationId: 'e'.repeat(64), credentialDigest: sha('another-bearer') }; commandDigestSeal(replacement);
+    expect(await f.model.consumeGrantAndCreateSession(replacement)).toEqual({ status: 'REPLAY' });
+  });
+  it('needs configured coordination and original metadata; missing records do not prove rollback', async () => {
+    const f = fixture(); const query = { operationId: 'a'.repeat(64), commandDigest: 'b'.repeat(64) };
+    expect(await composeLocalAuthentication({ ...f.ports, recovery: undefined }).recoverOperation(query))
+      .toEqual({ status: 'BLOCKED', code: 'NOT_CONFIGURED' });
+    expect(await f.app.recoverOperation(query)).toEqual({ status: 'BLOCKED', code: 'OUTCOME_UNKNOWN' });
+    expect(f.atomic.getOperationOutcome).not.toHaveBeenCalled();
+    expect(await composeLocalAuthentication().recoverOperation(query)).toEqual({ status: 'BLOCKED', code: 'NOT_CONFIGURED' });
+  });
+  it.each(['environment', 'expectedScriptId', 'applicationAudience', 'backendOrigin', 'commandCreatedAt', 'originalBodyDigest'] as const)(
+    'rejects altered saved descriptor %s before lookup, without creating a replacement', async field => {
+      const f = fixture(); await f.login(); const descriptor = [...f.saved.values()][0];
+      f.recovery.load.mockResolvedValue({ ...descriptor, [field]: field === 'commandCreatedAt' ? start + 1 :
+        field === 'environment' ? 'PRODUCTION' : field === 'backendOrigin' ? 'https://auth-other.example.com' : 'a'.repeat(64) });
+      expect((await f.app.recoverOperation({ operationId: descriptor.operationId, commandDigest: descriptor.commandDigest })).status).toBe('BLOCKED');
+      expect(f.atomic.getOperationOutcome).not.toHaveBeenCalled(); expect(f.atomic.acceptAssertionAndCreateGrant).toHaveBeenCalledTimes(1);
+    });
+  it.each(['json', 'spread', 'cross-store', 'cross-context'] as const)('rejects %s receipt evidence before issuance', async mode => {
+    const f = fixture(), other = fixture(mode === 'cross-context' ? 'PRODUCTION' : 'TEST');
+    const otherLogin = mode.startsWith('cross') ? await other.login() : undefined;
+    f.atomic.acceptAssertionAndCreateGrant.mockImplementation(async command => {
+      const result = await f.model.acceptAssertionAndCreateGrant(command); if (result.status !== 'COMMITTED') return result;
+      const otherCommand = otherLogin ? other.atomic.acceptAssertionAndCreateGrant.mock.calls[0][0] : undefined;
+      const remote = otherCommand ? await other.model.getOperationOutcome(other.saved.get(otherCommand.operationId)!) : undefined;
+      const capability = mode === 'json' ? JSON.parse(JSON.stringify(result.receipt)) : mode === 'spread' ? { ...result.receipt } :
+        remote && (remote.status === 'COMMITTED' || remote.status === 'REJECTED') ? remote.receipt : undefined;
+      return { ...result, receipt: capability as any };
+    });
+    const result = await f.app.completeLogin(await f.begin()); expect(result.status).toBe('BLOCKED'); expect(result).not.toHaveProperty('sessionCredential');
+    expect(f.atomic.consumeGrantAndCreateSession).not.toHaveBeenCalled();
+  });
+  it.each(['revocation', 'version', 'inactive', 'compromise', 'expiry'] as const)(
+    'does not release bearer from a real committed receipt after %s', async change => {
+      const f = fixture(); f.atomic.consumeGrantAndCreateSession.mockImplementation(async command => {
+        const result = await f.model.consumeGrantAndCreateSession(command);
+        if (change === 'revocation') f.model.revokeSession({ context: f.expected, credentialDigest: command.credentialDigest, expectedRevision: 0 });
+        if (change === 'version') f.setUser({ authorizationVersion: 4 });
+        if (change === 'inactive') f.setUser({ active: false });
+        if (change === 'compromise') f.setKey({ compromised: true });
+        if (change === 'expiry') f.setTime(start + IDENTITY_TTL.sessionMs);
+        return result;
+      });
+      const result = await f.app.completeLogin(await f.begin()); expect(result.status).toBe('BLOCKED'); expect(result).not.toHaveProperty('sessionCredential');
+      expect(f.model.inspect().sessions).toBe(1); expect(f.atomic.consumeGrantAndCreateSession).toHaveBeenCalledTimes(1);
+    });
+  it('blocks missing receipt reader/command digest and invalid origin configuration', async () => {
+    for (const change of [{ receipts: undefined }, { commandDigests: undefined }, { backendOrigin: 'http://invalid.example.com' }]) {
+      const f = fixture(), app = composeLocalAuthentication({ ...f.ports, ...change } as any);
+      expect(await app.startLogin({ browserProofBinding: sha(rawProof) })).toEqual({ status: 'BLOCKED', code: 'NOT_CONFIGURED' });
+      expect(f.atomic.acceptAssertionAndCreateGrant).not.toHaveBeenCalled();
+    }
+  });
+});
+
 function commandDigestSeal(command: ConsumeGrantCommand): void {
-  Object.assign(command, { commandDigest: sha(atomicCommandMaterial(command)) }); // Test fixture only.
+  Object.assign(command, { commandDigest: atomicOperationDescriptor(command, byteDigest).commandDigest }); // Test fixture only.
 }
 
 describe('session resolution and PermissionService bridge', () => {
@@ -235,7 +401,7 @@ describe('session resolution and PermissionService bridge', () => {
     f.setTime(result.expiresAt - 1); expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('AUTHORIZED');
     f.setTime(result.expiresAt); expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('DENIED');
     const revoked = fixture(), login = await revoked.login();
-    expect(revoked.model.revokeSession({ context: revoked.expected, credentialDigest: sha(login.result.sessionCredential), decisionTime: revoked.time(), expectedRevision: 0 })).toBe('REVOKED');
+    expect(revoked.model.revokeSession({ context: revoked.expected, credentialDigest: sha(login.result.sessionCredential), expectedRevision: 0 })).toBe('REVOKED');
     expect(revoked.app.authorize(login.credential, 'USER_MANAGE').status).toBe('DENIED');
   });
   it.each(['inactive', 'version', 'roles'] as const)('uses current directory %s on every protected request', async field => {
@@ -263,7 +429,7 @@ describe('session resolution and PermissionService bridge', () => {
     for (const forged of [{ ...proof }, JSON.parse(JSON.stringify(proof)), Object.create(proof)])
       expect(() => adapter.require(forged as any, 'USER_MANAGE')).toThrow();
     const other = new SessionResolver(f.ports); expect(() => new SessionAuthorizationAdapter(other, f.ports).require(proof, 'USER_MANAGE')).toThrow();
-    const original = f.model.readSession({ context: f.expected, credentialDigest: sha(credential.sessionCredential), decisionTime: f.time() });
+    const original = f.model.readSession({ context: f.expected, credentialDigest: sha(credential.sessionCredential) });
     if (original.status !== 'FOUND') throw Error('fixture');
     f.sessionPort.readSession.mockReturnValue({ status: 'FOUND', session: JSON.parse(JSON.stringify(original.session)) });
     expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('DENIED');

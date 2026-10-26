@@ -1,10 +1,13 @@
 import { IDENTITY_TTL, type LoginTransaction } from '../identity-contracts/contracts';
-import { browserLoginBegin, browserLoginComplete, transaction, lifetime, hex, record, matchContext, timestamp, addTime } from '../identity-contracts/validation';
+import { browserLoginBegin, browserLoginComplete, transaction, lifetime, hex, record, addTime } from '../identity-contracts/validation';
 import { transitionLoginTransaction } from '../identity-contracts/lifecycle';
 import { assertSignedAssertionLive } from '../identity-contracts/signed-assertion-profile';
-import { atomicCommandMaterial, type AcceptAssertionCommand, type ConsumeGrantCommand, type AtomicOutcome,
+import { atomicOperationDescriptor, type AcceptAssertionCommand, type ConsumeGrantCommand, type AtomicOutcome,
   type OperationReceipt, type VersionedLoginTransaction } from '../identity-contracts/atomic-store-contracts';
-import { type LocalAuthenticationPorts, type LoginStartResult, type LoginResult, type AuthenticationFailure } from './ports';
+import { type LocalAuthenticationPorts, type LoginStartResult, type LoginResult, type RecoveryResult, type AuthenticationFailure } from './ports';
+import { recoveryDescriptor, inspectRecoveryDescriptor, type RecoveryDescriptor } from '../operation-contracts';
+import { expectation } from '../channel-contracts/channel-policy';
+import { inspectReceipt } from '../channel-contracts/recovery';
 import { ApplicationTrustBoundary, currentUser } from './trust-boundaries';
 import { SessionResolver } from './session-resolver';
 
@@ -20,12 +23,18 @@ type Mutation = AcceptAssertionCommand | ConsumeGrantCommand;
  * adapter. Existing atomic port owns one-time use; receipt recovery NEVER retries a mutation. */
 export class LoginOrchestrator {
   private readonly trust: ApplicationTrustBoundary;
+  private readonly backendOrigin: string;
   constructor(private readonly ports: LocalAuthenticationPorts, private readonly sessions: SessionResolver) {
     this.trust = new ApplicationTrustBoundary(ports);
+    this.backendOrigin = ports.backendOrigin;
   }
   private configured(): void {
-    if (!this.ports.verifier) block('NOT_CONFIGURED');
-    try { this.ports.verifier.assertConfigured(); } catch { block('NOT_CONFIGURED'); }
+    if (!this.ports.verifier || !this.ports.receipts || !this.ports.commandDigests) block('NOT_CONFIGURED');
+    try {
+      this.ports.verifier.assertConfigured(); expectation({ ...this.trust.context, backendOrigin: this.backendOrigin });
+      if (this.ports.backendOrigin !== this.backendOrigin) block('NOT_CONFIGURED');
+    }
+    catch { block('NOT_CONFIGURED'); }
   }
   private snapshot(value: VersionedLoginTransaction | undefined): VersionedLoginTransaction {
     const v = record(value, ['record', 'revision']);
@@ -50,12 +59,12 @@ export class LoginOrchestrator {
   private seal(command: AcceptAssertionCommand): AcceptAssertionCommand;
   private seal(command: ConsumeGrantCommand): ConsumeGrantCommand;
   private seal(command: Mutation): Mutation {
-    return Object.freeze({ ...command, commandDigest: hex(this.ports.digest.digest(atomicCommandMaterial(command))) });
+    return Object.freeze({ ...command, commandDigest: atomicOperationDescriptor(command, this.ports.commandDigests).commandDigest });
   }
   private checkedOutcome(value: unknown): AtomicOutcome {
     if (!value || typeof value !== 'object') block('ACCESS_DENIED');
     const status = (value as { status?: unknown }).status;
-    if (status === 'COMMITTED') {
+    if (status === 'COMMITTED' || status === 'REJECTED') {
       const result = record(value, ['status', 'receipt', 'recovered']); if (typeof result.recovered !== 'boolean') block('ACCESS_DENIED');
       return value as AtomicOutcome; // Shape only; receipt never establishes identity or session trust.
     }
@@ -63,28 +72,54 @@ export class LoginOrchestrator {
     return value as AtomicOutcome;
   }
   private async commit(command: Mutation): Promise<Readonly<OperationReceipt>> {
+    const operation = atomicOperationDescriptor(command, this.ports.commandDigests);
+    const descriptor = recoveryDescriptor(operation, command.expectedRevision,
+      'assertion' in command ? command.assertion.data.claims.transactionId : command.credentialDigest);
+    // Metadata only, saved BEFORE dispatch. Failure cannot trigger a mutation.
+    try { await this.ports.recovery?.save(descriptor); } catch { block('UNAVAILABLE'); }
+    this.trust.check();
     let result: AtomicOutcome;
     try {
       result = this.checkedOutcome('assertion' in command ? await this.ports.atomic.acceptAssertionAndCreateGrant(command) :
         await this.ports.atomic.consumeGrantAndCreateSession(command));
     } catch { result = { status: 'OUTCOME_UNKNOWN' }; } // A thrown transport could follow a committed write.
-    const after = this.trust.check();
+    this.trust.check();
     if (result.status === 'OUTCOME_UNKNOWN') {
       try {
-        result = this.checkedOutcome(this.ports.atomic.getOperationOutcome({ context: this.trust.context, operationId: command.operationId,
-          commandDigest: command.commandDigest, expectedRevision: null, decisionTime: after }));
+        result = this.checkedOutcome(await this.ports.atomic.getOperationOutcome(descriptor));
       } catch { block('OUTCOME_UNKNOWN'); }
-      this.trust.check(); if (result.status !== 'COMMITTED') block(result.status === 'CONFLICT' ? 'CONFLICT' : 'OUTCOME_UNKNOWN');
+      this.trust.check(); if (result.status !== 'COMMITTED' && result.status !== 'REJECTED') block(result.status === 'CONFLICT' ? 'CONFLICT' : 'OUTCOME_UNKNOWN');
     }
-    if (result.status !== 'COMMITTED') block(result.status);
-    const r = record(result.receipt, ['environment', 'applicationAudience', 'expectedScriptId', 'operationId', 'commandDigest', 'kind',
-      'objectId', 'committedAt', 'revision', 'retainUntil']);
-    matchContext(result.receipt, this.trust.context);
-    const accepting = 'assertion' in command, objectId = accepting ? command.assertion.data.claims.transactionId : command.credentialDigest;
-    if (r.operationId !== command.operationId || r.commandDigest !== command.commandDigest || r.objectId !== objectId ||
-      r.kind !== (accepting ? 'ACCEPT_ASSERTION' : 'ISSUE_SESSION') || timestamp(r.committedAt) !== command.decisionTime ||
-      version(r.revision) !== command.expectedRevision + 1 || timestamp(r.retainUntil) <= this.trust.check()) block('CONFLICT');
-    return result.receipt;
+    if (result.status !== 'COMMITTED' && result.status !== 'REJECTED') block(result.status);
+    return this.readReceipt(result, descriptor);
+  }
+  private readReceipt(result: Extract<AtomicOutcome, { receipt: unknown }>, descriptor: RecoveryDescriptor): Readonly<OperationReceipt> {
+    // Authenticate runtime provenance FIRST. Schema checks never mint authority.
+    const r = inspectReceipt(this.ports.receipts.read(result.receipt, descriptor), descriptor, this.trust.check());
+    if (r.outcome !== result.status) block('CONFLICT');
+    if (r.outcome === 'REJECTED') block(r.code!);
+    if (r.objectId !== descriptor.expectedObjectId || r.revision !== descriptor.expectedRevision + 1) block('CONFLICT');
+    return r;
+  }
+  /** Internal server-local recovery only, NOT an ADMIN RPC. Never issues/replaces an operation or bearer. */
+  async recoverOperation(query: unknown): Promise<RecoveryResult> {
+    try {
+      this.configured(); this.trust.check(); if (!this.ports.recovery) block('NOT_CONFIGURED');
+      const q = record(query, ['operationId', 'commandDigest']), operationId = hex(q.operationId), commandDigest = hex(q.commandDigest);
+      const target = { ...this.trust.context, backendOrigin: this.backendOrigin };
+      const saved = await this.ports.recovery.load({ ...target, operationId, commandDigest }); this.trust.check();
+      if (!saved) block('OUTCOME_UNKNOWN');
+      const d = inspectRecoveryDescriptor(saved, target, this.ports.commandDigests);
+      if (d.operationId !== operationId || d.commandDigest !== commandDigest) block('CONFLICT');
+      let result: AtomicOutcome;
+      try { result = this.checkedOutcome(await this.ports.atomic.getOperationOutcome(d)); } catch { block('OUTCOME_UNKNOWN'); }
+      this.trust.check();
+      if (result.status !== 'COMMITTED' && result.status !== 'REJECTED') block(result.status === 'CONFLICT' ? 'CONFLICT' : 'OUTCOME_UNKNOWN');
+      const r = inspectReceipt(this.ports.receipts.read(result.receipt, d), d, this.trust.check());
+      if (r.outcome !== result.status || r.outcome === 'COMMITTED' &&
+        (r.objectId !== d.expectedObjectId || r.revision !== d.expectedRevision + 1)) block('CONFLICT');
+      return { status: 'RECOVERED', outcome: r.outcome };
+    } catch (error) { return { status: 'BLOCKED', code: error instanceof Blocked ? error.code : 'ACCESS_DENIED' }; }
   }
   async completeLogin(request: unknown): Promise<LoginResult> {
     try {
@@ -103,7 +138,7 @@ export class LoginOrchestrator {
         claims.issuedAt < tx.record.createdAt) block('ACCESS_DENIED');
       currentUser(this.ports.users, claims.identityIssuer, claims.subject);
       const accept: AcceptAssertionCommand = this.seal({ context: this.trust.context, operationId: hex(this.ports.secrets.secret()), commandDigest: '',
-        expectedRevision: tx.revision, decisionTime: this.trust.check(), assertion: verified });
+        protocolVersion: 1, backendOrigin: this.backendOrigin, expectedRevision: tx.revision, commandCreatedAt: this.trust.check(), assertion: verified });
       const accepted = await this.commit(accept);
       // Assertion may have expired AFTER acceptance. The store now enforces the grant's own TTL.
       const user = currentUser(this.ports.users, claims.identityIssuer, claims.subject);
@@ -111,7 +146,7 @@ export class LoginOrchestrator {
       const operationId = hex(this.ports.secrets.secret());
       if ([tx.record.transactionId, tx.record.nonce, accept.operationId, operationId, credentialDigest].includes(credential)) block('ACCESS_DENIED');
       const issue: ConsumeGrantCommand = this.seal({ context: this.trust.context, operationId, commandDigest: '',
-        expectedRevision: 0, decisionTime: this.trust.check(), grantId: accepted.objectId, credentialDigest,
+        protocolVersion: 1, backendOrigin: this.backendOrigin, expectedRevision: 0, commandCreatedAt: this.trust.check(), grantId: accepted.objectId!, credentialDigest,
         expectedAuthorizationVersion: user.authorizationVersion });
       await this.commit(issue); this.trust.check();
       // Receipts alone cannot authorize or release a credential: require live authoritative session.

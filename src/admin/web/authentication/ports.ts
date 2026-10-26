@@ -1,5 +1,7 @@
 import type { IdentityApplicationContext, LoginTransaction, UnverifiedBrokerAssertion } from '../identity-contracts/contracts';
-import type { AtomicLoginStorePort, AtomicStatus, CommandDigestPort, VersionedLoginTransaction } from '../identity-contracts/atomic-store-contracts';
+import type { AtomicLoginStorePort, AtomicStatus, TextDigestPort, OperationReceiptReaderPort, VersionedLoginTransaction } from '../identity-contracts/atomic-store-contracts';
+import type { BodyDigestPort } from '../channel-contracts/contracts';
+import type { RecoveryCoordinatorPort } from '../operation-contracts';
 import type { SessionStorePort, StoredSession } from '../identity-contracts/session-store-contracts';
 import type { SigningKeyPolicy } from '../identity-contracts/signing-key-policy';
 import type { VerifiedSignedAssertion } from '../identity-contracts/signed-assertion-profile';
@@ -30,13 +32,17 @@ export interface TrustedVerificationPort {
  * This interface cannot authenticate an arbitrary injected adapter: trusted server composition
  * must supply the reviewed, context-bound reader paired with its authoritative store. */
 export interface TrustedSessionReaderPort {
-  read(capability: unknown, decisionTime: number): Readonly<StoredSession>;
+  read(capability: unknown): Readonly<StoredSession>;
 }
 export interface SecretGenerationPort {
   /** Real adapter requires >=256 CSPRNG bits per independent secret; no UUID/Math.random fallback. */
   secret(): string;
 }
 export interface LocalAuthenticationPorts extends ApplicationTrustPorts {
+  readonly backendOrigin: string;
+  readonly commandDigests: BodyDigestPort;
+  readonly receipts: OperationReceiptReaderPort;
+  readonly recovery?: RecoveryCoordinatorPort;
   readonly transactions: LoginTransactionPort;
   readonly broker: BrokerAssertionSourcePort;
   readonly verifier?: TrustedVerificationPort;
@@ -44,7 +50,7 @@ export interface LocalAuthenticationPorts extends ApplicationTrustPorts {
   readonly sessions: SessionStorePort;
   readonly trustedSessions: TrustedSessionReaderPort;
   readonly users: UserRepository;
-  readonly digest: CommandDigestPort;
+  readonly digest: TextDigestPort;
   readonly secrets: SecretGenerationPort;
   readonly keyPolicy: () => SigningKeyPolicy;
 }
@@ -52,4 +58,6 @@ export type AuthenticationFailure = Exclude<AtomicStatus, 'COMMITTED'> | 'ACCESS
 export type LoginStartResult = { readonly status: 'STARTED'; readonly transactionId: string; readonly expiresAt: number } |
   { readonly status: 'BLOCKED'; readonly code: AuthenticationFailure };
 export type LoginResult = { readonly status: 'AUTHENTICATED'; readonly sessionCredential: string; readonly expiresAt: number } |
+  { readonly status: 'BLOCKED'; readonly code: AuthenticationFailure };
+export type RecoveryResult = { readonly status: 'RECOVERED'; readonly outcome: 'COMMITTED' | 'REJECTED' } |
   { readonly status: 'BLOCKED'; readonly code: AuthenticationFailure };

@@ -3,15 +3,16 @@
 ## Status and scope
 
 LOCAL CONTRACTS ONLY. The autonomous module is `src/admin/web/channel-contracts/`.
-It is not imported into ADMIN, production, readiness, legacy identity contracts, or authentication composition.
+No ADMIN, production or readiness target imports this module. Slice 2C.2a shares its pure semantic/
+receipt contracts with the local identity/reference-model/authentication layers; no transport is connected.
 HMAC-SHA256 is a candidate, not an approved production channel. There is no real signer/verifier,
 network adapter, broker, database, replay ledger, durable recovery adapter, or capability restoration.
 No OAuth configuration, scopes, manifests, RPC allowlist, Script Properties or Google resources change.
 
-**Пряме підключення нового wire protocol до чинного LoginOrchestrator поки заборонене через несумісність clock semantics.**
-**Direct integration with existing LoginOrchestrator remains BLOCKED pending Remote Clock Compatibility.**
-Adaptation of Slice 2B.1/2B.2 requires separate approval. The known incompatibility does not block this
-autonomous contract module. PRODUCTION, TEST_RESET execution and ADMIN deployment remain NO-GO.
+Slice 2C.2a resolves the local command-digest/clock/receipt signature incompatibility using approved
+in-place evolution. Runtime integration remains BLOCKED pending real authenticated channel/backend,
+remote session reader, independent backend JWS verification and persistent recovery coordination.
+PRODUCTION, TEST_RESET execution and ADMIN deployment remain NO-GO.
 
 ## 1. Protocol version
 
@@ -256,11 +257,45 @@ Planned signing-key rotation must preserve valid existing session lifetime; comp
 
 ## 10. Integration blockers and future approvals
 
-Existing `atomic-store-contracts.ts` has one decisionTime, reference model enforces exact clock equality
-and stores it as committedAt, and `login-orchestrator.ts:85` requires receipt.committedAt === decisionTime.
-New remote times cannot be directly passed to those contracts. No adapter may hide the incompatibility
-by fabricating a database timestamp. A separately approved change must version/map semantics explicitly,
-update canonical command material/receipt validation and preserve all fail-closed and TTL invariants.
+The former one-decisionTime/exact-clock-equality contracts are superseded by Slice 2C.2a.
+`operation-contracts.ts` owns canonical semantic bytes; `canonicalCommandBytes` delegates to it after
+strict header validation. Existing COMMAND_V1 domain/length framing/ordered fields and request/response
+MAC candidates are byte-identical. Existing golden vectors are unchanged; no silent wire reinterpretation
+or new protocol version is introduced. Local legacy JSON-array digests are rejected without fallback.
+
+Deterministic mutation bodies use these exact property orders:
+
+- ACCEPT_ASSERTION: `{ expectedRevision, assertion }` (exact original Compact JWS).
+- ISSUE_SESSION: `{ expectedRevision, grantId, credentialDigest, expectedAuthorizationVersion }`.
+
+Body JSON uses validated primitives and fixed ordering, UTF-8 without normalization; all existing revision
+and authorization preconditions are hashed. OperationDescriptor includes transient body, originalBodyDigest
+and commandDigest; RecoveryDescriptor omits body/JWS/bearer, adding expected revision/object for checking.
+The credential/proof text digest port stays separate from the shared byte-oriented command SHA-256 port.
+
+commandCreatedAt is application-owned and immutable. The reference model samples backendDecisionAt
+from its independent backend clock; final expiry/key/directory checks use a fresh actual backend time.
+No caller/backend equality is needed for reads/revocation/cleanup. It always uses explicit DB timestamp
+UNAVAILABLE, never a fake KNOWN time. Historic lookup validates original binding/retention without
+reapplying original command freshness. Fresh transport lookup still hashes its OWN lookup body and uses
+fresh nonce/ID/key/time; these never replace originalBodyDigest or alter the original business digest.
+
+Business receipt DTO, transport response and verified runtime receipt capability are separate. Private
+local ReceiptEvidence belongs to one model owner and a current retained record; only its paired reader
+can inspect it authoritatively. JSON/TypeScript casts do not mint evidence. This does not implement a
+cryptographic remote reader or durable restoration. COMMITTED with UNAVAILABLE DB time is confirmed,
+but never releases a bearer without fresh authoritative session/user/version/key/expiry checks.
+
+The optional metadata-only RecoveryCoordinatorPort saves before dispatch and loads the original immutable
+context-bound descriptor after restart. Internal recoverOperation is lookup-only, returns no credential,
+and never issues a replacement command/grant/session. There is no persistent coordinator implementation;
+test-only surviving Map fixtures are not a distributed atomicity or crash-durability proof. A missing
+receipt/metadata or unavailable lookup stays UNKNOWN. Lost bearer cannot be reconstructed from a receipt.
+
+Strict existing proof/session chronology is preserved even within transport skew: a locally verified
+proof ahead of backend time or a session issued ahead of application time blocks until applicable clocks
+permit the check. Independent backend verification of exact JWS and a reviewed remote session-read
+protocol remain necessary; no timestamp is rewritten to conceal this boundary.
 
 Further gates: real channel mechanism approval, reviewed HMAC/digest/entropy adapters, backend installation
 registry, bounded HTTP transport, durable nonce/operation transaction design, private capability restoration,

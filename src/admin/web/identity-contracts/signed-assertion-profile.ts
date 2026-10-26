@@ -46,7 +46,8 @@ export function validateCompactJws(message: unknown, expected: IdentityApplicati
 
 declare const profileProof: unique symbol;
 export interface VerifiedSignedAssertion {
-  readonly data: { readonly claims: Readonly<SignedAssertionClaimsV1>; readonly keyId: string; readonly legacy: VerifiedBrokerAssertion };
+  readonly data: { readonly claims: Readonly<SignedAssertionClaimsV1>; readonly keyId: string; readonly legacy: VerifiedBrokerAssertion;
+    /** Exact verified bytes, transient only; never a receipt or log field. */ readonly assertion: string };
   readonly [profileProof]: true;
 }
 const capability = Object.freeze({});
@@ -72,7 +73,7 @@ export function verifySignedAssertion(message: unknown, expected: IdentityApplic
     const legacy = verifyBrokerAssertion(message, expected, { brokerIssuer: policyValue.brokerIssuer,
       signature: { algorithm: 'RS256', keyId: parsed.header.kid } }, transaction(transactionValue, expected), after,
     { verify: () => ({ claims, signature: { algorithm: 'RS256', keyId: parsed.header.kid } }) });
-    return new ProfileEvidence(capability, Object.freeze({ claims: parsed.claims, keyId: parsed.header.kid, legacy })) as unknown as VerifiedSignedAssertion;
+    return new ProfileEvidence(capability, Object.freeze({ claims: parsed.claims, keyId: parsed.header.kid, legacy, assertion: parsed.assertion })) as unknown as VerifiedSignedAssertion;
   } catch { return invalid(); }
 }
 /** Provenance only. Call assertSignedAssertionLive before acceptance at a fresh trusted time. */

@@ -35,10 +35,10 @@ export class SessionResolver {
     return this.lookup(ResolutionEvidence.read(value, this.owner));
   }
   private lookup(digest: string): Readonly<StoredSession> {
-    const now = this.trust.check();
-    const result = this.ports.sessions.readSession({ context: this.trust.context, credentialDigest: digest, decisionTime: now });
+    this.trust.check();
+    const result = this.ports.sessions.readSession({ context: this.trust.context, credentialDigest: digest });
     if (result.status !== 'FOUND') return denied(); record(result, ['status', 'session']);
-    const s = this.ports.trustedSessions.read(result.session, this.trust.check());
+    this.trust.check(); const s = this.ports.trustedSessions.read(result.session);
     // This validation supplements the authoritative capability reader; it never replaces provenance.
     record(s, ['environment', 'applicationAudience', 'expectedScriptId', 'identityIssuer', 'identitySubject', 'authenticatedAt',
       'authenticationExpiresAt', 'issuedAt', 'expiresAt', 'authorizationVersion', 'sessionId', 'status', 'revokedAt', 'revision', 'grantId', 'signingKey']);

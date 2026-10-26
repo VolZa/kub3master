@@ -4,7 +4,8 @@ import { IDENTITY_TTL, type IdentityApplicationContext, type LoginTransaction } 
 import { browserLoginBegin, browserLoginComplete, browserSessionCredential } from './validation';
 import { validateCompactJws, verifySignedAssertion, readSignedAssertion, type SignedAssertionClaimsV1 } from './signed-assertion-profile';
 import { signingKeyPolicy, verificationKey, type SigningKeyPolicy, type SigningKeyRule } from './signing-key-policy';
-import { atomicCommandMaterial, type AcceptAssertionCommand, type ConsumeGrantCommand, type OperationLookup } from './atomic-store-contracts';
+import { atomicOperationDescriptor, type AcceptAssertionCommand, type ConsumeGrantCommand, type OperationLookup } from './atomic-store-contracts';
+import { recoveryDescriptor } from '../operation-contracts';
 import { AtomicStoreReferenceModel, type ReferenceFault } from './atomic-store-reference-model';
 import { type SessionCapacityPolicy } from './session-store-contracts';
 import { strictJson, base64urlJson, base64urlBytes } from './strict-json';
@@ -12,6 +13,9 @@ import { strictJson, base64urlJson, base64urlBytes } from './strict-json';
 const start = 1_800_000_000_000, hex = (c: string) => c.repeat(64);
 const expected: IdentityApplicationContext = { environment: 'TEST', applicationAudience: 'kub:admin:test', expectedScriptId: 'synthetic-admin-script-test-000000001' };
 const sha = (value: string) => createHash('sha256').update(value).digest('hex');
+const backendOrigin = 'https://auth-test.example.com';
+const byteDigest = { digest: (bytes: readonly number[]) => createHash('sha256').update(Buffer.from(bytes)).digest('hex') };
+
 const b64 = (value: string) => Buffer.from(value, 'utf8').toString('base64url');
 const header = { typ: 'kub-admin-login+jws', alg: 'RS256', kid: 'test-signing-key-v1' };
 // Deliberately NOT a signature. This suite tests structure and trusted-port semantics only.
@@ -21,9 +25,10 @@ function wire(claims: unknown, h: unknown = header) {
   return { assertion: [b64(JSON.stringify(h)), b64(JSON.stringify(claims)), syntheticSignature].join('.') };
 }
 function seal<T extends AcceptAssertionCommand | ConsumeGrantCommand>(command: T): T {
-  return { ...command, commandDigest: sha(atomicCommandMaterial(command)) };
+  return { ...command, commandDigest: atomicOperationDescriptor(command, byteDigest).commandDigest };
 }
 function fixture(capacity: Partial<SessionCapacityPolicy> = {}) {
+  let backendOffset = 0;
   let now = start, hook: (() => Promise<void>) | undefined;
   let key: SigningKeyRule = { ...expected, keyId: header.kid, algorithm: 'RS256', signingNotBefore: start - 100_000,
     signingNotAfter: start + 1_000_000, verificationNotBefore: start - 100_000, verificationNotAfter: start + 2_000_000,
@@ -39,21 +44,23 @@ function fixture(capacity: Partial<SessionCapacityPolicy> = {}) {
     authenticationExpiresAt: start - 2000 + IDENTITY_TTL.authenticationMaxAgeMs, issuedAt: start - 500,
     expiresAt: start - 500 + IDENTITY_TTL.assertionMs };
   const cryptoPort = { verify: vi.fn(() => true) };
-  const model = new AtomicStoreReferenceModel({ context: expected, clock: () => now, keyPolicy: () => policy,
-    directory: () => user, digest: { digest: sha }, beforeCommit: async () => hook?.(),
+  const model = new AtomicStoreReferenceModel({ context: expected, backendOrigin, clock: () => now + backendOffset, keyPolicy: () => policy,
+    directory: () => user, digest: byteDigest, beforeCommit: async () => hook?.(),
     capacity: { maxTransactions: 10, maxGrants: 10, maxSessions: 10, maxReceipts: 20, maxSessionsPerSubject: 3,
       receiptRetentionMs: 120_000, cleanupBatchSize: 100, ...capacity } });
   model.seedTransaction(tx);
   const evidence = () => verifySignedAssertion(wire(claims), expected, policy, tx, () => now, cryptoPort);
-  const accept = (operationId = hex('1')): AcceptAssertionCommand => seal({ context: expected, operationId, commandDigest: hex('0'),
-    expectedRevision: 0, decisionTime: now, assertion: evidence() });
-  const issue = (operationId = hex('2'), credentialDigest = sha(hex('e'))): ConsumeGrantCommand => seal({ context: expected,
-    operationId, commandDigest: hex('0'), expectedRevision: 0, decisionTime: now, grantId: tx.transactionId,
+  const accept = (operationId = hex('1')): AcceptAssertionCommand => seal({ context: expected, protocolVersion: 1, backendOrigin, operationId, commandDigest: hex('0'),
+    expectedRevision: 0, commandCreatedAt: now, assertion: evidence() });
+  const issue = (operationId = hex('2'), credentialDigest = sha(hex('e'))): ConsumeGrantCommand => seal({ context: expected, protocolVersion: 1, backendOrigin,
+    operationId, commandDigest: hex('0'), expectedRevision: 0, commandCreatedAt: now, grantId: tx.transactionId,
     credentialDigest, expectedAuthorizationVersion: user.authorizationVersion });
-  const lookup = (command: AcceptAssertionCommand | ConsumeGrantCommand): OperationLookup => ({ context: command.context,
-    operationId: command.operationId, commandDigest: command.commandDigest, expectedRevision: null, decisionTime: now });
-  const sessionLookup = (credentialDigest = sha(hex('e'))) => ({ context: expected, credentialDigest, decisionTime: now });
+  const lookup = (command: AcceptAssertionCommand | ConsumeGrantCommand): OperationLookup => recoveryDescriptor(
+    atomicOperationDescriptor(command, byteDigest), command.expectedRevision,
+    'assertion' in command ? command.assertion.data.claims.transactionId : command.credentialDigest);
+  const sessionLookup = (credentialDigest = sha(hex('e'))) => ({ context: expected, credentialDigest });
   return { model, tx, claims, cryptoPort, evidence, accept, issue, lookup, sessionLookup, policy: () => policy, time: () => now,
+    setBackendOffset: (value: number) => { backendOffset = value; },
     setTime: (value: number) => { now = value; }, setHook: (value: (() => Promise<void>) | undefined) => { hook = value; },
     setUser: (value: Partial<typeof user>) => { user = { ...user, ...value }; },
     setKey: (value: Partial<SigningKeyRule>) => { key = { ...key, ...value }; policy = { ...policy, keys: [key] }; },
@@ -149,6 +156,153 @@ describe('Compact JWS application profile (no cryptography)', () => {
   });
 });
 
+describe('remote clocks and owned receipt evidence', () => {
+  it('does not revive an expired session when the backend clock rolls back after a read', async () => {
+    const f = fixture(); await f.model.acceptAssertionAndCreateGrant(f.accept()); await f.model.consumeGrantAndCreateSession(f.issue());
+    f.setTime(start + IDENTITY_TTL.sessionMs); expect(f.model.readSession(f.sessionLookup()).status).toBe('BLOCKED');
+    const before = f.model.inspect(); f.setTime(start + IDENTITY_TTL.sessionMs - 1);
+    expect(f.model.readSession(f.sessionLookup()).status).toBe('BLOCKED');
+    expect(f.model.inspect()).toEqual(before);
+  });
+  it('does not revive expired receipt evidence after a read-only retention check and clock rollback', async () => {
+    const f = fixture(), command = f.accept(), accepted = await f.model.acceptAssertionAndCreateGrant(command);
+    if (accepted.status !== 'COMMITTED') throw Error('fixture');
+    const descriptor = f.lookup(command), receipt = f.model.readOperationReceipt(accepted.receipt, descriptor);
+    f.setTime(receipt.retainUntil); expect(await f.model.getOperationOutcome(descriptor)).toEqual({ status: 'OUTCOME_UNKNOWN' });
+    const before = f.model.inspect(); f.setTime(receipt.retainUntil - 1);
+    expect(await f.model.getOperationOutcome(descriptor)).toEqual({ status: 'INVALID' });
+    expect(() => f.model.readOperationReceipt(accepted.receipt, descriptor)).toThrow();
+    expect(f.model.inspect()).toEqual(before);
+  });
+  it('does not redeem an expired grant after backend time rolls back following a denied decision', async () => {
+    const f = fixture(); await f.model.acceptAssertionAndCreateGrant(f.accept());
+    f.setTime(start + IDENTITY_TTL.grantMs); expect(await f.model.consumeGrantAndCreateSession(f.issue())).toEqual({ status: 'EXPIRED' });
+    f.setTime(start + IDENTITY_TTL.grantMs - 1);
+    expect(await f.model.consumeGrantAndCreateSession(f.issue())).toEqual({ status: 'INVALID' });
+    expect(f.model.inspect()).toMatchObject({ consumedGrants: 0, sessions: 0 });
+  });
+  it('clones nested command context and freezes all reachable proof and receipt data', async () => {
+    const f = fixture(), command = { ...f.accept(), context: { ...expected } }, descriptor = f.lookup(command);
+    const proof = command.assertion, legacy = proof.data.legacy;
+    const frozen = [proof, proof.data, proof.data.claims, legacy, legacy.data, legacy.data.claims, legacy.data.signature];
+    f.setHook(async () => {
+      command.context.environment = 'PRODUCTION';
+      for (const value of frozen) {
+        expect(Object.isFrozen(value)).toBe(true);
+        expect(Reflect.set(value, 'injected', true)).toBe(false);
+      }
+      expect(Reflect.set(proof.data.claims, 'subject', 'forged')).toBe(false);
+      expect(Reflect.set(legacy.data.claims, 'expiresAt', Number.MAX_SAFE_INTEGER)).toBe(false);
+    });
+    const accepted = await f.model.acceptAssertionAndCreateGrant(command); expect(accepted.status).toBe('COMMITTED');
+    if (accepted.status !== 'COMMITTED') throw Error('fixture');
+    const receipt = f.model.readOperationReceipt(accepted.receipt, descriptor);
+    expect(receipt.environment).toBe('TEST');
+    for (const value of [accepted.receipt, accepted.receipt.record, accepted.receipt.record.databaseCommittedAt,
+      receipt, receipt.databaseCommittedAt]) {
+      expect(Object.isFrozen(value)).toBe(true); expect(Reflect.set(value, 'injected', true)).toBe(false);
+    }
+    expect(Reflect.set(receipt.databaseCommittedAt, 'status', 'KNOWN')).toBe(false);
+  });
+  it.each([-50, 2000])('uses an independent backend clock with offset %s, without caller equality', async offset => {
+    const f = fixture(); f.setTime(start - 100); const verifiedEarlier = f.accept(); f.setTime(start);
+    const command = seal({ ...verifiedEarlier, commandCreatedAt: start }); f.setBackendOffset(offset);
+    const accepted = await f.model.acceptAssertionAndCreateGrant(command);
+    if (accepted.status !== 'COMMITTED') throw Error('fixture');
+    const receipt = f.model.readOperationReceipt(accepted.receipt, f.lookup(command));
+    expect(receipt.commandCreatedAt).toBe(start); expect(receipt.backendDecisionAt).toBe(start + offset);
+    expect(receipt.databaseCommittedAt).toEqual({ status: 'UNAVAILABLE', value: null });
+    expect(Object.isFrozen(receipt.databaseCommittedAt)).toBe(true);
+    const issue = f.issue(); expect((await f.model.consumeGrantAndCreateSession(issue)).status).toBe('COMMITTED');
+    expect(f.model.readSession(f.sessionLookup()).status).toBe('FOUND');
+  });
+  it('keeps decision time separate from a later state swap without inventing a DB timestamp', async () => {
+    const f = fixture(), command = f.accept();
+    f.setHook(async () => { f.setTime(start + 1000); });
+    const outcome = await f.model.acceptAssertionAndCreateGrant(command);
+    if (outcome.status !== 'COMMITTED') throw Error('fixture');
+    const receipt = f.model.readOperationReceipt(outcome.receipt, f.lookup(command));
+    expect(receipt.backendDecisionAt).toBe(start); expect(f.time()).toBe(start + 1000);
+    expect(receipt.databaseCommittedAt).toEqual({ status: 'UNAVAILABLE', value: null });
+    expect(receipt).not.toHaveProperty('committedAt');
+    expect(JSON.stringify(receipt)).not.toContain(command.assertion.data.assertion);
+  });
+  it.each([-120_000, -120_001, 5001])('rejects command age/skew boundary offset %s before mutation', async offset => {
+    const f = fixture(), c = seal({ ...f.accept(), commandCreatedAt: start + offset });
+    expect(await f.model.acceptAssertionAndCreateGrant(c)).toEqual({ status: 'EXPIRED' });
+    expect(f.model.inspect().receipts).toBe(0);
+  });
+  it.each(['backendOrigin', 'protocolVersion'] as const)('rejects command %s mismatch', async field => {
+    const f = fixture(), c = { ...f.accept(), [field]: field === 'backendOrigin' ? 'https://auth-other.example.com' : 2 };
+    expect(await f.model.acceptAssertionAndCreateGrant(c as any)).toEqual({ status: 'CONTEXT_MISMATCH' });
+    expect(f.model.inspect().grants).toBe(0);
+  });
+  it('pins the verified exact JWS in the shared business body and rejects the legacy command schema', async () => {
+    const f = fixture(), c = f.accept(), descriptor = atomicOperationDescriptor(c, byteDigest);
+    expect(JSON.parse(descriptor.body)).toEqual({ expectedRevision: 0, assertion: wire(f.claims).assertion });
+    expect(readSignedAssertion(c.assertion, expected).assertion).toBe(wire(f.claims).assertion);
+    const { commandCreatedAt, ...rest } = c;
+    expect(await f.model.acceptAssertionAndCreateGrant({ ...rest, decisionTime: commandCreatedAt } as any)).toEqual({ status: 'INVALID' });
+  });
+  it('rejects receipt JSON, spreads, prototypes, constructor abuse and cross-store evidence', async () => {
+    const f = fixture(), c = f.accept(), accepted = await f.model.acceptAssertionAndCreateGrant(c);
+    if (accepted.status !== 'COMMITTED') throw Error('fixture');
+    for (const fake of [{ ...accepted.receipt }, JSON.parse(JSON.stringify(accepted.receipt)), Object.create(accepted.receipt),
+      { record: accepted.receipt.record }]) expect(() => f.model.readOperationReceipt(fake, f.lookup(c))).toThrow();
+    expect(() => new (accepted.receipt.constructor as any)({}, {}, accepted.receipt.record)).toThrow();
+    expect(() => fixture().model.readOperationReceipt(accepted.receipt, f.lookup(c))).toThrow();
+    expect(() => f.model.readOperationReceipt(accepted.receipt, { ...f.lookup(c), environment: 'PRODUCTION' })).toThrow();
+    expect(() => f.model.readOperationReceipt(accepted.receipt, { ...f.lookup(c), expectedObjectId: hex('f') })).toThrow();
+    expect(() => f.model.readOperationReceipt(accepted.receipt, { ...f.lookup(c), expectedRevision: 1 })).toThrow();
+  });
+  it('performs async historical lookup after command/assertion expiry without re-issuing or extending anything', async () => {
+    const f = fixture(), c = f.accept(); await f.model.acceptAssertionAndCreateGrant(c); const before = f.model.inspect();
+    f.setTime(start + 121_000);
+    const pending = f.model.getOperationOutcome(f.lookup(c)); expect(pending).toBeInstanceOf(Promise);
+    const result = await pending; expect(result.status).toBe('COMMITTED');
+    expect(f.model.inspect()).toEqual(before);
+    if (result.status !== 'COMMITTED') throw Error('fixture');
+    const r = f.model.readOperationReceipt(result.receipt, f.lookup(c));
+    expect(r.commandCreatedAt).toBe(start); expect(r.backendDecisionAt).toBe(start);
+    f.setTime(r.retainUntil);
+    expect(await f.model.getOperationOutcome(f.lookup(c))).toEqual({ status: 'OUTCOME_UNKNOWN' });
+    expect(() => f.model.readOperationReceipt(result.receipt, f.lookup(c))).toThrow();
+  });
+  it('rejects a backend clock rollback at the final commit boundary', async () => {
+    const f = fixture(); f.setHook(async () => { f.setTime(start - 1); });
+    expect(await f.model.acceptAssertionAndCreateGrant(f.accept())).toEqual({ status: 'INVALID' });
+    expect(f.model.inspect()).toMatchObject({ consumedTransactions: 0, grants: 0, receipts: 0 });
+  });
+  it('snapshots caller command fields before awaiting and rechecks the original signing proof', async () => {
+    const f = fixture(), command = f.accept(), descriptor = f.lookup(command);
+    f.setHook(async () => {
+      Object.assign(command, { operationId: hex('f'), commandDigest: hex('f'), assertion: {} });
+    });
+    const accepted = await f.model.acceptAssertionAndCreateGrant(command);
+    expect(accepted.status).toBe('COMMITTED');
+    if (accepted.status !== 'COMMITTED') throw Error('fixture');
+    expect(f.model.readOperationReceipt(accepted.receipt, descriptor).operationId).toBe(descriptor.operationId);
+    const issue = f.issue(), issueDescriptor = f.lookup(issue);
+    f.setHook(async () => { Object.assign(issue, { credentialDigest: sha('tampered-bearer'), expectedAuthorizationVersion: 999 }); });
+    const result = await f.model.consumeGrantAndCreateSession(issue);
+    expect(result.status).toBe('COMMITTED');
+    if (result.status !== 'COMMITTED') throw Error('fixture');
+    expect(f.model.readOperationReceipt(result.receipt, issueDescriptor).objectId).toBe(issueDescriptor.expectedObjectId);
+    expect(f.model.readSession(f.sessionLookup()).status).toBe('FOUND');
+  });
+  it('cannot swap to another valid proof to evade original-key compromise at final commit', async () => {
+    const f = fixture(), command = f.accept(), original = f.policy().keys[0], next = { ...original, keyId: 'next-signing-key' };
+    f.setPolicy({ ...f.policy(), keys: [original, next] });
+    const other = verifySignedAssertion(wire(f.claims, { ...header, kid: next.keyId }), expected, f.policy(), f.tx, f.time, f.cryptoPort);
+    f.setHook(async () => {
+      Object.assign(command, { assertion: other });
+      f.setPolicy({ ...f.policy(), keys: [{ ...original, compromised: true }, next] });
+    });
+    expect(await f.model.acceptAssertionAndCreateGrant(command)).toEqual({ status: 'INVALID' });
+    expect(f.model.inspect()).toMatchObject({ consumedTransactions: 0, grants: 0, receipts: 0 });
+  });
+});
+
 describe('versioned signing key policy', () => {
   it('supports verify-only overlap and exact signing/verification half-open intervals', () => {
     const f = fixture(), old = { ...f.policy().keys[0], status: 'VERIFY_ONLY' as const, signingNotAfter: start },
@@ -186,7 +340,7 @@ describe('atomic reference semantics (NOT distributed persistence)', () => {
     expect(f.model.inspect()).toEqual({ transactions: 1, consumedTransactions: 1, assertions: 1, grants: 1, consumedGrants: 1, sessions: 1, receipts: 2 });
     const result = f.model.readSession(f.sessionLookup()); expect(result.status).toBe('FOUND');
     if (result.status !== 'FOUND') throw Error('fixture');
-    const s = f.model.readTrustedSession(result.session, start);
+    const s = f.model.readTrustedSession(result.session);
     expect(s.sessionId).toBe(sha(hex('e'))); expect(s).not.toHaveProperty('sessionCredential'); expect(JSON.stringify(s)).not.toContain(hex('e'));
     expect(s.signingKey).toMatchObject({ keyId: header.kid, protocolVersion: 1, assertionId: f.claims.assertionId });
     expect(s).not.toHaveProperty('roles'); expect(s).not.toHaveProperty('permissions');
@@ -227,7 +381,7 @@ describe('atomic reference semantics (NOT distributed persistence)', () => {
     'rolls back ALL acceptance writes at %s', async fault => {
       const f = fixture(), command = f.accept(), before = f.model.inspect(); f.model.failNext(fault);
       expect((await f.model.acceptAssertionAndCreateGrant(command)).status).toBe('UNAVAILABLE'); expect(f.model.inspect()).toEqual(before);
-      expect(f.model.getOperationOutcome(f.lookup(command)).status).toBe('OUTCOME_UNKNOWN');
+      expect((await f.model.getOperationOutcome(f.lookup(command))).status).toBe('OUTCOME_UNKNOWN');
       expect((await f.model.acceptAssertionAndCreateGrant(command)).status).toBe('COMMITTED');
     });
   it.each(['AFTER_GRANT', 'AFTER_SESSION', 'AFTER_RECEIPT', 'BEFORE_COMMIT', 'UNAVAILABLE'] as ReferenceFault[])(
@@ -241,19 +395,19 @@ describe('atomic reference semantics (NOT distributed persistence)', () => {
     const command = stage === 'accept' ? f.accept() : f.issue(); f.model.failNext('AFTER_COMMIT');
     const run = () => 'assertion' in command ? f.model.acceptAssertionAndCreateGrant(command) : f.model.consumeGrantAndCreateSession(command);
     expect((await run()).status).toBe('OUTCOME_UNKNOWN'); const count = f.model.inspect();
-    expect(f.model.getOperationOutcome(f.lookup(command))).toMatchObject({ status: 'COMMITTED', recovered: true });
+    expect(await f.model.getOperationOutcome(f.lookup(command))).toMatchObject({ status: 'COMMITTED', recovered: true });
     expect(await run()).toMatchObject({ status: 'COMMITTED', recovered: true }); expect(f.model.inspect()).toEqual(count);
   });
   it('binds operation ID to digest and recalculates digest rather than trusting command metadata', async () => {
     const f = fixture(), command = f.accept(); await f.model.acceptAssertionAndCreateGrant(command);
-    expect(f.model.getOperationOutcome({ ...f.lookup(command), commandDigest: hex('f') }).status).toBe('CONFLICT');
+    expect((await f.model.getOperationOutcome({ ...f.lookup(command), commandDigest: hex('f') })).status).toBe('CONFLICT');
     expect((await f.model.acceptAssertionAndCreateGrant({ ...command, commandDigest: hex('f') })).status).toBe('CONFLICT');
     const modified = seal({ ...command, expectedRevision: 1 }); expect((await f.model.acceptAssertionAndCreateGrant(modified)).status).toBe('CONFLICT');
   });
   it.each(['environment', 'expectedScriptId', 'applicationAudience'] as const)('rejects server command context mismatch: %s', async key => {
     const f = fixture(), c = f.accept(), other = { ...expected, [key]: key === 'environment' ? 'PRODUCTION' as const : 'synthetic-other-application-00000001' };
     expect((await f.model.acceptAssertionAndCreateGrant({ ...c, context: other })).status).toBe('CONTEXT_MISMATCH');
-    expect(f.model.getOperationOutcome({ ...f.lookup(c), context: other }).status).toBe('CONTEXT_MISMATCH');
+    expect((await f.model.getOperationOutcome({ ...f.lookup(c), ...other })).status).toBe('CONTEXT_MISMATCH');
     expect((await f.model.consumeGrantAndCreateSession({ ...f.issue(), context: other })).status).toBe('CONTEXT_MISMATCH');
     expect(f.model.inspect().grants).toBe(0);
   });
@@ -269,13 +423,13 @@ describe('atomic reference semantics (NOT distributed persistence)', () => {
     }
     expect(f.model.inspect().grants).toBe(0);
   });
-  it('fails closed on unavailable store, unknown context, missing receipt and untrusted decision times', async () => {
+  it('fails closed on unavailable store, unknown context, missing receipt and invalid command times', async () => {
     const f = fixture(), c = f.accept(); f.model.setAvailable(false);
     expect((await f.model.acceptAssertionAndCreateGrant(c)).status).toBe('UNAVAILABLE');
-    expect(f.model.getOperationOutcome(f.lookup(c)).status).toBe('UNAVAILABLE');
+    expect((await f.model.getOperationOutcome(f.lookup(c))).status).toBe('UNAVAILABLE');
     expect(f.model.readSession(f.sessionLookup()).status).toBe('UNAVAILABLE');
-    f.model.setAvailable(true); expect(f.model.getOperationOutcome(f.lookup(c)).status).toBe('OUTCOME_UNKNOWN');
-    for (const decisionTime of [start - 1, start + 1, NaN]) expect((await f.model.acceptAssertionAndCreateGrant({ ...c, decisionTime })).status).toBe('INVALID');
+    f.model.setAvailable(true); expect((await f.model.getOperationOutcome(f.lookup(c))).status).toBe('OUTCOME_UNKNOWN');
+    for (const commandCreatedAt of [0, -1, NaN]) expect((await f.model.acceptAssertionAndCreateGrant({ ...c, commandCreatedAt })).status).toBe('INVALID');
     expect((await f.model.acceptAssertionAndCreateGrant({ ...c, context: undefined } as any)).status).toBe('CONTEXT_MISMATCH');
   });
   it('rechecks expiry after scheduling and does not commit a stale validation', async () => {
@@ -296,16 +450,16 @@ describe('atomic reference semantics (NOT distributed persistence)', () => {
   it('expires a transaction independently of assertion expiry', async () => {
     const f = fixture(); (f.tx as any).expiresAt = start + 1;
     // Independent model receives this authoritative short-lived transaction.
-    const model = new AtomicStoreReferenceModel({ context: expected, clock: f.time, keyPolicy: f.policy, directory: () => undefined,
-      digest: { digest: sha }, capacity: { maxTransactions: 1, maxGrants: 1, maxSessions: 1, maxReceipts: 2, maxSessionsPerSubject: 1, receiptRetentionMs: 1000, cleanupBatchSize: 10 } });
+    const model = new AtomicStoreReferenceModel({ context: expected, backendOrigin, clock: f.time, keyPolicy: f.policy, directory: () => undefined,
+      digest: byteDigest, capacity: { maxTransactions: 1, maxGrants: 1, maxSessions: 1, maxReceipts: 2, maxSessionsPerSubject: 1, receiptRetentionMs: 1000, cleanupBatchSize: 10 } });
     model.seedTransaction(f.tx); const c = f.accept(); f.setTime(start + 1);
-    expect((await model.acceptAssertionAndCreateGrant(seal({ ...c, decisionTime: f.time() }))).status).toBe('EXPIRED');
+    expect((await model.acceptAssertionAndCreateGrant(seal({ ...c, commandCreatedAt: f.time() }))).status).toBe('EXPIRED');
   });
   it('allows a 15-minute session after the 20-second assertion expires, while grant is live', async () => {
     const f = fixture(); await f.model.acceptAssertionAndCreateGrant(f.accept()); f.setTime(start + 25_000);
     expect((await f.model.consumeGrantAndCreateSession(f.issue())).status).toBe('COMMITTED');
     const result = f.model.readSession(f.sessionLookup()); if (result.status !== 'FOUND') throw Error('fixture');
-    const s = f.model.readTrustedSession(result.session, f.time()); expect(s.expiresAt).toBe(f.time() + IDENTITY_TTL.sessionMs);
+    const s = f.model.readTrustedSession(result.session); expect(s.expiresAt).toBe(f.time() + IDENTITY_TTL.sessionMs);
     expect(s.expiresAt).toBeGreaterThan(f.claims.expiresAt);
     f.setTime(s.expiresAt); expect(f.model.readSession(f.sessionLookup()).status).toBe('BLOCKED');
   });
@@ -332,11 +486,11 @@ describe('atomic reference semantics (NOT distributed persistence)', () => {
     const f = fixture(); await f.model.acceptAssertionAndCreateGrant(f.accept()); await f.model.consumeGrantAndCreateSession(f.issue());
     const r = f.model.readSession(f.sessionLookup()); if (r.status !== 'FOUND') throw Error('fixture');
     for (const value of [{ ...r.session }, JSON.parse(JSON.stringify(r.session)), Object.create(r.session)])
-      expect(() => f.model.readTrustedSession(value, start)).toThrow();
-    expect(() => fixture().model.readTrustedSession(r.session, start)).toThrow();
+      expect(() => f.model.readTrustedSession(value)).toThrow();
+    expect(() => fixture().model.readTrustedSession(r.session)).toThrow();
     expect(f.model.revokeSession({ ...f.sessionLookup(), expectedRevision: 1 })).toBe('CONFLICT');
     expect(f.model.revokeSession({ ...f.sessionLookup(), expectedRevision: 0 })).toBe('REVOKED');
-    expect(() => f.model.readTrustedSession(r.session, start)).toThrow(); expect(f.model.readSession(f.sessionLookup()).status).toBe('BLOCKED');
+    expect(() => f.model.readTrustedSession(r.session)).toThrow(); expect(f.model.readSession(f.sessionLookup()).status).toBe('BLOCKED');
   });
   it('blocks compromised signing provenance at acceptance, issuance and session use', async () => {
     const f = fixture(), c = f.accept(); f.setKey({ compromised: true });
@@ -376,7 +530,7 @@ describe('atomic reference semantics (NOT distributed persistence)', () => {
     const verifierCalls = f.cryptoPort.verify.mock.calls.length;
     f.setTime(start + 10_000); f.setKey({ status });
     expect(f.model.readSession(f.sessionLookup()).status).toBe('FOUND');
-    expect(f.model.readTrustedSession(initial.session, f.time()).expiresAt).toBe(start + IDENTITY_TTL.sessionMs);
+    expect(f.model.readTrustedSession(initial.session).expiresAt).toBe(start + IDENTITY_TTL.sessionMs);
     expect(f.cryptoPort.verify.mock.calls.length).toBe(verifierCalls);
     // Still-live assertion cannot use the same expired/retired verification key for new admission.
     expect(f.time()).toBeLessThan(f.claims.expiresAt);
@@ -396,7 +550,7 @@ describe('atomic reference semantics (NOT distributed persistence)', () => {
       if (change === 'context') f.setKey({ environment: 'PRODUCTION' });
       if (change === 'issuer') f.setPolicy({ ...f.policy(), brokerIssuer: 'https://other-broker.invalid' });
       expect(f.model.readSession(f.sessionLookup()).status).toBe('BLOCKED');
-      expect(() => f.model.readTrustedSession(initial.session, f.time())).toThrow();
+      expect(() => f.model.readTrustedSession(initial.session)).toThrow();
     });
   it('rotates to a new signing key while keeping the retired key provenance for existing sessions', async () => {
     const f = fixture(); f.setKey({ signingNotAfter: start + 3000, verificationNotAfter: start + 10_000 });
@@ -415,8 +569,8 @@ describe('atomic reference semantics (NOT distributed persistence)', () => {
   it('enforces capacity without evicting live receipts or sessions and cleans up only eligible state', async () => {
     const f = fixture({ maxReceipts: 1 }); await f.model.acceptAssertionAndCreateGrant(f.accept());
     expect((await f.model.consumeGrantAndCreateSession(f.issue())).status).toBe('CAPACITY_EXCEEDED'); expect(f.model.inspect().consumedGrants).toBe(0);
-    expect(f.model.cleanup(start)).toBe(0); f.setTime(start + 300_000);
-    expect(f.model.cleanup(f.time())).toBeGreaterThan(0); expect(f.model.inspect().grants).toBe(0);
+    expect(f.model.cleanup()).toBe(0); f.setTime(start + 300_000);
+    expect(f.model.cleanup()).toBeGreaterThan(0); expect(f.model.inspect().grants).toBe(0);
     const full = fixture({ maxSessions: 1 }); await full.model.acceptAssertionAndCreateGrant(full.accept());
     await full.model.consumeGrantAndCreateSession(full.issue()); expect(full.model.inspect().sessions).toBe(1);
   });
@@ -434,9 +588,9 @@ describe('atomic reference semantics (NOT distributed persistence)', () => {
   });
   it('bounds cleanup batches and keeps committed receipts past assertion/grant expiry for recovery', async () => {
     const f = fixture({ cleanupBatchSize: 1 }), command = f.accept(); await f.model.acceptAssertionAndCreateGrant(command);
-    f.setTime(start + 40_000); expect(f.model.cleanup(f.time())).toBe(0);
-    expect(f.model.getOperationOutcome(f.lookup(command))).toMatchObject({ status: 'COMMITTED', recovered: true });
-    f.setTime(start + 300_000); expect(f.model.cleanup(f.time())).toBe(1);
+    f.setTime(start + 40_000); expect(f.model.cleanup()).toBe(0);
+    expect(await f.model.getOperationOutcome(f.lookup(command))).toMatchObject({ status: 'COMMITTED', recovered: true });
+    f.setTime(start + 300_000); expect(f.model.cleanup()).toBe(1);
     expect(f.model.inspect().receipts).toBe(0);
   });
 });

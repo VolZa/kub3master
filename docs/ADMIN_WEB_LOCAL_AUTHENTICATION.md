@@ -20,7 +20,8 @@ All new TypeScript modules are in `src/admin/web/authentication/`:
 | composition.ts | Unregistered local composition; no default verifier or adapter fallback |
 | authentication.test.ts | Synthetic verifier/clock/secrets and reference-model adapters, test-only |
 
-Existing Slice 2A/2B.1 modules, PermissionService, security prototypes, production authorization,
+The original Slice 2B.2 left Slice 2A/2B.1 unchanged. Slice 2C.2a evolves local operation/store contracts below.
+PermissionService, security prototypes, production authorization,
 ADMIN entrypoints/RPC allowlist, Rollup targets, repositories and TEST_RESET are unchanged.
 No imports connect this module to running GAS entrypoints or bundles.
 
@@ -34,7 +35,8 @@ but its runtime capability reader is model-specific. Two narrowly scoped local i
 - TrustedSessionReaderPort.read: verify store ownership/provenance and current record before returning
   StoredSession. JSON parsing or a TypeScript cast is explicitly NOT a valid implementation.
 
-No existing interface or reference-model implementation was changed. Tests adapt create/read to
+Originally no existing interface or model was changed; the 2C.2a compatibility update below supersedes
+operation/receipt/clock signatures. Tests adapt create/read to
 fixture transaction snapshots plus model.seedTransaction, and capability reads to model.readTrustedSession.
 These test adapters are defined ONLY in the test file. They are not persistent stores. Fixture read
 snapshots can be stale; the original atomic reference model still fences all actual one-time admission.
@@ -61,7 +63,7 @@ without checking the running installation. No Script Properties or GAS APIs are 
    proof binding and issuance time must match. A structurally valid JWS or copied evidence cannot pass.
 7. Read current active directory user by canonical issuer + subject; validate roles and version.
 8. Build a server command using fresh operation ID, canonical command digest, authoritative transaction
-   revision and trusted decision time. Call acceptAssertionAndCreateGrant ONCE.
+   revision, fixed backend origin and immutable commandCreatedAt. Call acceptAssertionAndCreateGrant ONCE.
 9. Read the current directory again. Generate the session bearer through the trusted secret port and
    pass ONLY its digest to consumeGrantAndCreateSession. The newly created grant starts at revision 0,
    matching the existing reference contract. No independent consumption logic is added.
@@ -78,10 +80,11 @@ No implicit REPORT_VIEW requirement is introduced for login: actual permissions 
 
 ## Atomic outcomes and recovery
 
-COMMITTED is checked against the exact operation context/ID/digest/kind/object/revision/decision time.
+COMMITTED first requires the paired trusted receipt reader, then exact operation context/ID/digest/kind/
+object/revision/original command time, normalized remote times and retention validation.
 REPLAY, EXPIRED, CONFLICT, CONTEXT_MISMATCH, UNAVAILABLE, INVALID and CAPACITY_EXCEEDED block.
 OUTCOME_UNKNOWN triggers exactly one getOperationOutcome lookup using the original operation ID/digest
-and a fresh trusted query time. A thrown mutation response is also treated as potentially committed.
+and its immutable recovery descriptor; the backend owns its decision clock. A thrown mutation response is also treated as potentially committed.
 The orchestrator NEVER retries a mutation, resets a grant or assumes that missing/unavailable receipts
 mean rollback. Unconfirmed outcomes remain BLOCKED/OUTCOME_UNKNOWN. A confirmed receipt allows
 continuation of the SAME in-flight application call, not another successful consumer.
@@ -166,11 +169,12 @@ hardening cannot protect against an actor who can replace the trusted server cod
 - No real Google authentication, persistent atomicity, distributed stores, broker channel or login UI.
 - No live durable capability restoration; the new port identifies the required boundary, not its implementation.
 - No broker cookie/state/PKCE/browser origin handshake; matching proof digests alone is not a complete login-CSRF defense.
-- Reference-model decision times are deterministic. Real clock/latency and authoritative decision-time semantics
-  must be reviewed with the actual store adapter; no browser time/skew is accepted.
+- Independent trusted application/backend clocks are modeled in Slice 2C.2a. Real clock/latency sources
+  and strict proof/session chronology still require review with the actual adapter; browser time is never accepted.
 - User directory, key policy and session DB have no cross-service transaction. Rechecks narrow races but
   do not atomically cancel business operations already in flight or prove distributed snapshot isolation.
-- No persisted operation recovery across process/browser loss, rate limiting, production capacity limits,
+- Restart recovery has only a metadata port and local test fixtures, no persistent implementation,
+  rate limiting, production capacity limits,
   bearer rotation, bulk key-provenance revocation or orphan cleanup implementation.
 - No production composition config is created. All deployment/security gates and resetAllowed:false in
   existing ADMIN shell/readiness remain unchanged.
@@ -215,3 +219,117 @@ resetAllowed:false. Production/readiness in-memory Code.gs SHA-256 matches the b
 All baseline production/services/prototypes/targets remain unchanged. The local checkpoint includes
 only the nine approved files; staged diff check must pass before commit. No remote push/deployment,
 Google resources, OAuth/broker/Firestore setup, TEST_RESET or next-slice implementation is authorized.
+
+## Slice 2C.2a - shared commands, owned receipts and restart recovery
+
+`LocalAuthenticationPorts` separates unchanged credential/proof text `digest` from byte-oriented
+`commandDigests`. It adds a pinned backendOrigin, mandatory paired `receipts` reader and optional
+`RecoveryCoordinatorPort`. Missing verifier/receipt reader/command digest/origin returns NOT_CONFIGURED.
+Server dependency injection remains a trust assumption: no TypeScript interface authenticates an
+arbitrary malicious server adapter. These local ports must not be selected by browser input.
+
+The orchestrator creates/seals each command once using shared operationDescriptor. The original
+body/digest, context, version, origin, operation ID/kind and commandCreatedAt remain fixed across async
+lookup. It does not create synthetic transport headers or hash transport nonce/key/request timestamps
+as business fields. Both mutations are called at most once per in-flight workflow.
+
+Before mutation, configured coordination saves only RecoveryDescriptor. Save failure forbids dispatch.
+The interface requires immutable create-if-absent metadata in a context/origin-bound namespace, never
+raw JWS, body, proof or bearer. A coordinator is optional for an in-process flow; without one, recovery
+after process loss is NOT_CONFIGURED. No runtime coordinator implementation is included. The test-only
+Map simulates surviving metadata, not durable database availability or atomic distributed admission.
+
+Internal `recoverOperation({operationId, commandDigest})` loads the ORIGINAL trusted descriptor,
+validates its context/origin/digest, then does async read-only receipt lookup and private evidence read.
+Missing metadata, missing receipt, expired retention, unavailable/unknown lookup never proves rollback.
+There is no mutation retry, replacement operation, grant reset, TTL extension, raw credential recovery
+or new session issuance. This method is server-local only and is NOT registered as a GAS/ADMIN RPC.
+A recovered COMMITTED result reports a historical operation; it does not authorize ERP access and can
+be reported even if its session was subsequently revoked. It returns only outcome/status, never a bearer.
+
+For same-call recovery, a confirmed grant may continue to its first session issuance. A committed
+session receipt (including DB timestamp UNAVAILABLE) still cannot release a bearer unless the current
+session/store/user/version/key/expiry checks all pass. PermissionService remains required for every
+protected operation. Loss of an issued credential means a new login, not replay of its consumed grant.
+
+Receipt capabilities have private model ownership. The orchestrator calls `receipts.read` before
+inspecting receipt DTO fields. JSON/casts/spreads/cross-store/context records fail with the paired
+reference-model reader. A future remote reader must authenticate the response, request binding and
+current store ownership; schema validation and the local reference model cannot substitute for that.
+
+Independent clocks have no equality requirement. Existing strict identity/session chronology is retained:
+backend now cannot precede a local proof's verifiedAt; application now cannot precede session issuedAt.
+Such races block safely, without timestamp rewriting. True backend JWS re-verification and remote session
+restoration still need separately approved adapters and clock-source review. Assertion and planned key
+verification TTLs still do not cap sessions; upstream authentication expiry does.
+
+No production/readiness target, ADMIN entrypoint/RPC, lifecycle, authorization adapter, signing-key policy,
+PermissionService or security prototype is changed by this compatibility slice. No real channel, signer,
+network/store adapter or infrastructure is created. PRODUCTION / TEST_RESET / ADMIN deployment are NO-GO.
+
+The reference model snapshots command/context before awaiting its scheduling hook. Terminal key-policy
+checks therefore use the original signing proof, even if the caller mutates its command object during
+the wait. Regression tests include an attempted proof swap to evade compromise of the original key;
+the staged transaction/grant/receipt state is discarded. No signing-key policy rule is relaxed.
+
+Slice 2C.2a local verification: TypeScript --noEmit PASS; isolated ES2019 compile with types:[] and
+only lib.es2019 PASS (23 runtime roots); identity/atomic/authentication/channel/shared-operation tests
+438 PASS (63 additional regressions; all 375 prior tests preserved); full Vitest 66 files / 1860 PASS.
+Both ADMIN target checkers PASS / NOT_CONFIGURED, doGet/getAdminBootstrap only, deploymentAllowed:false,
+resetAllowed:false. Existing channel golden vectors and wire v1 byte format are unchanged.
+Tracked diff and new-file whitespace checks PASS. In-memory production/readiness Code.gs SHA-256
+matches the baseline hashes recorded above; existing generated artifacts also remain unchanged.
+The slice modifies 14 files and adds 2, with empty staging and unchanged HEAD 2c09069. No Git commit,
+push, deployment, Google resources, persistent coordinator or next-slice implementation is included.
+
+## Slice 2C.2a acceptance review
+
+Review resumed from feature/bom-logic / 2c09069 with exactly the 16 approved slice files, empty
+staging and four unfinished acceptance tests (47 added lines) in atomic-store-contracts.test.ts.
+Three tests reproduced a real clock-rollback defect; the nested-mutation test already passed.
+
+The model previously remembered backend time only after successful business state changes. After an
+expiry/retention read or denied decision, moving that clock backwards could revive a session, receipt
+or grant. The minimal correction remembers every valid backend-time observation and rejects any later
+rollback. This process-local high-water guard advances even after denied decisions/reads; it does not
+modify transaction/assertion/grant/session/receipt maps, revisions or the business-state epoch. Lookup
+remains read-only for business state. TTLs and timestamp fields are not changed, extended or fabricated.
+This is not a persistent clock guarantee across model/process loss or distributed workers.
+
+Removed-check review:
+
+| Previous check/signature | Replacement and preserved boundary |
+| --- | --- |
+| Caller decisionTime equals backend clock | Backend-owned validated safe-integer milliseconds, monotonic observations, command age/skew and final expiry/key/directory rechecks |
+| receipt.committedAt equals decisionTime | Private owner/current-record evidence plus normalized original command/context/digest/object/revision/retention and remote-times validation |
+| Ordered JSON-array command material | One wire-v1 semantic framing profile and deterministic body, including every business precondition and exact JWS bytes; no legacy fallback |
+| Synchronous lookup with null revision/fresh caller time | Async lookup of original immutable descriptor, expected revision/object and original body digest; no mutation retry or replacement operation |
+| Caller time on session read/revoke/cleanup | Authoritative backend clock and unchanged current session/user/version/key/expiry guards; caller still validates its own session chronology |
+
+Existing tests retain their security assertions. Replacing rejection of any one-millisecond clock
+difference with explicit command age/skew/invalid-time tests follows the approved independent-clock
+semantics, not a relaxed authorization rule. JSON/spread/cast/cross-store evidence still fails; historic
+COMMITTED receipts never stand in for live session/revocation/directory/PermissionService decisions.
+
+Seven acceptance tests supplement the implementation tests: session/receipt/grant rollback (three),
+nested context/proof/receipt immutability (one), detached frozen canonical byte arrays (one), and no
+new credential/operation generation while recovering unknown acceptance/issuance (two). Reachable proof
+objects are frozen, context is defensively cloned before await, and canonical arrays contain immutable
+primitive bytes. No shallow-freeze alias can change the committed business command in these paths.
+
+The remaining trusted-composition, real signature/channel verification, durable coordinator/store,
+remote session restoration and independent-worker atomicity assumptions above remain open. This review
+does not introduce those implementations or authorize their deployment.
+
+Acceptance verification: TypeScript --noEmit PASS; isolated ES2019 with no Node/GAS ambient types
+PASS (23 runtime roots); 445 targeted tests PASS (112 identity, 127 atomic, 82 authentication,
+100 unchanged channel, 24 shared-operation tests). Full Vitest: 66 files / 1867 PASS. Seven acceptance
+tests are additional to the 63 implementation regressions. ADMIN checkers for both environments PASS;
+in-memory ADMIN bundles are byte-identical and their existing import/global guards pass. Disk and
+in-memory production/readiness Code.gs SHA-256 remain equal to the baseline hashes above. Diff and
+new-file whitespace checks pass; exactly 14 modified plus 2 new approved files remain in scope.
+
+All local acceptance gates pass for the separately authorized local checkpoint with message
+`refactor(auth): align operation clocks digests and receipts`. This approval is for local source control
+only. Real infrastructure, Google operations, push, PRODUCTION, TEST_RESET and ADMIN deployment remain
+NO-GO. The next implementation slice still requires its own approved scope and security boundaries.

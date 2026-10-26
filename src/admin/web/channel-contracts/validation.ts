@@ -4,6 +4,7 @@ import { object, hex, time, keyId, expectation, checkFresh, verificationKey } fr
 import { frame, invalid, parseWireJson, utf8 } from './encoding';
 import { inspectReceipt, REJECTIONS } from './recovery';
 import type { RejectionCode } from './contracts';
+import { canonicalSemanticBytes } from '../operation-contracts';
 
 const bindingKeys = ['environment', 'applicationAudience', 'expectedScriptId', 'operationId', 'operationKind', 'commandDigest', 'commandCreatedAt'];
 const transportKeys = ['protocolVersion', 'algorithm', 'keyId', 'requestId', 'requestKind', 'method', 'backendOrigin', 'backendPath'];
@@ -55,8 +56,9 @@ export function canonicalResponseBytes(value: ResponseHeader): readonly number[]
  * bodyDigest is the ORIGINAL mutation body's digest; lookup cannot reconstruct or replace it. */
 export function canonicalCommandBytes(h: RequestHeader, originalBodyDigest: string): readonly number[] {
   const raw = object(h, requestKeys), v = requestHeader(raw, ownExpectation(raw));
-  return frame('KUB_ADMIN_CHANNEL_COMMAND_V1', [v.protocolVersion, v.backendOrigin, v.environment, v.applicationAudience,
-    v.expectedScriptId, v.operationKind, v.operationId, v.commandCreatedAt, hex(originalBodyDigest)]);
+  return canonicalSemanticBytes({ protocolVersion: v.protocolVersion, backendOrigin: v.backendOrigin, environment: v.environment,
+    applicationAudience: v.applicationAudience, expectedScriptId: v.expectedScriptId, operationKind: v.operationKind,
+    operationId: v.operationId, commandCreatedAt: v.commandCreatedAt }, originalBodyDigest);
 }
 function envelope(value: unknown): Record<string, unknown> { return object(value, ['header', 'body', 'tag']); }
 function body(value: unknown, claimedDigest: string, digest: BodyDigestPort): { text: string; json: unknown } {
