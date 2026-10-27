@@ -41,10 +41,16 @@ export interface SessionLookup {
 export type SessionLookupOutcome = { readonly status: 'FOUND'; readonly session: TrustedStoredSession } |
   { readonly status: 'BLOCKED' | 'UNAVAILABLE' };
 export interface RevokeSessionCommand extends SessionLookup { readonly expectedRevision: number }
-export interface SessionStorePort {
+/** Synchronous fixture surface only; never a substitute for remote authoritative reads. */
+export interface ReferenceSessionStorePort {
   readSession(command: SessionLookup): SessionLookupOutcome;
   revokeSession(command: RevokeSessionCommand): 'REVOKED' | 'CONFLICT' | 'BLOCKED' | 'UNAVAILABLE';
   /** Never return expired state as valid while waiting for cleanup. Never delete live receipts.
    * Real implementations need durable revocation/provenance indexes, not an authoritative cache. */
   cleanup(): number;
+}
+export interface SessionStorePort {
+  readSession(command: SessionLookup): Promise<SessionLookupOutcome>;
+  revokeSession(command: RevokeSessionCommand): Promise<'REVOKED' | 'CONFLICT' | 'BLOCKED' | 'UNAVAILABLE'>;
+  cleanup(): Promise<number>;
 }

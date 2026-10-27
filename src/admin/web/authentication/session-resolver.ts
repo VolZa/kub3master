@@ -3,6 +3,7 @@ import { browserSessionCredential, hex, record, timestamp, validateSessionUse } 
 import { sessionProvenanceKey, signingKeyPolicy } from '../identity-contracts/signing-key-policy';
 import type { LocalAuthenticationPorts } from './ports';
 import { ApplicationTrustBoundary, currentUser, denied } from './trust-boundaries';
+import { authoritativeRead } from './authoritative-reads';
 
 declare const resolvedProof: unique symbol;
 export interface ResolvedSession { readonly [resolvedProof]: true }
@@ -23,32 +24,37 @@ export class SessionResolver {
   private readonly trust: ApplicationTrustBoundary;
   private readonly owner = Object.freeze({});
   constructor(private readonly ports: LocalAuthenticationPorts) { this.trust = new ApplicationTrustBoundary(ports); }
-  resolve(request: unknown): ResolvedSession {
+  async resolve(request: unknown): Promise<ResolvedSession> {
     this.trust.check(); const credential = browserSessionCredential(request);
     const digest = hex(this.ports.digest.digest(credential.sessionCredential));
     if (digest === credential.sessionCredential) return denied();
-    this.lookup(digest);
+    await this.lookup(digest);
     // Runtime private field establishes provenance; this cast only exposes the opaque interface.
     return new ResolutionEvidence(construction, this.owner, digest) as unknown as ResolvedSession;
   }
-  read(value: unknown): Readonly<StoredSession> {
+  async read(value: unknown): Promise<Readonly<StoredSession>> {
     return this.lookup(ResolutionEvidence.read(value, this.owner));
   }
-  private lookup(digest: string): Readonly<StoredSession> {
-    this.trust.check();
-    const result = this.ports.sessions.readSession({ context: this.trust.context, credentialDigest: digest });
+  private async lookup(digest: string): Promise<Readonly<StoredSession>> {
+    const result = await authoritativeRead(this.ports.readDeadline, this.trust.check(), () =>
+      this.ports.sessions.readSession({ context: this.trust.context, credentialDigest: digest }));
     if (result.status !== 'FOUND') return denied(); record(result, ['status', 'session']);
-    this.trust.check(); const s = this.ports.trustedSessions.read(result.session);
+    const raw = await authoritativeRead(this.ports.readDeadline, this.trust.check(), () => this.ports.trustedSessions.read(result.session));
+    this.trust.check();
     // This validation supplements the authoritative capability reader; it never replaces provenance.
-    record(s, ['environment', 'applicationAudience', 'expectedScriptId', 'identityIssuer', 'identitySubject', 'authenticatedAt',
+    record(raw, ['environment', 'applicationAudience', 'expectedScriptId', 'identityIssuer', 'identitySubject', 'authenticatedAt',
       'authenticationExpiresAt', 'issuedAt', 'expiresAt', 'authorizationVersion', 'sessionId', 'status', 'revokedAt', 'revision', 'grantId', 'signingKey']);
+    record(raw.signingKey, ['protocolVersion', 'brokerIssuer', 'keyId', 'algorithm', 'assertionId', 'assertionIssuedAt']);
+    // Detach nested DTO data before the next async policy read; readonly types are not a snapshot.
+    const s = Object.freeze({ ...raw, signingKey: Object.freeze({ ...raw.signingKey }) });
     if (s.sessionId !== digest || !Number.isSafeInteger(s.revision) || s.revision < 0) return denied(); hex(s.grantId);
     const key = record(s.signingKey, ['protocolVersion', 'brokerIssuer', 'keyId', 'algorithm', 'assertionId', 'assertionIssuedAt']);
     if (key.protocolVersion !== 1 || key.algorithm !== 'RS256' || typeof key.keyId !== 'string') return denied();
     hex(key.assertionId); timestamp(key.assertionIssuedAt);
     if ((key.assertionIssuedAt as number) > s.issuedAt) return denied();
+    const rawPolicy = await authoritativeRead(this.ports.readDeadline, this.trust.check(), () => this.ports.keyPolicy());
+    const at = this.trust.check(), policy = signingKeyPolicy(rawPolicy);
     const user = currentUser(this.ports.users, s.identityIssuer, s.identitySubject, s.authorizationVersion);
-    const at = this.trust.check(), policy = signingKeyPolicy(this.ports.keyPolicy());
     if (policy.brokerIssuer !== key.brokerIssuer) return denied();
     sessionProvenanceKey(policy, key.keyId, this.trust.context, key.assertionIssuedAt as number);
     const { revision: _revision, grantId: _grant, signingKey: _key, ...legacy } = s;

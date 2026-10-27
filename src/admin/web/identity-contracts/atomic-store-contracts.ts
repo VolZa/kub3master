@@ -26,7 +26,7 @@ declare const receiptProof: unique symbol;
 /** A type cannot establish runtime provenance. Only a paired authoritative reader can inspect it. */
 export interface VerifiedOperationReceipt { readonly record: Readonly<OperationReceipt>; readonly [receiptProof]: true }
 export interface OperationReceiptReaderPort {
-  read(evidence: unknown, expected: Readonly<RecoveryDescriptor>): Readonly<OperationReceipt>;
+  read(evidence: unknown, expected: Readonly<RecoveryDescriptor>): Promise<Readonly<OperationReceipt>>;
 }
 export type AtomicStatus = 'COMMITTED' | 'REJECTED' | 'REPLAY' | 'EXPIRED' | 'CONFLICT' | 'CONTEXT_MISMATCH' |
   'UNAVAILABLE' | 'OUTCOME_UNKNOWN' | 'INVALID' | 'CAPACITY_EXCEEDED';

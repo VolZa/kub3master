@@ -8,6 +8,7 @@ import { type LocalAuthenticationPorts, type LoginStartResult, type LoginResult,
 import { recoveryDescriptor, inspectRecoveryDescriptor, type RecoveryDescriptor } from '../operation-contracts';
 import { expectation } from '../channel-contracts/channel-policy';
 import { inspectReceipt } from '../channel-contracts/recovery';
+import { authoritativeRead } from './authoritative-reads';
 import { ApplicationTrustBoundary, currentUser } from './trust-boundaries';
 import { SessionResolver } from './session-resolver';
 
@@ -29,7 +30,7 @@ export class LoginOrchestrator {
     this.backendOrigin = ports.backendOrigin;
   }
   private configured(): void {
-    if (!this.ports.verifier || !this.ports.receipts || !this.ports.commandDigests) block('NOT_CONFIGURED');
+    if (!this.ports.verifier || !this.ports.receipts || !this.ports.commandDigests || !this.ports.readDeadline) block('NOT_CONFIGURED');
     try {
       this.ports.verifier.assertConfigured(); expectation({ ...this.trust.context, backendOrigin: this.backendOrigin });
       if (this.ports.backendOrigin !== this.backendOrigin) block('NOT_CONFIGURED');
@@ -86,16 +87,17 @@ export class LoginOrchestrator {
     this.trust.check();
     if (result.status === 'OUTCOME_UNKNOWN') {
       try {
-        result = this.checkedOutcome(await this.ports.atomic.getOperationOutcome(descriptor));
+        result = this.checkedOutcome(await authoritativeRead(this.ports.readDeadline, this.trust.check(), () => this.ports.atomic.getOperationOutcome(descriptor)));
       } catch { block('OUTCOME_UNKNOWN'); }
       this.trust.check(); if (result.status !== 'COMMITTED' && result.status !== 'REJECTED') block(result.status === 'CONFLICT' ? 'CONFLICT' : 'OUTCOME_UNKNOWN');
     }
     if (result.status !== 'COMMITTED' && result.status !== 'REJECTED') block(result.status);
-    return this.readReceipt(result, descriptor);
+    return await this.readReceipt(result, descriptor);
   }
-  private readReceipt(result: Extract<AtomicOutcome, { receipt: unknown }>, descriptor: RecoveryDescriptor): Readonly<OperationReceipt> {
+  private async readReceipt(result: Extract<AtomicOutcome, { receipt: unknown }>, descriptor: RecoveryDescriptor): Promise<Readonly<OperationReceipt>> {
     // Authenticate runtime provenance FIRST. Schema checks never mint authority.
-    const r = inspectReceipt(this.ports.receipts.read(result.receipt, descriptor), descriptor, this.trust.check());
+    const receipt = await authoritativeRead(this.ports.readDeadline, this.trust.check(), () => this.ports.receipts.read(result.receipt, descriptor));
+    const r = inspectReceipt(receipt, descriptor, this.trust.check());
     if (r.outcome !== result.status) block('CONFLICT');
     if (r.outcome === 'REJECTED') block(r.code!);
     if (r.objectId !== descriptor.expectedObjectId || r.revision !== descriptor.expectedRevision + 1) block('CONFLICT');
@@ -107,15 +109,16 @@ export class LoginOrchestrator {
       this.configured(); this.trust.check(); if (!this.ports.recovery) block('NOT_CONFIGURED');
       const q = record(query, ['operationId', 'commandDigest']), operationId = hex(q.operationId), commandDigest = hex(q.commandDigest);
       const target = { ...this.trust.context, backendOrigin: this.backendOrigin };
-      const saved = await this.ports.recovery.load({ ...target, operationId, commandDigest }); this.trust.check();
+      const saved = await authoritativeRead(this.ports.readDeadline, this.trust.check(), () => this.ports.recovery!.load({ ...target, operationId, commandDigest })); this.trust.check();
       if (!saved) block('OUTCOME_UNKNOWN');
       const d = inspectRecoveryDescriptor(saved, target, this.ports.commandDigests);
       if (d.operationId !== operationId || d.commandDigest !== commandDigest) block('CONFLICT');
       let result: AtomicOutcome;
-      try { result = this.checkedOutcome(await this.ports.atomic.getOperationOutcome(d)); } catch { block('OUTCOME_UNKNOWN'); }
+      try { result = this.checkedOutcome(await authoritativeRead(this.ports.readDeadline, this.trust.check(), () => this.ports.atomic.getOperationOutcome(d))); } catch { block('OUTCOME_UNKNOWN'); }
       this.trust.check();
       if (result.status !== 'COMMITTED' && result.status !== 'REJECTED') block(result.status === 'CONFLICT' ? 'CONFLICT' : 'OUTCOME_UNKNOWN');
-      const r = inspectReceipt(this.ports.receipts.read(result.receipt, d), d, this.trust.check());
+      const receipt = await authoritativeRead(this.ports.readDeadline, this.trust.check(), () => this.ports.receipts.read(result.receipt, d));
+      const r = inspectReceipt(receipt, d, this.trust.check());
       if (r.outcome !== result.status || r.outcome === 'COMMITTED' &&
         (r.objectId !== d.expectedObjectId || r.revision !== d.expectedRevision + 1)) block('CONFLICT');
       return { status: 'RECOVERED', outcome: r.outcome };
@@ -124,16 +127,17 @@ export class LoginOrchestrator {
   async completeLogin(request: unknown): Promise<LoginResult> {
     try {
       this.configured(); this.trust.check(); const complete = browserLoginComplete(request);
-      const tx = this.snapshot(await this.ports.transactions.read(complete.transactionId, this.trust.context));
+      const tx = this.snapshot(await authoritativeRead(this.ports.readDeadline, this.trust.check(), () => this.ports.transactions.read(complete.transactionId, this.trust.context)));
       let now = this.trust.check();
       if (tx.record.transactionId !== complete.transactionId || hex(this.ports.digest.digest(complete.browserProof)) !== tx.record.browserProofBinding) block('ACCESS_DENIED');
       if (now >= tx.record.expiresAt) block('EXPIRED');
       lifetime(tx.record.createdAt, tx.record.expiresAt, IDENTITY_TTL.transactionMs, now);
       if (tx.record.status === 'CONSUMED') block('REPLAY'); if (tx.record.status !== 'VERIFYING') block('ACCESS_DENIED');
-      const message = await this.ports.broker.receive(tx.record); this.trust.check();
-      const verified = this.ports.verifier!.verify(message, tx.record);
+      const message = await authoritativeRead(this.ports.readDeadline, this.trust.check(), () => this.ports.broker.receive(tx.record)); this.trust.check();
+      const verified = await authoritativeRead(this.ports.readDeadline, this.trust.check(), () => this.ports.verifier!.verify(message, tx.record));
+      const policy = await authoritativeRead(this.ports.readDeadline, this.trust.check(), () => this.ports.keyPolicy());
       now = this.trust.check();
-      const proof = assertSignedAssertionLive(verified, this.trust.context, this.ports.keyPolicy(), now), claims = proof.claims;
+      const proof = assertSignedAssertionLive(verified, this.trust.context, policy, now), claims = proof.claims;
       if (claims.transactionId !== tx.record.transactionId || claims.nonce !== tx.record.nonce || claims.browserProofBinding !== tx.record.browserProofBinding ||
         claims.issuedAt < tx.record.createdAt) block('ACCESS_DENIED');
       currentUser(this.ports.users, claims.identityIssuer, claims.subject);
@@ -150,7 +154,7 @@ export class LoginOrchestrator {
         expectedAuthorizationVersion: user.authorizationVersion });
       await this.commit(issue); this.trust.check();
       // Receipts alone cannot authorize or release a credential: require live authoritative session.
-      const resolved = this.sessions.resolve({ sessionCredential: credential }), session = this.sessions.read(resolved);
+      const resolved = await this.sessions.resolve({ sessionCredential: credential }), session = await this.sessions.read(resolved);
       if (session.grantId !== accepted.objectId || session.identityIssuer !== claims.identityIssuer || session.identitySubject !== claims.subject) block('ACCESS_DENIED');
       this.trust.check(); return { status: 'AUTHENTICATED', sessionCredential: credential, expiresAt: session.expiresAt };
     } catch (error) { return { status: 'BLOCKED', code: error instanceof Blocked ? error.code : 'ACCESS_DENIED' }; }

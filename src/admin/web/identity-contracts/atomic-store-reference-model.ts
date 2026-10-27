@@ -11,7 +11,7 @@ import { CHANNEL, type BodyDigestPort, type ChannelExpectation } from '../channe
 import { expectation } from '../channel-contracts/channel-policy';
 import { inspectReceipt } from '../channel-contracts/recovery';
 import { inspectRecoveryDescriptor } from '../operation-contracts';
-import { type StoredSession, type TrustedStoredSession, type SessionStorePort, type SessionLookup, type SessionLookupOutcome,
+import { type StoredSession, type TrustedStoredSession, type ReferenceSessionStorePort, type SessionLookup, type SessionLookupOutcome,
   type RevokeSessionCommand, type CurrentDirectoryUser, type SessionCapacityPolicy } from './session-store-contracts';
 
 export type ReferenceFault = 'UNAVAILABLE' | 'AFTER_TRANSACTION' | 'AFTER_ASSERTION' | 'AFTER_GRANT' |
@@ -66,7 +66,7 @@ interface State {
 /** LOCAL TEST MODEL ONLY. Optimistic serializable snapshots + one synchronous state swap.
  * No persistence, distributed coordination, crypto, RNG, Google APIs or implicit clock.
  * Session/grant provenance is request/process-local; this is NOT a durable restore adapter. */
-export class AtomicStoreReferenceModel implements AtomicLoginStorePort, SessionStorePort {
+export class AtomicStoreReferenceModel implements AtomicLoginStorePort, ReferenceSessionStorePort {
   private readonly expected: Readonly<IdentityApplicationContext>;
   private readonly target: Readonly<ChannelExpectation>;
   private readonly limits: Readonly<SessionCapacityPolicy>;

@@ -333,3 +333,18 @@ All local acceptance gates pass for the separately authorized local checkpoint w
 `refactor(auth): align operation clocks digests and receipts`. This approval is for local source control
 only. Real infrastructure, Google operations, push, PRODUCTION, TEST_RESET and ADMIN deployment remain
 NO-GO. The next implementation slice still requires its own approved scope and security boundaries.
+
+## Slice 2C.3B.1 async contracts
+
+The new [durable store contract document](ADMIN_WEB_DURABLE_STORE_CONTRACTS.md) supersedes synchronous
+application signatures described in the historical slices above. Session lookup/revocation/cleanup,
+paired session/receipt readers, policy reads and verifier orchestration are now async. Resolver,
+authorization and composition callers must await their results. A required deadline port bounds
+read waits without changing identity TTLs. PermissionService remains synchronous and unchanged;
+authorization repeats current permission checks after its final awaited session/policy recheck.
+
+The standalone reference model retains its synchronous ReferenceSessionStorePort and unchanged
+high-water/atomic behavior; only test adapters connect it to async application ports. Positive grant
+restoration implementations are test-only. Remote durable composition is unconditionally BLOCKED:
+no injected boolean/cast can prove unresolved expiry-at-commit or clock/directory guarantees.
+This is not runtime integration and does not authorize a backend/emulator/ADMIN deployment.

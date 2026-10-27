@@ -6,6 +6,7 @@ import type { SessionStorePort, StoredSession } from '../identity-contracts/sess
 import type { SigningKeyPolicy } from '../identity-contracts/signing-key-policy';
 import type { VerifiedSignedAssertion } from '../identity-contracts/signed-assertion-profile';
 import type { UserRepository } from '../../../security/permission-service';
+import type { ReadDeadlinePort } from './authoritative-reads';
 
 /** Server injection only. No browser-defined context, clock, identity, permissions or adapters. */
 export interface ApplicationTrustPorts {
@@ -25,20 +26,21 @@ export interface BrokerAssertionSourcePort {
 export interface TrustedVerificationPort {
   /** Fail closed if the trusted signature adapter is absent; not a live broker health check. */
   assertConfigured(): void;
-  verify(message: unknown, transaction: Readonly<LoginTransaction>): VerifiedSignedAssertion;
+  verify(message: unknown, transaction: Readonly<LoginTransaction>): Promise<VerifiedSignedAssertion>;
 }
 /** Must authenticate store ownership/provenance and recheck its current authoritative record.
  * Plain record validation/casting/JSON.parse is NOT an implementation of this port.
  * This interface cannot authenticate an arbitrary injected adapter: trusted server composition
  * must supply the reviewed, context-bound reader paired with its authoritative store. */
 export interface TrustedSessionReaderPort {
-  read(capability: unknown): Readonly<StoredSession>;
+  read(capability: unknown): Promise<Readonly<StoredSession>>;
 }
 export interface SecretGenerationPort {
   /** Real adapter requires >=256 CSPRNG bits per independent secret; no UUID/Math.random fallback. */
   secret(): string;
 }
 export interface LocalAuthenticationPorts extends ApplicationTrustPorts {
+  readonly readDeadline: ReadDeadlinePort;
   readonly backendOrigin: string;
   readonly commandDigests: BodyDigestPort;
   readonly receipts: OperationReceiptReaderPort;
@@ -52,7 +54,7 @@ export interface LocalAuthenticationPorts extends ApplicationTrustPorts {
   readonly users: UserRepository;
   readonly digest: TextDigestPort;
   readonly secrets: SecretGenerationPort;
-  readonly keyPolicy: () => SigningKeyPolicy;
+  readonly keyPolicy: () => Promise<SigningKeyPolicy>;
 }
 export type AuthenticationFailure = Exclude<AtomicStatus, 'COMMITTED'> | 'ACCESS_DENIED' | 'NOT_CONFIGURED';
 export type LoginStartResult = { readonly status: 'STARTED'; readonly transactionId: string; readonly expiresAt: number } |

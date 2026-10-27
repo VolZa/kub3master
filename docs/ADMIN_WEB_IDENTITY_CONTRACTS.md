@@ -465,3 +465,14 @@ Runtime code remains ES2019 with no Node/GAS ambient dependencies. Local tests p
 atomic/security invariants and add independent clocks, strict timestamp bounds, exact JWS/profile
 binding, private receipt ownership and historical async recovery. They do not prove distributed
 atomicity, durable storage, real signature verification or authenticated remote restoration.
+
+## Slice 2C.3B.1 durable boundaries
+
+See [ADMIN_WEB_DURABLE_STORE_CONTRACTS.md](ADMIN_WEB_DURABLE_STORE_CONTRACTS.md) for the serializable
+grant identity projection, separate DTO/ownership/context/fresh-policy/private-evidence boundaries,
+async session/receipt/restoration requirements and closed remote-admission capability gate.
+DTO validation never creates TrustedLoginGrant or identity evidence. No runtime restoration factory,
+Firestore adapter or positive durable-guarantee issuer exists. Historical identity does not replace
+current UserRepository authorizationVersion/permissions. Timing policy/TTLs, key rotation semantics,
+Wire v1 and process-local high-water checks remain unchanged. Cross-worker/restart clock guarantees
+and expiry-valid actual remote commit remain unverified and block real admission.

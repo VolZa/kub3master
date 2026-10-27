@@ -6,7 +6,7 @@ import { type LoginTransaction, type IdentityApplicationContext, type Unverified
 import { type SigningKeyPolicy, type SigningKeyRule } from '../identity-contracts/signing-key-policy';
 import { type SignedAssertionClaimsV1 } from '../identity-contracts/signed-assertion-profile';
 import { type User, type Permission } from '../../../security/permission-service';
-import { composeLocalAuthentication } from './composition';
+import { composeLocalAuthentication, composeRemoteDurableAuthentication } from './composition';
 import { SignedAssertionVerificationService } from './trusted-verification';
 import { type LocalAuthenticationPorts } from './ports';
 import type { RecoveryDescriptor } from '../operation-contracts';
@@ -40,7 +40,13 @@ function fixture(environment: 'PRODUCTION' | 'TEST' = 'TEST') {
       Buffer.alloc(256).toString('base64url')].join('.') };
   });
   const syntheticSignature = { verify: vi.fn(() => true) }; // Available ONLY in this test file.
-  const signed = new SignedAssertionVerificationService(trust, policy, syntheticSignature);
+  // TEST-ONLY timer adapter. No timer, synchronous cache or synthetic verifier ships in runtime.
+  const readDeadline = { start: (_at: number) => {
+    let timer: ReturnType<typeof setTimeout>;
+    const expires = new Promise<void>(resolve => { timer = setTimeout(resolve, 5000); });
+    return { expires, cancel: () => clearTimeout(timer) };
+  } };
+  const signed = new SignedAssertionVerificationService(trust, async () => policy(), syntheticSignature, readDeadline);
   const verifier = { assertConfigured: () => signed.assertConfigured(), verify: vi.fn((message: unknown, tx: Readonly<LoginTransaction>) => signed.verify(message, tx)) };
   const model = new AtomicStoreReferenceModel({ context: expected, backendOrigin, clock: () => now + backendOffset, keyPolicy: policy,
     directory: () => ({ issuer: user.issuer, subject: user.subject, active: user.active, authorizationVersion: user.authorizationVersion }),
@@ -63,8 +69,8 @@ function fixture(environment: 'PRODUCTION' | 'TEST' = 'TEST') {
     getOperationOutcome: vi.fn((c: Parameters<typeof model.getOperationOutcome>[0]) => model.getOperationOutcome(c)),
   };
   const users = { find: vi.fn((_issuer: string, _subject: string) => user) };
-  const sessionPort = { readSession: vi.fn((c: Parameters<typeof model.readSession>[0]) => model.readSession(c)),
-    revokeSession: (c: Parameters<typeof model.revokeSession>[0]) => model.revokeSession(c), cleanup: () => model.cleanup() };
+  const sessionPort = { readSession: vi.fn(async (c: Parameters<typeof model.readSession>[0]) => model.readSession(c)),
+    revokeSession: async (c: Parameters<typeof model.revokeSession>[0]) => model.revokeSession(c), cleanup: async () => model.cleanup() };
   // TEST-ONLY process-independent metadata fixture. Not a persistent runtime coordinator.
   const saved = new Map<string, Readonly<RecoveryDescriptor>>();
   const recovery = {
@@ -77,11 +83,11 @@ function fixture(environment: 'PRODUCTION' | 'TEST' = 'TEST') {
       const d = saved.get(query.operationId); return d?.commandDigest === query.commandDigest ? d : undefined;
     }),
   };
-  const receipts = { read: vi.fn((capability: unknown, descriptor: RecoveryDescriptor) => model.readOperationReceipt(capability, descriptor)) };
-  const ports: LocalAuthenticationPorts = { ...trust, backendOrigin, commandDigests: byteDigest,
+  const receipts = { read: vi.fn(async (capability: unknown, descriptor: RecoveryDescriptor) => model.readOperationReceipt(capability, descriptor)) };
+  const ports: LocalAuthenticationPorts = { ...trust, readDeadline, backendOrigin, commandDigests: byteDigest,
     receipts, recovery, transactions: transactionPort, atomic, broker: { receive: source }, verifier,
-    sessions: sessionPort, trustedSessions: { read: capability => model.readTrustedSession(capability) },
-    users, digest: { digest: sha }, secrets: { secret: () => (++sequence).toString(16).padStart(64, '0') }, keyPolicy: policy };
+    sessions: sessionPort, trustedSessions: { read: async capability => model.readTrustedSession(capability) },
+    users, digest: { digest: sha }, secrets: { secret: () => (++sequence).toString(16).padStart(64, '0') }, keyPolicy: async () => policy() };
   const app = composeLocalAuthentication(ports);
   const begin = async () => {
     const result = await app.startLogin({ browserProofBinding: sha(rawProof) });
@@ -108,7 +114,7 @@ describe('local login orchestration (synthetic adapters only)', () => {
     const f = fixture(), { result, credential } = await f.login();
     expect(Object.keys(result).sort()).toEqual(['expiresAt', 'sessionCredential', 'status']);
     expect(result.expiresAt).toBe(start + IDENTITY_TTL.sessionMs);
-    expect(f.app.authorize(credential, 'USER_MANAGE')).toEqual({ status: 'AUTHORIZED' });
+    expect((await f.app.authorize(credential, 'USER_MANAGE'))).toEqual({ status: 'AUTHORIZED' });
     expect(f.model.inspect()).toMatchObject({ consumedTransactions: 1, assertions: 1, grants: 1, consumedGrants: 1, sessions: 1, receipts: 2 });
     expect(f.syntheticSignature.verify).toHaveBeenCalledExactlyOnceWith(expect.any(String), expect.objectContaining({ algorithm: 'RS256' }));
     const issue = f.atomic.consumeGrantAndCreateSession.mock.calls[0][0]; expect(issue.credentialDigest).toBe(sha(result.sessionCredential));
@@ -128,10 +134,10 @@ describe('local login orchestration (synthetic adapters only)', () => {
     const empty = composeLocalAuthentication();
     expect(await empty.startLogin({})).toEqual({ status: 'BLOCKED', code: 'NOT_CONFIGURED' });
     expect(await empty.completeLogin({})).toEqual({ status: 'BLOCKED', code: 'NOT_CONFIGURED' });
-    expect(empty.authorize({}, 'USER_MANAGE')).toEqual({ status: 'DENIED' });
+    expect((await empty.authorize({}, 'USER_MANAGE'))).toEqual({ status: 'DENIED' });
     const f = fixture(), noVerifier = composeLocalAuthentication({ ...f.ports, verifier: undefined });
     expect(await noVerifier.startLogin({ browserProofBinding: sha(rawProof) })).toEqual({ status: 'BLOCKED', code: 'NOT_CONFIGURED' });
-    const noSignature = new SignedAssertionVerificationService(f.trust, f.policy);
+    const noSignature = new SignedAssertionVerificationService(f.trust, async () => f.policy());
     const app = composeLocalAuthentication({ ...f.ports, verifier: noSignature });
     expect(await app.startLogin({ browserProofBinding: sha(rawProof) })).toEqual({ status: 'BLOCKED', code: 'NOT_CONFIGURED' });
     expect(await app.completeLogin({ transactionId: '0'.repeat(64), browserProof: rawProof })).toEqual({ status: 'BLOCKED', code: 'NOT_CONFIGURED' });
@@ -149,7 +155,7 @@ describe('local login orchestration (synthetic adapters only)', () => {
   it('accepts a fresh assertion once, then redeems the independent grant after assertion expiry', async () => {
     const f = fixture(); f.onAccepted(() => { f.setTime(start + 25_000); });
     const { result, credential } = await f.login(); expect(result.expiresAt).toBe(start + 25_000 + IDENTITY_TTL.sessionMs);
-    expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('AUTHORIZED');
+    expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('AUTHORIZED');
   });
   it('blocks expired grant without resetting the accepted transaction or retrying mutations', async () => {
     const f = fixture(); f.onAccepted(() => { f.setTime(start + IDENTITY_TTL.grantMs); });
@@ -192,7 +198,7 @@ describe('local login orchestration (synthetic adapters only)', () => {
     const f = fixture(); if (stage === 'accept') f.model.failNext('AFTER_COMMIT'); else f.onAccepted(() => f.model.failNext('AFTER_COMMIT'));
     const { credential } = await f.login(); expect(f.atomic.getOperationOutcome).toHaveBeenCalledTimes(1);
     expect(f.atomic.acceptAssertionAndCreateGrant).toHaveBeenCalledTimes(1); expect(f.atomic.consumeGrantAndCreateSession).toHaveBeenCalledTimes(1);
-    expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('AUTHORIZED');
+    expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('AUTHORIZED');
   });
   it.each(['accept', 'issue'] as const)('does not assume rollback when receipt lookup cannot confirm %s commit', async stage => {
     const f = fixture(); if (stage === 'accept') f.model.failNext('AFTER_COMMIT'); else f.onAccepted(() => f.model.failNext('AFTER_COMMIT'));
@@ -236,14 +242,210 @@ describe('local login orchestration (synthetic adapters only)', () => {
     expect(f.atomic.consumeGrantAndCreateSession).toHaveBeenCalledTimes(1);
   });
   it('rejects forged verification evidence despite its valid-looking JSON payload', async () => {
-    const f = fixture(); f.verifier.verify.mockImplementation((m, tx) => ({ ...f.signed.verify(m, tx) }));
+    const f = fixture(); f.verifier.verify.mockImplementation(async (m, tx) => ({ ...await f.signed.verify(m, tx) }));
     expect((await f.app.completeLogin(await f.begin())).status).toBe('BLOCKED'); expect(f.atomic.acceptAssertionAndCreateGrant).not.toHaveBeenCalled();
   });
   it.each(['roles', 'permissions', 'email', 'subject', 'environment', 'expectedScriptId', 'applicationAudience', 'authorizationVersion'])(
     'rejects browser-controlled %s in begin/complete/session payloads', async field => {
       const f = fixture(); expect((await f.app.startLogin({ browserProofBinding: sha(rawProof), [field]: 'forged' })).status).toBe('BLOCKED');
       const request = await f.begin(); expect((await f.app.completeLogin({ ...request, [field]: 'forged' })).status).toBe('BLOCKED');
-      const { credential } = await f.login(); expect(f.app.authorize({ ...credential, [field]: 'forged' }, 'USER_MANAGE').status).toBe('DENIED');
+      const { credential } = await f.login(); expect((await f.app.authorize({ ...credential, [field]: 'forged' }, 'USER_MANAGE')).status).toBe('DENIED');
+    });
+});
+
+describe('async authoritative boundaries and blocked remote admission', () => {
+  it('detaches nested session data before awaiting fresh policy', async () => {
+    const f = fixture(), { credential } = await f.login(), resolver = new SessionResolver(f.ports);
+    let mutable: any;
+    vi.spyOn(f.ports.trustedSessions, 'read').mockImplementation(async proof => {
+      const stored = f.model.readTrustedSession(proof); mutable = { ...stored, signingKey: { ...stored.signingKey } }; return mutable;
+    });
+    vi.spyOn(f.ports, 'keyPolicy').mockImplementation(async () => {
+      await Promise.resolve(); mutable.signingKey.assertionId = 'e'.repeat(64); return f.policy();
+    });
+    const proof = await resolver.resolve(credential), session = await resolver.read(proof);
+    expect(session.signingKey.assertionId).not.toBe('e'.repeat(64));
+    expect(Object.isFrozen(session)).toBe(true); expect(Object.isFrozen(session.signingKey)).toBe(true);
+  });
+  it('awaits session lookup and revocation before deciding authorization', async () => {
+    const f = fixture(), { credential } = await f.login();
+    let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; });
+    f.sessionPort.readSession.mockImplementationOnce(async query => { await barrier; return f.model.readSession(query); });
+    let settled = false; const pending = f.app.authorize(credential, 'USER_MANAGE').then(result => { settled = true; return result; });
+    await Promise.resolve(); expect(settled).toBe(false);
+    const revocation = f.ports.sessions.revokeSession({ context: f.expected, credentialDigest: sha(credential.sessionCredential), expectedRevision: 0 });
+    expect(revocation).toBeInstanceOf(Promise); expect(await revocation).toBe('REVOKED'); release();
+    expect(await pending).toEqual({ status: 'DENIED' });
+  });
+  it('rechecks revocation in the async capability reader after lookup returned a genuine capability', async () => {
+    const f = fixture(), { credential } = await f.login();
+    let entered!: () => void, release!: () => void;
+    const waiting = new Promise<void>(resolve => { entered = resolve; }), barrier = new Promise<void>(resolve => { release = resolve; });
+    const read = vi.spyOn(f.ports.trustedSessions, 'read');
+    read.mockImplementationOnce(async proof => { entered(); await barrier; return f.model.readTrustedSession(proof); });
+    const pending = f.app.authorize(credential, 'USER_MANAGE'); await waiting;
+    await f.ports.sessions.revokeSession({ context: f.expected, credentialDigest: sha(credential.sessionCredential), expectedRevision: 0 });
+    release(); expect(await pending).toEqual({ status: 'DENIED' });
+  });
+  it.each(['inactive', 'version', 'key'] as const)('rechecks %s after asynchronous authoritative policy I/O', async change => {
+    const f = fixture(), { credential } = await f.login();
+    vi.spyOn(f.ports, 'keyPolicy').mockImplementationOnce(async () => {
+      await Promise.resolve();
+      if (change === 'inactive') f.setUser({ active: false });
+      if (change === 'version') f.setUser({ authorizationVersion: 4 });
+      if (change === 'key') f.setKey({ status: 'REVOKED', revokedAt: start });
+      return f.policy();
+    });
+    expect(await f.app.authorize(credential, 'USER_MANAGE')).toEqual({ status: 'DENIED' });
+  });
+  it('uses current permissions again after the final asynchronous session recheck', async () => {
+    const f = fixture(), { credential } = await f.login(); f.sessionPort.readSession.mockClear();
+    f.sessionPort.readSession.mockImplementation(async query => {
+      await Promise.resolve();
+      if (f.sessionPort.readSession.mock.calls.length === 3) f.setUser({ roles: ['MANAGER'] });
+      return f.model.readSession(query);
+    });
+    expect(await f.app.authorize(credential, 'USER_MANAGE')).toEqual({ status: 'DENIED' });
+  });
+  it('fails closed when the paired authoritative reader is unavailable', async () => {
+    const f = fixture(), { credential } = await f.login();
+    vi.spyOn(f.ports.trustedSessions, 'read').mockRejectedValue(Error('PRIVATE_READER_UNAVAILABLE'));
+    expect(await f.app.authorize(credential, 'USER_MANAGE')).toEqual({ status: 'DENIED' });
+  });
+  it.each(['session', 'reader', 'policy'] as const)('bounds a non-settling %s read without a synchronous cache fallback', async stage => {
+    const f = fixture(), { credential } = await f.login(); vi.useFakeTimers();
+    try {
+      if (stage === 'session') f.sessionPort.readSession.mockImplementation(() => new Promise(() => {}));
+      if (stage === 'reader') vi.spyOn(f.ports.trustedSessions, 'read').mockImplementation(() => new Promise(() => {}));
+      if (stage === 'policy') vi.spyOn(f.ports, 'keyPolicy').mockImplementation(() => new Promise(() => {}));
+      const pending = f.app.authorize(credential, 'USER_MANAGE');
+      await vi.advanceTimersByTimeAsync(5000); expect(await pending).toEqual({ status: 'DENIED' });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+  it('awaits authoritative receipt reads before creating a session', async () => {
+    const f = fixture(), request = await f.begin();
+    let entered!: () => void, release!: () => void;
+    const waiting = new Promise<void>(resolve => { entered = resolve; }), barrier = new Promise<void>(resolve => { release = resolve; });
+    f.receipts.read.mockImplementationOnce(async (proof, descriptor) => {
+      entered(); await barrier; return f.model.readOperationReceipt(proof, descriptor);
+    });
+    const pending = f.app.completeLogin(request); await waiting;
+    expect(f.atomic.consumeGrantAndCreateSession).not.toHaveBeenCalled();
+    expect(f.model.inspect()).toMatchObject({ consumedTransactions: 1, grants: 1, sessions: 0 });
+    release(); expect((await pending).status).toBe('AUTHENTICATED');
+  });
+  it.each(['session', 'reader', 'policy'] as const)('cannot reopen denied authorization after a late %s response', async stage => {
+    const f = fixture(), { credential } = await f.login(); vi.useFakeTimers();
+    try {
+      let release!: () => void;
+      if (stage === 'session') f.sessionPort.readSession.mockImplementationOnce(query => new Promise(resolve => {
+        release = () => resolve(f.model.readSession(query));
+      }));
+      if (stage === 'reader') vi.spyOn(f.ports.trustedSessions, 'read').mockImplementationOnce(proof => new Promise(resolve => {
+        release = () => resolve(f.model.readTrustedSession(proof));
+      }));
+      if (stage === 'policy') vi.spyOn(f.ports, 'keyPolicy').mockImplementationOnce(() => new Promise(resolve => {
+        release = () => resolve(f.policy());
+      }));
+      const decisions: string[] = [];
+      const pending = f.app.authorize(credential, 'USER_MANAGE').then(result => { decisions.push(result.status); return result; });
+      await vi.advanceTimersByTimeAsync(4999); expect(decisions).toEqual([]);
+      await vi.advanceTimersByTimeAsync(1); expect(await pending).toEqual({ status: 'DENIED' });
+      const reads = f.sessionPort.readSession.mock.calls.length, users = f.users.find.mock.calls.length;
+      release(); await vi.advanceTimersByTimeAsync(0);
+      expect(decisions).toEqual(['DENIED']); expect(f.sessionPort.readSession).toHaveBeenCalledTimes(reads);
+      expect(f.users.find).toHaveBeenCalledTimes(users); expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+  it('isolates concurrent authorizations when one credential is revoked during its pending read', async () => {
+    const f = fixture(), first = await f.login(), second = await f.login();
+    const digest = sha(first.credential.sessionCredential);
+    let entered!: () => void, release!: () => void;
+    const waiting = new Promise<void>(resolve => { entered = resolve; }), barrier = new Promise<void>(resolve => { release = resolve; });
+    f.sessionPort.readSession.mockImplementation(async query => {
+      if (query.credentialDigest === digest) { entered(); await barrier; }
+      return f.model.readSession(query);
+    });
+    const pending = f.app.authorize(first.credential, 'USER_MANAGE'); await waiting;
+    expect(await f.app.authorize(second.credential, 'USER_MANAGE')).toEqual({ status: 'AUTHORIZED' });
+    expect(await f.ports.sessions.revokeSession({ context: f.expected, credentialDigest: digest, expectedRevision: 0 })).toBe('REVOKED');
+    release(); expect(await pending).toEqual({ status: 'DENIED' });
+    expect(await f.app.authorize(second.credential, 'USER_MANAGE')).toEqual({ status: 'AUTHORIZED' });
+  });
+  it('does not resume session issuance when a committed receipt arrives after the read timeout', async () => {
+    const f = fixture(), request = await f.begin(); vi.useFakeTimers();
+    try {
+      let release!: () => void;
+      f.receipts.read.mockImplementationOnce((proof, descriptor) => new Promise(resolve => {
+        release = () => resolve(f.model.readOperationReceipt(proof, descriptor));
+      }));
+      const pending = f.app.completeLogin(request); await vi.advanceTimersByTimeAsync(5000);
+      expect(await pending).toEqual({ status: 'BLOCKED', code: 'ACCESS_DENIED' });
+      const committed = f.model.inspect(); expect(committed).toMatchObject({ grants: 1, sessions: 0 });
+      release(); await vi.advanceTimersByTimeAsync(0);
+      expect(f.model.inspect()).toEqual(committed); expect(f.atomic.acceptAssertionAndCreateGrant).toHaveBeenCalledTimes(1);
+      expect(f.atomic.consumeGrantAndCreateSession).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+  it('keeps late unknown-outcome recovery read-only without resuming login or treating timeout as rollback', async () => {
+    const f = fixture(), request = await f.begin(); f.model.failNext('AFTER_COMMIT'); vi.useFakeTimers();
+    try {
+      let release!: () => Promise<void>;
+      f.atomic.getOperationOutcome.mockImplementationOnce(descriptor => new Promise(resolve => {
+        release = async () => { resolve(await f.model.getOperationOutcome(descriptor)); };
+      }));
+      const pending = f.app.completeLogin(request); await vi.advanceTimersByTimeAsync(5000);
+      expect(await pending).toEqual({ status: 'BLOCKED', code: 'OUTCOME_UNKNOWN' });
+      const committed = f.model.inspect(); expect(committed).toMatchObject({ grants: 1, sessions: 0, receipts: 1 });
+      await release(); await vi.advanceTimersByTimeAsync(0); expect(f.model.inspect()).toEqual(committed);
+      const descriptor = [...f.saved.values()][0];
+      expect(await f.app.recoverOperation({ operationId: descriptor.operationId, commandDigest: descriptor.commandDigest }))
+        .toEqual({ status: 'RECOVERED', outcome: 'COMMITTED' });
+      expect(f.model.inspect()).toEqual(committed); expect(f.atomic.acceptAssertionAndCreateGrant).toHaveBeenCalledTimes(1);
+      expect(f.atomic.consumeGrantAndCreateSession).not.toHaveBeenCalled(); expect(f.saved.size).toBe(1);
+    } finally { vi.useRealTimers(); }
+  });
+  it('blocks a receipt read timeout without issuing another grant/session', async () => {
+    const f = fixture(), request = await f.begin(); vi.useFakeTimers();
+    try {
+      f.receipts.read.mockImplementation(() => new Promise(() => {}));
+      const pending = f.app.completeLogin(request); await vi.advanceTimersByTimeAsync(5000);
+      expect(await pending).toEqual({ status: 'BLOCKED', code: 'ACCESS_DENIED' });
+      expect(f.atomic.acceptAssertionAndCreateGrant).toHaveBeenCalledTimes(1);
+      expect(f.atomic.consumeGrantAndCreateSession).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+  it('keeps an unknown outcome after async lookup timeout without replacement mutation or credential', async () => {
+    const f = fixture(), request = await f.begin(); f.model.failNext('AFTER_COMMIT'); vi.useFakeTimers();
+    try {
+      f.atomic.getOperationOutcome.mockImplementation(() => new Promise(() => {}));
+      const pending = f.app.completeLogin(request); await vi.advanceTimersByTimeAsync(5000);
+      expect(await pending).toEqual({ status: 'BLOCKED', code: 'OUTCOME_UNKNOWN' });
+      expect(f.atomic.acceptAssertionAndCreateGrant).toHaveBeenCalledTimes(1); expect(f.atomic.consumeGrantAndCreateSession).not.toHaveBeenCalled();
+      expect(f.saved.size).toBe(1);
+    } finally { vi.useRealTimers(); }
+  });
+  it('blocks missing deadline configuration before any authentication I/O', async () => {
+    const f = fixture(), app = composeLocalAuthentication({ ...f.ports, readDeadline: undefined } as any);
+    expect(await app.startLogin({ browserProofBinding: sha(rawProof) })).toEqual({ status: 'BLOCKED', code: 'NOT_CONFIGURED' });
+    expect(await app.authorize({}, 'USER_MANAGE')).toEqual({ status: 'DENIED' }); expect(f.source).not.toHaveBeenCalled();
+  });
+  it.each([undefined, {}, { expiryAtCommit: true }, { verified: true, expiryAtCommit: 'STRICT', authoritativeClock: 'VERIFIED' },
+    JSON.parse('{"expiryAtCommit":"STRICT","authoritativeClock":"VERIFIED_ACROSS_WORKERS_AND_RESTART","restoration":"REVIEWED_STORE_OWNERSHIP","directoryConsistency":"EXPLICITLY_APPROVED"}'),
+    { expiryAtCommit: 'STRICT', authoritativeClock: undefined, clock: undefined },
+    { trustedSessions: undefined, expiryAtCommit: 'STRICT' },
+    { syntheticAdapter: { verify: () => true, read: async () => ({ verified: true }) }, supported: true }])(
+    'never opens the remote composition for an injected guarantee claim (%#)', async guarantees => {
+      const f = fixture(), app = composeRemoteDurableAuthentication({ ...f.ports,
+        ...(guarantees && typeof guarantees === 'object' ? guarantees : {}), guarantees });
+      expect(app.securityGate.status).toBe('BLOCKED');
+      expect(await app.startLogin({ browserProofBinding: sha(rawProof) })).toEqual({ status: 'BLOCKED', code: 'NOT_CONFIGURED' });
+      expect(await app.completeLogin({})).toEqual({ status: 'BLOCKED', code: 'NOT_CONFIGURED' });
+      expect(await app.recoverOperation({})).toEqual({ status: 'BLOCKED', code: 'NOT_CONFIGURED' });
+      expect(await app.authorize({}, 'USER_MANAGE')).toEqual({ status: 'DENIED' });
+      expect(f.atomic.acceptAssertionAndCreateGrant).not.toHaveBeenCalled(); expect(f.sessionPort.readSession).not.toHaveBeenCalled();
+      expect(f.source).not.toHaveBeenCalled(); expect(f.recovery.load).not.toHaveBeenCalled();
     });
 });
 
@@ -267,13 +469,13 @@ describe('immutable operations and receipt-only recovery', () => {
     const f = fixture(); f.setBackendOffset(offset);
     if (offset < 0) {
       const verify = f.verifier.verify.getMockImplementation()!;
-      f.verifier.verify.mockImplementation((message, tx) => { const result = verify(message, tx); f.setTime(start + 100); return result; });
+      f.verifier.verify.mockImplementation(async (message, tx) => { const result = await verify(message, tx); f.setTime(start + 100); return result; });
     } else {
       f.atomic.consumeGrantAndCreateSession.mockImplementation(async command => {
         const result = await f.model.consumeGrantAndCreateSession(command); f.setTime(start + 1500); return result;
       });
     }
-    const { credential } = await f.login(); expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('AUTHORIZED');
+    const { credential } = await f.login(); expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('AUTHORIZED');
     const accept = f.atomic.acceptAssertionAndCreateGrant.mock.calls[0][0], descriptor = f.saved.get(accept.operationId)!;
     const result = await f.model.getOperationOutcome(descriptor);
     if (result.status !== 'COMMITTED') throw Error('fixture');
@@ -398,26 +600,26 @@ function commandDigestSeal(command: ConsumeGrantCommand): void {
 describe('session resolution and PermissionService bridge', () => {
   it('checks own session expiry and explicit revocation', async () => {
     const f = fixture(), { credential, result } = await f.login();
-    f.setTime(result.expiresAt - 1); expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('AUTHORIZED');
-    f.setTime(result.expiresAt); expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('DENIED');
+    f.setTime(result.expiresAt - 1); expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('AUTHORIZED');
+    f.setTime(result.expiresAt); expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('DENIED');
     const revoked = fixture(), login = await revoked.login();
     expect(revoked.model.revokeSession({ context: revoked.expected, credentialDigest: sha(login.result.sessionCredential), expectedRevision: 0 })).toBe('REVOKED');
-    expect(revoked.app.authorize(login.credential, 'USER_MANAGE').status).toBe('DENIED');
+    expect((await revoked.app.authorize(login.credential, 'USER_MANAGE')).status).toBe('DENIED');
   });
   it.each(['inactive', 'version', 'roles'] as const)('uses current directory %s on every protected request', async field => {
     const f = fixture(), { credential } = await f.login();
     f.setUser(field === 'inactive' ? { active: false } : field === 'version' ? { authorizationVersion: 4 } : { roles: ['MANAGER'] });
-    expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('DENIED');
+    expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('DENIED');
   });
   it('keeps existing environment-aware permission rules without new roles or implicit grants', async () => {
     const f = fixture('PRODUCTION'); f.setUser({ roles: ['MANAGER'] }); const { credential } = await f.login();
-    expect(f.app.authorize(credential, 'REPORT_VIEW').status).toBe('AUTHORIZED'); expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('DENIED');
-    expect(f.app.authorize(credential, 'UNKNOWN_PERMISSION' as Permission).status).toBe('DENIED');
+    expect((await f.app.authorize(credential, 'REPORT_VIEW')).status).toBe('AUTHORIZED'); expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('DENIED');
+    expect((await f.app.authorize(credential, 'UNKNOWN_PERMISSION' as Permission)).status).toBe('DENIED');
   });
   it('rechecks authorizationVersion during PermissionService directory lookup', async () => {
     const f = fixture(), { credential } = await f.login(); f.users.find.mockClear();
     f.users.find.mockImplementation(() => { if (f.users.find.mock.calls.length === 3) f.setUser({ authorizationVersion: 4 }); return f.user(); });
-    expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('DENIED');
+    expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('DENIED');
   });
   it('blocks inactive or unknown users before any grant is accepted', async () => {
     const f = fixture(); f.setUser({ active: false }); expect((await f.app.completeLogin(await f.begin())).status).toBe('BLOCKED');
@@ -425,16 +627,16 @@ describe('session resolution and PermissionService bridge', () => {
   });
   it('rejects forged/cross-resolver runtime evidence and forged store capabilities', async () => {
     const f = fixture(), { credential } = await f.login(), resolver = new SessionResolver(f.ports), adapter = new SessionAuthorizationAdapter(resolver, f.ports);
-    const proof = resolver.resolve(credential); expect(() => adapter.require(proof, 'USER_MANAGE')).not.toThrow();
+    const proof = await resolver.resolve(credential); await expect(adapter.require(proof, 'USER_MANAGE')).resolves.toBeUndefined();
     for (const forged of [{ ...proof }, JSON.parse(JSON.stringify(proof)), Object.create(proof)])
-      expect(() => adapter.require(forged as any, 'USER_MANAGE')).toThrow();
-    const other = new SessionResolver(f.ports); expect(() => new SessionAuthorizationAdapter(other, f.ports).require(proof, 'USER_MANAGE')).toThrow();
+      await expect(adapter.require(forged as any, 'USER_MANAGE')).rejects.toThrow();
+    const other = new SessionResolver(f.ports); await expect(new SessionAuthorizationAdapter(other, f.ports).require(proof, 'USER_MANAGE')).rejects.toThrow();
     const original = f.model.readSession({ context: f.expected, credentialDigest: sha(credential.sessionCredential) });
     if (original.status !== 'FOUND') throw Error('fixture');
-    f.sessionPort.readSession.mockReturnValue({ status: 'FOUND', session: JSON.parse(JSON.stringify(original.session)) });
-    expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('DENIED');
+    f.sessionPort.readSession.mockResolvedValue({ status: 'FOUND', session: JSON.parse(JSON.stringify(original.session)) });
+    expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('DENIED');
   });
-  it('documents the trusted-DI limit: a lying server reader is not authenticated by its interface', () => {
+  it('documents the trusted-DI limit: a lying server reader is not authenticated by its interface', async () => {
     const f = fixture(), credential = 'e'.repeat(64);
     const invented = Object.freeze({ ...f.expected, identityIssuer: 'https://accounts.google.com' as const,
       identitySubject: f.user().subject, authenticatedAt: start - 1000, authenticationExpiresAt: start + 1_000_000,
@@ -445,49 +647,49 @@ describe('session resolution and PermissionService bridge', () => {
     // Deliberately malicious SERVER injection, never a browser input or a runtime adapter shipped
     // by this slice. These ports lie about storage ownership; schema/readonly types cannot detect it.
     const lyingPorts: LocalAuthenticationPorts = { ...f.ports,
-      sessions: { ...f.ports.sessions, readSession: () => ({ status: 'FOUND', session: { record: invented } as any }) },
-      trustedSessions: { read: () => invented } };
-    expect(composeLocalAuthentication(lyingPorts).authorize({ sessionCredential: credential }, 'USER_MANAGE').status).toBe('AUTHORIZED');
+      sessions: { ...f.ports.sessions, readSession: async () => ({ status: 'FOUND', session: { record: invented } as any }) },
+      trustedSessions: { read: async () => invented } };
+    expect((await composeLocalAuthentication(lyingPorts).authorize({ sessionCredential: credential }, 'USER_MANAGE')).status).toBe('AUTHORIZED');
     expect(f.model.inspect().sessions).toBe(0);
     // This is a documented trust assumption, NOT a claimed rejection or proof of durable provenance.
   });
   it('cannot combine TEST resolver evidence with PRODUCTION permission context', async () => {
     const f = fixture('TEST'), production = fixture('PRODUCTION'), { credential } = await f.login();
-    const resolver = new SessionResolver(f.ports), proof = resolver.resolve(credential);
-    expect(() => new SessionAuthorizationAdapter(resolver, production.ports).require(proof, 'USER_MANAGE')).toThrow();
+    const resolver = new SessionResolver(f.ports), proof = await resolver.resolve(credential);
+    await expect(new SessionAuthorizationAdapter(resolver, production.ports).require(proof, 'USER_MANAGE')).rejects.toThrow();
   });
   it('rejects invalid credential/digest adapters and current runtime context changes', async () => {
     const f = fixture(), { credential } = await f.login();
     const identityDigest = composeLocalAuthentication({ ...f.ports, digest: { digest: s => s } });
-    expect(identityDigest.authorize(credential, 'USER_MANAGE').status).toBe('DENIED');
+    expect((await identityDigest.authorize(credential, 'USER_MANAGE')).status).toBe('DENIED');
     f.setContext({ ...f.expected, expectedScriptId: 'synthetic-other-script-0000000001' });
-    expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('DENIED');
+    expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('DENIED');
     const bad = fixture(), app = composeLocalAuthentication({ ...bad.ports, secrets: { secret: () => 'not-a-secret' } });
     expect((await app.startLogin({ browserProofBinding: sha(rawProof) })).status).toBe('BLOCKED');
     expect(bad.model.inspect().transactions).toBe(0);
   });
   it('denies pre-existing sessions with no configured signature adapter but tolerates live verifier outage for session use', async () => {
     const f = fixture(), { credential } = await f.login();
-    const unconfigured = composeLocalAuthentication({ ...f.ports, verifier: new SignedAssertionVerificationService(f.trust, f.policy) });
-    expect(unconfigured.authorize(credential, 'USER_MANAGE').status).toBe('DENIED');
+    const unconfigured = composeLocalAuthentication({ ...f.ports, verifier: new SignedAssertionVerificationService(f.trust, async () => f.policy()) });
+    expect((await unconfigured.authorize(credential, 'USER_MANAGE')).status).toBe('DENIED');
     f.syntheticSignature.verify.mockImplementation(() => { throw Error('PRIVATE_VERIFIER_UNAVAILABLE'); });
-    expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('AUTHORIZED');
+    expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('AUTHORIZED');
     expect((await f.app.completeLogin(await f.begin())).status).toBe('BLOCKED');
   });
   it('preserves planned key rotation but blocks key compromise and revocation', async () => {
     const f = fixture(), { credential } = await f.login();
     f.setKey({ signingNotAfter: start + 999, verificationNotAfter: start + 1000, status: 'RETIRED' }); f.setTime(start + 2000);
-    expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('AUTHORIZED');
-    f.setKey({ compromised: true }); expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('DENIED');
+    expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('AUTHORIZED');
+    f.setKey({ compromised: true }); expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('DENIED');
     const r = fixture(), login = await r.login(); r.setKey({ revokedAt: start, status: 'REVOKED' });
-    expect(r.app.authorize(login.credential, 'USER_MANAGE').status).toBe('DENIED');
+    expect((await r.app.authorize(login.credential, 'USER_MANAGE')).status).toBe('DENIED');
   });
   it('blocks compromised key before login and unknown credentials without owner identity fallback', async () => {
     const f = fixture(); f.setKey({ compromised: true }); expect((await f.app.completeLogin(await f.begin())).status).toBe('BLOCKED');
-    expect(f.app.authorize({ sessionCredential: '0'.repeat(64) }, 'USER_MANAGE').status).toBe('DENIED');
+    expect((await f.app.authorize({ sessionCredential: '0'.repeat(64) }, 'USER_MANAGE')).status).toBe('DENIED');
   });
   it('rejects expired upstream proof independently of assertion and session policy TTL', async () => {
     const f = fixture(); f.setClaims({ authenticationExpiresAt: start + 60_000 }); const { result, credential } = await f.login();
-    expect(result.expiresAt).toBe(start + 60_000); f.setTime(start + 60_000); expect(f.app.authorize(credential, 'USER_MANAGE').status).toBe('DENIED');
+    expect(result.expiresAt).toBe(start + 60_000); f.setTime(start + 60_000); expect((await f.app.authorize(credential, 'USER_MANAGE')).status).toBe('DENIED');
   });
 });
