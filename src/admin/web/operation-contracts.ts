@@ -90,3 +90,85 @@ export interface RecoveryCoordinatorPort {
   save(descriptor: Readonly<RecoveryDescriptor>): Promise<void>;
   load(query: Readonly<ChannelExpectation> & { readonly operationId: string; readonly commandDigest: string }): Promise<Readonly<RecoveryDescriptor> | undefined>;
 }
+
+/** DATA ONLY. These pairs describe proposed semantics, never an approved runtime policy.
+ * No approval verifier/factory, admission evidence, clock or activation path is supplied. */
+export type TemporalAdmissionPolicy =
+  Readonly<{ operation: 'ACCEPT_ASSERTION'; mode: 'STRICT_COMMIT_TIME' }> |
+  Readonly<{ operation: 'ISSUE_SESSION'; mode: 'STRICT_COMMIT_TIME' }> |
+  Readonly<{ operation: 'ISSUE_SESSION'; mode: 'STRICT_BACKEND_ADMISSION' }>;
+export const TEMPORAL_METADATA_PROFILE = 'KUB_ADMIN_TEMPORAL_METADATA_V1' as const;
+export interface TemporalPolicyBinding {
+  readonly profile: typeof TEMPORAL_METADATA_PROFILE;
+  /** Temporal metadata schema version, NOT Wire v1 or evidence of policy approval. */
+  readonly version: 1;
+  readonly policy: TemporalAdmissionPolicy;
+  /** Claimed immutable reference only; parsing does not verify approval existence/validity. */
+  readonly approvalId: string;
+  readonly approvalRevision: number;
+}
+/** Detached sidecar DATA, not an OperationDescriptor/Wire body or a trusted capability.
+ * Durable ownership, save-before-dispatch and restoration remain unimplemented obligations. */
+export interface TemporalMetadataDescriptor {
+  readonly recovery: Readonly<RecoveryDescriptor>;
+  readonly binding: Readonly<TemporalPolicyBinding>;
+}
+export type TemporalContractValidation<T> =
+  Readonly<{ status: 'VALID_DATA'; value: Readonly<T> }> |
+  Readonly<{ status: 'INVALID_DATA'; reason: 'INVALID_INPUT' | 'BINDING_MISMATCH' }>;
+
+function temporalPolicyData(value: unknown): TemporalAdmissionPolicy {
+  const v = object(value, ['operation', 'mode']);
+  if (v.operation === 'ACCEPT_ASSERTION' && v.mode === 'STRICT_COMMIT_TIME')
+    return Object.freeze({ operation: 'ACCEPT_ASSERTION', mode: 'STRICT_COMMIT_TIME' });
+  if (v.operation === 'ISSUE_SESSION' && v.mode === 'STRICT_COMMIT_TIME')
+    return Object.freeze({ operation: 'ISSUE_SESSION', mode: 'STRICT_COMMIT_TIME' });
+  if (v.operation === 'ISSUE_SESSION' && v.mode === 'STRICT_BACKEND_ADMISSION')
+    return Object.freeze({ operation: 'ISSUE_SESSION', mode: 'STRICT_BACKEND_ADMISSION' });
+  return invalid();
+}
+function temporalBindingData(value: unknown): Readonly<TemporalPolicyBinding> {
+  const v = object(value, ['profile', 'version', 'policy', 'approvalId', 'approvalRevision']);
+  if (v.profile !== TEMPORAL_METADATA_PROFILE || v.version !== 1) return invalid();
+  return Object.freeze({ profile: TEMPORAL_METADATA_PROFILE, version: 1, policy: temporalPolicyData(v.policy),
+    approvalId: hex(v.approvalId), approvalRevision: revision(v.approvalRevision) });
+}
+const invalidTemporalData = (reason: 'INVALID_INPUT' | 'BINDING_MISMATCH' = 'INVALID_INPUT') =>
+  Object.freeze({ status: 'INVALID_DATA' as const, reason });
+/** Exact structural validation only. Browser JSON can be valid data, never approval evidence. */
+export function validateTemporalAdmissionPolicy(value: unknown): TemporalContractValidation<TemporalAdmissionPolicy> {
+  try { return Object.freeze({ status: 'VALID_DATA', value: temporalPolicyData(value) }); }
+  catch { return invalidTemporalData(); }
+}
+export function validateTemporalPolicyBinding(value: unknown): TemporalContractValidation<TemporalPolicyBinding> {
+  try { return Object.freeze({ status: 'VALID_DATA', value: temporalBindingData(value) }); }
+  catch { return invalidTemporalData(); }
+}
+const temporalRecoveryKeys = Object.freeze(['protocolVersion', 'backendOrigin', 'environment', 'applicationAudience',
+  'expectedScriptId', 'operationKind', 'operationId', 'commandDigest', 'commandCreatedAt', 'originalBodyDigest',
+  'expectedRevision', 'expectedObjectId'] as const);
+function temporalDataSnapshot(value: unknown) {
+  const v = object(value, ['recovery', 'binding']);
+  return Object.freeze({ recovery: Object.freeze({ ...object(v.recovery, temporalRecoveryKeys) }),
+    binding: temporalBindingData(v.binding) });
+}
+/** Compare with independent server-owned original metadata and pinned target, never candidate-echo
+ * browser expectations. Even VALID_DATA authenticates neither that owner nor its claimed approval.
+ * Recovery requires the original binding: missing/changed policy never gets a current default.
+ * All inputs are detached before the digest port runs. No state, I/O or Wire v1 mutation occurs. */
+export function validateTemporalMetadataDescriptor(value: unknown, expectedValue: unknown,
+  targetValue: ChannelExpectation, digest: BodyDigestPort): TemporalContractValidation<TemporalMetadataDescriptor> {
+  try {
+    const candidate = temporalDataSnapshot(value), expected = temporalDataSnapshot(expectedValue), target = expectation(targetValue);
+    const recovery = inspectRecoveryDescriptor(candidate.recovery, target, digest);
+    const original = inspectRecoveryDescriptor(expected.recovery, target, digest);
+    const binding = candidate.binding, pinned = expected.binding;
+    if (temporalRecoveryKeys.some(field => recovery[field] !== original[field]) ||
+      binding.policy.operation !== recovery.operationKind || pinned.policy.operation !== original.operationKind ||
+      binding.profile !== pinned.profile || binding.version !== pinned.version ||
+      binding.policy.operation !== pinned.policy.operation || binding.policy.mode !== pinned.policy.mode ||
+      binding.approvalId !== pinned.approvalId || binding.approvalRevision !== pinned.approvalRevision)
+      return invalidTemporalData('BINDING_MISMATCH');
+    return Object.freeze({ status: 'VALID_DATA', value: Object.freeze({ recovery, binding }) });
+  } catch { return invalidTemporalData(); }
+}

@@ -5,6 +5,14 @@ import { operationDescriptor, encodeBusinessBody, canonicalSemanticBytes, recove
 import { canonicalCommandBytes, canonicalRequestBytes } from './channel-contracts/validation';
 import { utf8 } from './channel-contracts/encoding';
 import type { RequestHeader } from './channel-contracts/contracts';
+import { TEMPORAL_METADATA_PROFILE, validateTemporalAdmissionPolicy, validateTemporalPolicyBinding,
+  validateTemporalMetadataDescriptor, type TemporalAdmissionPolicy, type TemporalMetadataDescriptor,
+  type TemporalContractValidation } from './operation-contracts';
+import { durableAdmissionGate, requireDurableAdmissionGuarantees,
+  type VerifiedDurableGuarantees } from './identity-contracts/durable-store-contracts';
+import { composeRemoteDurableAuthentication } from './authentication/composition';
+import { readSignedAssertion } from './identity-contracts/signed-assertion-profile';
+import { readTrustedLoginGrant } from './identity-contracts/verification';
 
 // Test-only SHA-256. No HMAC, network or runtime digest adapter.
 const digest = { digest: (bytes: readonly number[]) => createHash('sha256').update(Buffer.from(bytes)).digest('hex') };
@@ -116,5 +124,190 @@ describe('shared semantic command profile', () => {
     for (const value of [-1, 1.5, NaN, Number.MAX_SAFE_INTEGER + 1])
       expect(() => encodeBusinessBody('ISSUE_SESSION', { ...body, expectedRevision: value })).toThrow();
     expect(() => encodeBusinessBody('ACCEPT_ASSERTION', { expectedRevision: 0, assertion: 'a'.repeat(8193) })).toThrow();
+  });
+});
+
+const temporalPolicies: readonly TemporalAdmissionPolicy[] = [
+  { operation: 'ACCEPT_ASSERTION', mode: 'STRICT_COMMIT_TIME' },
+  { operation: 'ISSUE_SESSION', mode: 'STRICT_COMMIT_TIME' },
+  { operation: 'ISSUE_SESSION', mode: 'STRICT_BACKEND_ADMISSION' },
+];
+function temporalFixture(policy: TemporalAdmissionPolicy = temporalPolicies[1]): TemporalMetadataDescriptor {
+  // SYNTHETIC data only, including approvalId. This fixture approves/activates nothing.
+  const op = operationDescriptor({ ...metadata, operationKind: policy.operation }, policy.operation === 'ACCEPT_ASSERTION' ?
+    { expectedRevision: 0, assertion: 'e30.e30.AA' } : body, digest);
+  return { recovery: { ...recoveryDescriptor(op, 0, policy.operation === 'ISSUE_SESSION' ? body.credentialDigest : id('b')) },
+    binding: { profile: TEMPORAL_METADATA_PROFILE, version: 1, policy: { ...policy }, approvalId: id('f'), approvalRevision: 3 } };
+}
+function temporalValue<T>(result: TemporalContractValidation<T>): Readonly<T> {
+  if (result.status !== 'VALID_DATA') throw Error('fixture expected valid data'); return result.value;
+}
+const checkTemporal = (value: unknown, pinned: unknown) => validateTemporalMetadataDescriptor(value, pinned, target, digest);
+const invalidTemporal = { status: 'INVALID_DATA', reason: 'INVALID_INPUT' };
+
+describe('operation-scoped temporal metadata (data only, no runtime approval)', () => {
+  it.each(temporalPolicies)('validates the allowed pair $operation / $mode as data only', policy => {
+    const candidate = temporalFixture(policy), pinned = temporalFixture(policy);
+    expect(validateTemporalAdmissionPolicy(policy)).toEqual({ status: 'VALID_DATA', value: policy });
+    expect(validateTemporalPolicyBinding(candidate.binding)).toEqual({ status: 'VALID_DATA', value: candidate.binding });
+    expect(checkTemporal(candidate, pinned)).toEqual({ status: 'VALID_DATA', value: candidate });
+  });
+  it('rejects ACCEPT_ASSERTION + B at both the type and runtime boundaries', () => {
+    const forbidden = { operation: 'ACCEPT_ASSERTION', mode: 'STRICT_BACKEND_ADMISSION' } as const;
+    // @ts-expect-error The closed union forbids this operation/policy pair.
+    const invalidPolicy: TemporalAdmissionPolicy = forbidden;
+    expect(validateTemporalAdmissionPolicy(invalidPolicy)).toEqual(invalidTemporal);
+    const candidate = temporalFixture();
+    expect(checkTemporal({ ...candidate, binding: { ...candidate.binding, policy: forbidden } }, candidate)).toEqual(invalidTemporal);
+  });
+  it.each([null, undefined, [], {}, { operation: 'UNKNOWN', mode: 'STRICT_COMMIT_TIME' },
+    { operation: 'ISSUE_SESSION', mode: 'UNKNOWN' }, { operation: 'ISSUE_SESSION' },
+    { operation: 'ISSUE_SESSION', mode: true }, { operation: 'ISSUE_SESSION', mode: 'strict_commit_time' },
+    { operation: 'ISSUE_SESSION', mode: 'STRICT_COMMIT_TIME', approved: true }])('fails closed for invalid policy (%#)', value => {
+      expect(validateTemporalAdmissionPolicy(value)).toEqual(invalidTemporal);
+    });
+  it.each([undefined, null, 0, 2, '1', 1.5, NaN, Infinity])('rejects unknown/malformed temporal version %s', version => {
+    const pinned = temporalFixture(), candidate = { ...pinned, binding: { ...pinned.binding, version } };
+    expect(validateTemporalPolicyBinding(candidate.binding)).toEqual(invalidTemporal);
+    expect(checkTemporal(candidate, pinned)).toEqual(invalidTemporal);
+  });
+  it.each(['UNKNOWN', 'KUB_ADMIN_CHANNEL_COMMAND_V1', 'KUB_ADMIN_TEMPORAL_METADATA_V2', ''])('rejects unknown profile %s', profile => {
+    const pinned = temporalFixture();
+    expect(checkTemporal({ ...pinned, binding: { ...pinned.binding, profile } }, pinned)).toEqual(invalidTemporal);
+  });
+  it.each(['descriptor', 'recovery', 'binding', 'policy'])('rejects extra authority fields on %s', level => {
+    const candidate: any = temporalFixture(), pinned = temporalFixture();
+    const nested = level === 'descriptor' ? candidate : level === 'recovery' ? candidate.recovery :
+      level === 'binding' ? candidate.binding : candidate.binding.policy;
+    nested.approved = true;
+    expect(checkTemporal(candidate, pinned)).toEqual(invalidTemporal);
+  });
+  it.each(['binding', 'policy', 'profile', 'version', 'approvalId', 'approvalRevision'])('rejects missing immutable %s', field => {
+    const candidate: any = temporalFixture(), pinned = temporalFixture();
+    if (field === 'binding') delete candidate.binding; else delete candidate.binding[field];
+    expect(checkTemporal(candidate, pinned)).toEqual(invalidTemporal);
+  });
+  it.each(['policy', 'approvalId', 'approvalRevision'])('rejects a changed pinned %s in either direction', field => {
+    const candidate: any = temporalFixture(), pinned = temporalFixture();
+    if (field === 'policy') candidate.binding.policy.mode = 'STRICT_BACKEND_ADMISSION';
+    else if (field === 'approvalId') candidate.binding.approvalId = id('e');
+    else candidate.binding.approvalRevision++;
+    const rejected = { status: 'INVALID_DATA', reason: 'BINDING_MISMATCH' };
+    expect(checkTemporal(candidate, pinned)).toEqual(rejected);
+    expect(checkTemporal(pinned, candidate)).toEqual(rejected);
+  });
+  it('binds the policy operation to the recovered operation even with matching supplied DTOs', () => {
+    const candidate: any = temporalFixture(); candidate.binding.policy = { ...temporalPolicies[0] };
+    expect(checkTemporal(candidate, JSON.parse(JSON.stringify(candidate))))
+      .toEqual({ status: 'INVALID_DATA', reason: 'BINDING_MISMATCH' });
+  });
+  it.each(['environment', 'applicationAudience', 'expectedScriptId', 'backendOrigin', 'operationId', 'commandCreatedAt'] as const)(
+    'rejects a different valid operation/context (%s)', field => {
+      const pinned = temporalFixture(), changed = { environment: 'PRODUCTION', applicationAudience: 'kub:other',
+        expectedScriptId: 'synthetic-other-script-000000000001', backendOrigin: 'https://auth-other.example.com',
+        operationId: id('9'), commandCreatedAt: now + 1 };
+      const op = operationDescriptor({ ...metadata, [field]: changed[field] } as SemanticMetadata, body, digest);
+      const candidate = { ...pinned, recovery: recoveryDescriptor(op, 0, body.credentialDigest) };
+      expect(checkTemporal(candidate, pinned).status).toBe('INVALID_DATA');
+    });
+  it.each(['expectedRevision', 'expectedObjectId'] as const)('compares independent recovery %s not covered by metadata framing', field => {
+    const candidate = temporalFixture(), pinned = temporalFixture();
+    const recovery = { ...candidate.recovery, [field]: field === 'expectedRevision' ? 1 : id('e') };
+    expect(checkTemporal({ ...candidate, recovery }, pinned)).toEqual({ status: 'INVALID_DATA', reason: 'BINDING_MISMATCH' });
+  });
+  it.each(['operationId', 'commandDigest', 'originalBodyDigest', 'expectedObjectId'])('rejects malformed recovery %s', field => {
+    const pinned = temporalFixture(), candidate = { ...pinned, recovery: { ...pinned.recovery, [field]: 'malformed-id' } };
+    expect(checkTemporal(candidate, pinned)).toEqual(invalidTemporal);
+  });
+  it.each([undefined, '', 'F'.repeat(64), 'f'.repeat(63), 'f'.repeat(65), 123])('rejects malformed approval ID (%#)', approvalId => {
+    const pinned = temporalFixture();
+    expect(checkTemporal({ ...pinned, binding: { ...pinned.binding, approvalId } }, pinned)).toEqual(invalidTemporal);
+  });
+  it.each([-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, '3'])('rejects malformed approval revision %s', approvalRevision => {
+    const pinned = temporalFixture();
+    expect(checkTemporal({ ...pinned, binding: { ...pinned.binding, approvalRevision } }, pinned)).toEqual(invalidTemporal);
+  });
+  it.each(['body', 'assertion', 'sessionCredential', 'browserProof', 'roles', 'permissions', 'enablePolicyB'])(
+    'rejects browser-forged/sensitive metadata field %s', field => {
+      const pinned = temporalFixture();
+      expect(checkTemporal({ ...pinned, [field]: 'browser-supplied' }, pinned)).toEqual(invalidTemporal);
+    });
+  it('rejects getters, hidden/symbol fields and inherited-only binding instead of reading them as approval', () => {
+    const pinned = temporalFixture(); let reads = 0;
+    const getter = { ...pinned.binding, get approvalId() { reads++; return id('f'); } };
+    expect(checkTemporal({ ...pinned, binding: getter }, pinned)).toEqual(invalidTemporal); expect(reads).toBe(0);
+    const hidden = Object.defineProperty({ ...pinned.binding }, 'trusted', { value: true });
+    expect(checkTemporal({ ...pinned, binding: hidden }, pinned)).toEqual(invalidTemporal);
+    expect(checkTemporal({ ...pinned, binding: { ...pinned.binding, [Symbol('proof')]: true } }, pinned)).toEqual(invalidTemporal);
+    expect(checkTemporal(Object.create(pinned), pinned)).toEqual(invalidTemporal);
+  });
+  it('detaches and deeply freezes results without retaining mutable policy/recovery input', () => {
+    const candidate: any = temporalFixture(), pinned: any = temporalFixture();
+    const result = checkTemporal(candidate, pinned), value = temporalValue(result), before = JSON.stringify(value);
+    for (const object of [result, value, value.binding, value.binding.policy, value.recovery]) expect(Object.isFrozen(object)).toBe(true);
+    candidate.binding.policy.mode = 'STRICT_BACKEND_ADMISSION'; candidate.recovery.expectedObjectId = id('e');
+    pinned.binding.approvalId = id('e');
+    expect(JSON.stringify(value)).toBe(before);
+    expect(Reflect.set(value.binding.policy, 'mode', 'STRICT_BACKEND_ADMISSION')).toBe(false);
+    expect(Reflect.set(value.binding, 'approvalId', id('e'))).toBe(false);
+  });
+  it('snapshots both original expectations and target before a digest callback can mutate them', () => {
+    const candidate: any = temporalFixture(), pinned: any = temporalFixture(), mutableTarget = { ...target };
+    const changingDigest = { digest(bytes: readonly number[]) {
+      candidate.binding.policy.mode = 'STRICT_BACKEND_ADMISSION'; pinned.binding.approvalId = id('e');
+      mutableTarget.environment = 'PRODUCTION'; return digest.digest(bytes);
+    } };
+    const value = temporalValue(validateTemporalMetadataDescriptor(candidate, pinned, mutableTarget, changingDigest));
+    expect(value.binding.policy.mode).toBe('STRICT_COMMIT_TIME'); expect(value.binding.approvalId).toBe(id('f'));
+  });
+  it('cannot hide an original approval mismatch by mutating expectations during hashing', () => {
+    const candidate: any = temporalFixture(), pinned: any = temporalFixture(); candidate.binding.approvalId = id('e');
+    const changingDigest = { digest(bytes: readonly number[]) { pinned.binding.approvalId = id('e'); return digest.digest(bytes); } };
+    expect(validateTemporalMetadataDescriptor(candidate, pinned, target, changingDigest))
+      .toEqual({ status: 'INVALID_DATA', reason: 'BINDING_MISMATCH' });
+  });
+  it('returns a fixed fail-closed result for a throwing dependency or invalid target', () => {
+    const candidate = temporalFixture(), pinned = temporalFixture();
+    expect(validateTemporalMetadataDescriptor(candidate, pinned, target, { digest: () => { throw Error('PRIVATE_ADAPTER_ERROR'); } }))
+      .toEqual(invalidTemporal);
+    expect(validateTemporalMetadataDescriptor(candidate, pinned, { ...target, approved: true } as any, digest)).toEqual(invalidTemporal);
+    expect(Object.isFrozen(checkTemporal(null, pinned))).toBe(true);
+  });
+  it('never assigns a current default policy to missing, changed or unreadable recovery metadata', () => {
+    const pinned = temporalFixture(temporalPolicies[2]);
+    for (const candidate of [pinned.recovery, { recovery: pinned.recovery }, null, undefined])
+      expect(checkTemporal(candidate, pinned)).toEqual(invalidTemporal);
+    expect(checkTemporal(pinned, undefined)).toEqual(invalidTemporal);
+    expect(checkTemporal(pinned, { recovery: pinned.recovery })).toEqual(invalidTemporal);
+    expect(checkTemporal(temporalFixture(), pinned)).toEqual({ status: 'INVALID_DATA', reason: 'BINDING_MISMATCH' });
+  });
+  it('keeps temporal sidecars out of Wire v1 command bytes, IDs, digests and legacy recovery schema', () => {
+    const op = operationDescriptor(metadata, body, digest), before = JSON.stringify(op);
+    const originalBytes = canonicalCommandBytes(header(), op.originalBodyDigest), r = recoveryDescriptor(op, 0, body.credentialDigest);
+    for (const policy of temporalPolicies.filter(p => p.operation === 'ISSUE_SESSION')) {
+      const candidate = temporalFixture(policy); expect(checkTemporal(candidate, temporalFixture(policy)).status).toBe('VALID_DATA');
+      expect(operationDescriptor(metadata, body, digest)).toEqual(op);
+      expect(canonicalCommandBytes(header(), op.originalBodyDigest)).toEqual(originalBytes);
+      expect(() => encodeBusinessBody('ISSUE_SESSION', { ...body, temporal: candidate })).toThrow();
+      expect(() => inspectRecoveryDescriptor({ ...r, binding: candidate.binding }, target, digest)).toThrow();
+    }
+    expect(JSON.stringify(op)).toBe(before);
+    expect(checkTemporal({ recovery: op, binding: temporalFixture().binding }, temporalFixture())).toEqual(invalidTemporal);
+  });
+  it('accepts JSON only as data: fabricated positive DTOs/casts never become production trust or activation', async () => {
+    const pinned = temporalFixture(temporalPolicies[2]), json = JSON.parse(JSON.stringify(pinned));
+    const result = checkTemporal(json, pinned), value = temporalValue(result);
+    // @ts-expect-error Validated metadata has no durable-guarantee provenance brand.
+    const notEvidence: VerifiedDurableGuarantees = value;
+    for (const fake of [value, result, notEvidence, json, { ...json, approved: true }, json as unknown as VerifiedDurableGuarantees]) {
+      expect(() => requireDurableAdmissionGuarantees(fake)).toThrow('DURABLE_ADMISSION_BLOCKED');
+      expect(durableAdmissionGate(fake).status).toBe('BLOCKED');
+      expect(() => readSignedAssertion(fake, metadata)).toThrow();
+      expect(() => readTrustedLoginGrant(fake, metadata, now)).toThrow();
+      const remote = composeRemoteDurableAuthentication(fake);
+      expect(await remote.startLogin({ temporal: fake })).toEqual({ status: 'BLOCKED', code: 'NOT_CONFIGURED' });
+      expect(await remote.authorize({ temporal: fake }, 'USER_MANAGE')).toEqual({ status: 'DENIED' });
+    }
+    expect(result).not.toHaveProperty('authorized'); expect(value).not.toHaveProperty('sessionCredential');
   });
 });
