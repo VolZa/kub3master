@@ -9,12 +9,23 @@
 runtime enforcement, реалізацію адаптера, runtime integration або production activation.
 До окремих approvals та Acceptance Review чинні контракти й guards не змінюються.
 
+**[DOCUMENTED]** Amendment Slice 2C.3B.10a (2026-10-29): owner-selected модель B —
+**First Durably Admitted Operation**. Погоджено нормативний напрямок durable-first,
+`t0 = L_j` першої valid durable transition, fail-closed recovery та умовну
+допустимість inert historical records. Нижче сформульовано запропонований amendment;
+ADR залишається PROPOSED. Backend implementation не доведена, Gate B —
+**BLOCKED BY MISSING DECISION**, Gate C–E не відкриті. Це рішення не завершує Gate B.
+
 **[DOCUMENTED]** Baseline: `feature/bom-logic`,
 `d6256e4f56d14650a51e124813066309ef5691f1`, clean working tree, empty staging
 до створення цих двох документів. ADR-000–ADR-048 утворюють наявну послідовність;
 ADR-049 є наступним вільним номером. Використано чинний каталог `docs/adr`,
 нумерацію `ADR-NNN`, title/status/context/decision/consequences та Markdown-розділи
 за зразком останніх ADR. Застарілі індекси README не перенумеровуються цим slice.
+
+**[DOCUMENTED]** Baseline цього amendment: `feature/bom-logic`, HEAD
+`930c19fc558f41de0cbab3c6474427955dc87f43`, clean working tree, empty staging.
+Попередній baseline вище є історією створення документів.
 
 **[DOCUMENTED]** PRODUCTION — NO-GO. ADMIN deployment — NO-GO.
 TEST_RESET execution — NO-GO. Remote durable admission — BLOCKED.
@@ -84,7 +95,9 @@ expiry grace або доказом `STRICT_COMMIT_TIME`; authoritative-read time
 | Remote durable admission | `BLOCKED` | Залишається BLOCKED |
 
 **[DESIGN ASSUMPTION]** Policy B розділяє законність створення session і законність
-її використання. Вона може дозволяти лише завершення незмінної, законно допущеної
+її використання. У цьому amendment модель B уточнює first admission як першу
+законну authoritative durable admission transition. Вона може дозволяти лише
+завершення незмінної, законно допущеної
 `ISSUE_SESSION` operation після grant expiry. Вона не дозволяє новий admission
 expired grant, не вводить grace та не поширюється на `ACCEPT_ASSERTION` або ERP
 business mutations. Наявність чинного `Es` не легалізує issuance, яке порушило
@@ -96,44 +109,55 @@ business mutations. Наявність чинного `Es` не легалізу
 
 | Символ | Визначення |
 | --- | --- |
-| `a_i` | Фінальна authoritative backend admission boundary конкретної transaction attempt `i` |
-| `a` | `a_k` останньої attempt `k`, яка потім успішно завершилася commit |
+| `d_i` | Доведений linearization point законної authoritative durable admission transition attempt `i` |
+| `d` | `d_k` attempt `k`, яка потім успішно завершила business commit |
+| `j` | Attempt першої valid durable transition у linearizable order для original `O` |
 | `c` | Actual database commit time; може бути недоступним для точного спостереження |
 | `Eg` | Незмінний expiry саме grant, який споживає `O` |
 | `Es` | Незмінний expiry створеної session |
 | `C` | Effective upstream authentication cap із перевіреного lineage; не збільшується renewal |
-| `[L_i, U_i]` | Trusted time interval, який обмежує час boundary `a_i`, а не старого request |
-| `t0` | Незмінний conservative lifetime anchor першого валідного admission `O` |
+| `[L_i, U_i]` | Trusted interval, що доведено охоплює саме `d_i` |
+| `t0` | `L_j`, single-assignment conservative lifetime anchor першої valid durable transition `O` |
 
 `O` зв'язує operation kind/ID/digest, context/environment/audience/script ID/backend
 origin, grant/transaction/assertion lineage, issuer/subject, expected revision,
 credential digest та expected authorization version. Додаткові trusted metadata
 мають бути незалежно authenticated і незмінно зв'язані з `O`, а не прийняті з DTO.
 
-`a_i` відбувається після всіх необхідних authoritative dependency reads та підготовки
-незмінного write-set. Final time sample і decision мають належати саме цій boundary;
-збережений чи переданий із попередньої attempt interval непридатний. Механізм має
-довести freshness до decision. Після decision не можна читати нову policy або
-змінювати bindings без нового admission. Сам подальший database commit є окремою
-подією `c` і може чекати.
+Authoritative admission конкретної attempt — успішна законна durable admission
+transition у погодженій authority з доведеним linearization point. Вона встановлює
+незмінний зв'язок operation, attempt, policy, lifetime anchor, dependency state та
+prepared write-set. Необхідні authoritative dependency reads і підготовка write-set
+передують transition; їхня validity на `d_i` потребує окремого fencing/ordering proof.
+Після decision не можна змінювати policy чи bindings без нового admission.
+Подальший business database commit є окремою подією `c` і може чекати.
 
-Admission не дорівнює початку HTTP request, початку transaction, browser readiness
-check, grant issuance, dispatch, historical receipt або commit response.
-Aborted attempt не дає права на session; збереження її раннього anchor не переносить
-її admission decision на наступну attempt.
+Першість визначає linearizable order законних durable transitions для original `O`.
+Найраніша volatile application-level перевірка без durable transition не визначає
+`t0`. HTTP/transaction start, локальний timestamp, browser readiness, dispatch,
+backend response, historical receipt або CAS без доказу validity не є admission.
+Durability чи database timestamp самі не доводять законність transition.
+
+Interval має доведено охоплювати саме `d_i`; time check до durable transition не
+доводить expiry predicate на її linearization point. Clock authority та механізм
+цього доказу OPEN (PO-01/PO-02). Firestore, CAS або інша database не оголошуються
+такими, що вже забезпечують ці гарантії. Business abort після valid admission
+не дає session authority та не переносить decision на наступну attempt, але
+не скасовує вже зафіксований original anchor.
 
 ## Temporal invariants для запропонованої Policy B
 
 **[DESIGN ASSUMPTION]** Наступні TI є вимогами до майбутнього дизайну, а не runtime
 дозволами. Вони застосовуються сукупно.
 
-1. **TI-01:** кожна attempt має власне `a_i`; `L_i <= a_i <= U_i` та `U_i < Eg`,
-   отже `a_i < Eg`. Також `L_i >= grant.issuedAt`, `U_i < C`; невідомий/невалідний
-   clock або boundary uncertainty, що досягає expiry, означає deny.
+1. **TI-01:** кожна attempt має власне `d_i` та fresh trusted interval:
+   `grant.issuedAt <= L_i <= d_i <= U_i`, `U_i < Eg`, `U_i < C`.
+   Transition на або після grant expiry недопустима. Невідомі/недостовірні bounds
+   або uncertainty, що досягає expiry, означають deny, навіть за успішного precheck.
 2. **TI-02:** equality на expiry означає deny. Немає `Eg + grace`, permissive skew
    або TTL extension. Grant lifecycle/revision, provenance, current user/version
    і погоджений revocation fence перевіряються на цій attempt.
-3. **TI-03:** `c >= Eg` може завершувати лише ту саму `O` після законного `a` та
+3. **TI-03:** `c >= Eg` може завершувати лише ту саму `O` після законного `d` та
    атомарного одноразового consumption. Це не загальний дозвіл створювати session
    з expired grant і не право повторити mutation після UNKNOWN.
 4. **TI-04:** кожна retry attempt виконує fresh authoritative reads і новий decision;
@@ -155,7 +179,8 @@ Aborted attempt не дає права на session; збереження її �
 ## CreationOK та UseOK
 
 **[DESIGN ASSUMPTION]** `CreationOK_B(O, S)` вимагає: verified grant provenance і
-bindings, чинний admission останньої успішної attempt, незмінний trusted anchor,
+bindings, чинну durable admission transition саме committed attempt з незмінним
+decision/attempt/write-set binding, незмінний trusted anchor,
 atomic grant consumption + одна session + bound durable receipt, а також погоджені
 revocation/directory guarantees. Поля session і TypeScript brand самі цього не доводять.
 Для Policy A додатково залишається застосовний strict actual-commit expiry predicate;
@@ -171,12 +196,23 @@ Current PermissionService checks зберігаються. Чинність gran
 
 ## Lifetime anchor t0
 
-**[DESIGN ASSUMPTION]** `t0` фіксується під час першого валідного admission саме `O`,
-включно з випадком, коли ця attempt потім abort. Він має бути trusted conservative
-anchor, не пізніший за відповідний actual admission. Кандидат `t0 = L_0` допустимий
-лише після доведення clock bounds, freshness і lineage consistency; це не вибраний
-готовий clock mechanism. Browser time, token `iat`, dispatch/response time,
-`commandCreatedAt` orchestration clock чи historical lookup time не підміняють його.
+**[DESIGN ASSUMPTION]** Для першої valid durable transition attempt `j` original
+`O` decision та original anchor мають атомарний незмінний зв'язок. Anchor
+призначається рівно один раз за linearizable order, включно з випадком, коли
+business transaction цієї attempt потім abort:
+
+```text
+t0 = L_j
+session.issuedAt = t0
+Es = min(t0 + 900000, C)
+```
+
+`L_j` є conservative нижньою межею trusted interval, що доведено охоплює `d_j`.
+Browser time, token `iat`, dispatch/response time, `commandCreatedAt` orchestration
+clock чи historical lookup time не підміняють його. Це owner-approved семантика,
+а не вибраний чи доведений clock/backend mechanism. Durable-first anchor може
+бути пізнішим за anchor найранішої volatile перевірки: це явна погоджена зміна
+семантики початку lifetime; session TTL та upstream cap залишаються незмінними.
 
 ```typescript
 sessionIssuedAt = t0;
@@ -188,11 +224,14 @@ sessionExpiresAt = Math.min(
 
 Тут `authenticationExpiresAt = C` із verified effective lineage. Arithmetic має
 залишатися валідним; cap не збільшується під час renewal. Усі retries отримують той
-самий anchor, але новий admission decision. Commit delay скорочує доступний lifetime.
-Recovery не створює нової session та не переобчислює expiresAt.
+самий anchor, але проходять fresh admission та current dependency checks. Retry
+не збільшує `t0`, `Es` або pinned `C`. Business abort не скасовує durable anchor;
+crash, restart, failover та UNKNOWN не дозволяють його перепризначити. Commit delay
+скорочує доступний lifetime. Recovery не створює нової session та не переобчислює
+expiresAt. Admission record сам по собі не є session, business receipt чи credential.
 
 **[NOT IMPLEMENTED]** У чинному RecoveryDescriptor немає reviewed реалізації
-durable ownership/restoration цього anchor. Вибір джерела `t0`, immutable fixation
+durable ownership/restoration цього anchor. Доказ джерела `L_j`, immutable fixation
 при concurrent first admissions, зв'язування з `O`, збереження при abort та restoration
 після restart — **OPEN PROOF OBLIGATION PO-04**, разом із PO-01/PO-08/PO-12.
 Цей ADR не додає поля до Wire v1. Якщо anchor не можна безпечно відновити, дозволений
@@ -200,13 +239,14 @@ durable ownership/restoration цього anchor. Вибір джерела `t0`,
 
 ## Late commits та часові обмеження
 
-**[DESIGN ASSUMPTION]** Late commit може залишити вже expired session record.
-Такий record може бути лише історичним: немає positive credential release,
-`UseOK` або автоматичного replacement. Допустимість самого такого запису після
-`Es`/`C` є відкритим owner decision у PO-14; design-direction approval не означає,
-що цей residual risk уже прийнято.
+**[DOCUMENTED]** Власник умовно погодив historical session record, створений або
+завершений після `Es` або `C`, лише як inert, неактивний і невикористовуваний запис
+за наявності доказу відсутності credential release/use authority та обходу revocation.
+Це не дозвіл створювати usable expired sessions, late credential release/use або
+автоматичний replacement. Фактичний допустимий commit protocol та його proof
+залишаються OPEN у PO-10/PO-14; runtime approval не надано.
 
-**[BLOCKED]** Не доведено числову верхню межу `c - a`, commit cancellation або
+**[BLOCKED]** Не доведено числову верхню межу `c - d`, commit cancellation або
 safe finite retention для всіх in-flight cases. Немає нового вигаданого commit
 deadline чи retention period. Якщо власник вимагає фізично не створювати навіть
 історичний record після expiry, необхідний окремий commit-time proof; use checks
@@ -221,7 +261,11 @@ scope. Участь усіх потрібних records та конкретні 
 Script Properties та Firestore не мають спільного atomic commit у чинному дизайні;
 PermissionService/UserRepository не мігруються цим ADR.
 
-**[DESIGN ASSUMPTION]** Потрібні окремі гарантії, не просто ще один reread:
+**[DESIGN ASSUMPTION]** Durable admission не резервує authorization та не дозволяє відновити відкликані
+права. Точні revocation effectiveness boundary, порядок dependency revision checks,
+pending-issuance fencing, race revocation/business commit, release/use checks та
+гарантії inert late records OPEN (PO-05/PO-06/PO-10/PO-14). Revocation proof не завершено.
+Потрібні окремі гарантії, не просто ще один reread:
 
 | Подія | Потрібна поведінка / відкритий механізм |
 | --- | --- |
@@ -233,7 +277,7 @@ PermissionService/UserRepository не мігруються цим ADR.
 | User disable | Current authority забороняє use; ordering із late issuance потребує proof |
 | authorizationVersion change | Стара version не підвищується в старій session; ordering/повторне використання version потребують погодження |
 | Current permissions | PermissionService перевіряє конкретну дію; roles не копіюються з grant/browser |
-| Revocation між a і c | Late commit не відновлює доступ; або transaction conflict/retry/deny, або доведений fence робить record непридатним |
+| Revocation між d і c | Late commit не відновлює доступ; або transaction conflict/retry/deny, або доведений fence робить record непридатним |
 | Revocation між c і protected RPC | Current authoritative checks та execution fence забороняють новий допуск |
 | Зміна permission між check та ERP mutation | Потрібна окрема погоджена execution boundary; наслідки вже admitted in-flight operation визначаються явно |
 
@@ -260,12 +304,25 @@ lookup оригінальної operation. Timeout, missing receipt, втрач�
 orphan session не доводять rollback і не дозволяють replacement mutation/session.
 Historical receipt не містить bearer і не створює `UseOK`.
 
+Дві concurrent attempts original `O` мають одну original anchor assignment за
+першої valid durable transition; без такої transition assignment немає.
+Програвша attempt не обирає новий `t0`. UNKNOWN response durable admission transition
+вимагає authoritative lookup admission/anchor state, навіть коли business receipt
+відсутній. Невідома generation не вгадується, не скидається та не замінюється новою.
+Definitive business abort дозволяє лише окремо законну fresh attempt із тим самим
+anchor та current checks; він не скасовує durable admission history. UNKNOWN не
+доводить abort і залишає лише lookup-only recovery. Повторна mutation не є
+універсальним fallback; recreate/replacement/re-anchor і timeout-based rollback заборонені.
+
 Recovery descriptors, uniqueness/replay markers, unresolved intents, revocation
 tombstones та anchor evidence зберігаються до доведеного safe GC condition.
 Cleanup має врахувати всі ще можливі in-flight completions, retries і restart,
 а не лише час останнього lookup. Якщо finite bound або fence не доведений,
 time-based deletion не схвалюється; потрібні fail-closed capacity limits і
-окреме availability рішення. Числового retention period цей ADR не встановлює.
+доказ capacity/availability handling. Якщо safe cleanup unresolved evidence не
+доведений, система залишається fail-closed навіть ціною capacity/availability.
+Cleanup/tombstone не може знищити необхідні proof або fencing unresolved operation.
+Числового retention period цей ADR не встановлює.
 
 ## Compatibility та незмінність чинного контракту
 
@@ -278,12 +335,35 @@ time-based deletion не схвалюється; потрібні fail-closed ca
 - ADMIN entrypoints/RPC allowlist, manifests/build configuration;
 - [Safe Grant Renewal contracts](../../src/admin/web/authentication/renewal-contracts.ts).
 
-**[DESIGN ASSUMPTION]** Майбутня зміна потребує Gate B: versioned policy evidence,
-точної семантики `consumedAt`/admittedAt/commit facts, trusted anchor binding та
-сумісності readers/receipts. Старий boolean, enum cast, JSON DTO або readiness
-result не може ввімкнути B чи відкрити gate. Не можна мовчки записати admission time
+**[DOCUMENTED]** Окремий versioned authoritative sidecar є owner-approved напрямком
+проєктування зі збереженням Wire v1 за умови майбутнього compatibility/security review.
+Це не схвалення чинного data-only sidecar як authoritative evidence.
+
+**[DESIGN ASSUMPTION]** Для sidecar-напрямку майбутня зміна потребує Gate B: явних version/profile,
+authenticated ownership, незмінних operation/attempt/policy/anchor/dependency/write-set
+bindings, trusted readers та окремого доказу Wire v1 compatibility. Чинний command
+digest не охоплює автоматично нові sidecar fields. Старі receipts не стають admission
+evidence. Значення `backendDecisionAt`, `consumedAt` та `databaseCommittedAt` не
+змінюються; admission не підставляється в ці fields. Новий evidence protocol surface,
+якщо потрібний, вимагає окремого owner decision. Старий boolean, enum cast, JSON DTO
+або readiness result не може ввімкнути B чи відкрити gate. Не можна мовчки записати admission time
 як нібито відомий actual commit time. Wire v1 можна зберегти лише після доказу
 сумісності; непогоджені fields/fallback у v1 не додаються.
+
+**[NOT IMPLEMENTED]** Чинні [temporal attempt contracts](../../src/admin/web/identity-contracts/temporal-attempt-contracts.ts)
+та [anchored planner](../../src/admin/web/identity-contracts/anchored-session-planner.ts)
+описують лише локальні data invariants. `VALID_DATA`, `ADMITTED`, `COMMITTED`,
+`PLAN_CANDIDATE`, owner/generation IDs та claimed write-set digest не доводять
+clock provenance, durable transition/order, authenticated ownership або approval.
+`LifetimeAnchorData` допускає `t0Ms <= originClock.earliestMs`, тоді як цільова
+семантика вимагає `t0 = L_j`: mapping/equality та proof першої durable transition
+залишаються OPEN у PO-04/PO-12. Planner працює з `PREPARED` data і відхиляє
+`clock.latestMs >= Es`; він не є протоколом late historical commit. Узгодження
+цього розділення OPEN у PO-02/PO-10/PO-14. Чинні contracts тут не змінюються.
+Чинний [lifecycle planner](../../src/admin/web/identity-contracts/lifecycle.ts)
+використовує `now` для `issuedAt`/`consumedAt`; цей scalar не оголошується `L_j`
+чи admission evidence. Майбутнє mapping до durable-first semantics OPEN у PO-04/PO-12
+без reinterpretation чинних fields.
 
 ## Альтернативи та наслідки
 
@@ -306,10 +386,10 @@ records, orphan credentials, довгий UNKNOWN і capacity/availability failu
 | Gate | Потрібний результат | Поточний стан |
 | --- | --- | --- |
 | A — ADR/Proof Model Review | Незалежно узгоджені scope, модель, PO та acceptance scenarios | PROPOSED; review ще потрібний |
-| B — Contract Evolution Approval | Явне погодження нормативної зміни, versioning і residual risks | BLOCKED; approval відсутній |
-| C — Backend Adapter Evidence | Reviewed clock/store/coordinator/revocation/recovery evidence | BLOCKED; implementation/evidence відсутні |
-| D — Integration Acceptance | Негативні integration tests, runtime provenance, bundle guards, deployment readiness | BLOCKED; acceptance відсутній |
-| E — Production Authorization | Окреме рішення власника системи | BLOCKED; authorization відсутній |
+| B — Contract Evolution Approval | Окремі рішення щодо evidence protocol/versioning, compatibility/security та revocation/commit semantics; owner direction їх не замінює | BLOCKED BY MISSING DECISION |
+| C — Backend Adapter Evidence | Reviewed clock/store/coordinator/revocation/recovery evidence | NOT OPENED; BLOCKED, implementation/evidence відсутні |
+| D — Integration Acceptance | Негативні integration tests, runtime provenance, bundle guards, deployment readiness | NOT OPENED; BLOCKED, acceptance відсутній |
+| E — Production Authorization | Окреме рішення власника системи | NOT OPENED; BLOCKED, authorization відсутній |
 
 **[BLOCKED]** PO-11 щодо ACCEPT_ASSERTION не обходиться проходженням A–D для
 ISSUE_SESSION. Gate E не замінює невиконані security proofs. Повний каталог,
@@ -320,8 +400,9 @@ ISSUE_SESSION. Gate E не замінює невиконані security proofs. 
 
 **[BLOCKED]** Не вибрані й не доведені: authoritative clock profile; атомарне
 закріплення/restoration `t0`; distributed grant/family ownership; revocation та
-directory/execution ordering; safe retention/GC; допустимість історичних late
-records; policy/schema compatibility; незалежний strict ACCEPT_ASSERTION mechanism.
+directory/execution ordering; safe retention/GC; proof інертності умовно погоджених
+late records та допустимий commit protocol; policy/schema/sidecar compatibility;
+mapping локальних data-only contracts; незалежний strict ACCEPT_ASSERTION mechanism.
 Кожен із них має відповідний PO; жоден не закритий сукупним числом локальних tests.
 
 **[DOCUMENTED]** Супровідні чинні документи:

@@ -9,6 +9,16 @@ Baseline: `feature/bom-logic`, HEAD
 `d6256e4f56d14650a51e124813066309ef5691f1`, clean working tree та empty staging
 до документаційних additions. Власник погодив design direction, а не runtime policy.
 
+**[DOCUMENTED]** Amendment Slice 2C.3B.10a, дата 2026-10-29. Baseline amendment:
+`feature/bom-logic`, HEAD `930c19fc558f41de0cbab3c6474427955dc87f43`, clean working
+tree та empty staging. Попередній baseline є історією створення документів.
+Owner-selected модель B — **First Durably Admitted Operation**: first valid durable
+transition визначає single-assignment `t0 = L_j`; погоджено fail-closed recovery,
+умовні inert historical records та проєктування versioned authoritative sidecar.
+Це owner-approved нормативний напрямок; amendment залишається PROPOSED, backend
+implementation недоведена. Gate B — **BLOCKED BY MISSING DECISION**, Gate C–E
+не відкриті. Цей amendment не завершує Gate B та не закриває жоден PO-01–PO-14.
+
 | Surface | Чинна policy / стан | Scope цього дизайну |
 | --- | --- | --- |
 | ACCEPT_ASSERTION | STRICT_COMMIT_TIME | Незмінний незалежний blocker PO-11 |
@@ -48,26 +58,39 @@ scope, authoritative source, відтворюваних artifacts/results, ан�
 
 **[DESIGN ASSUMPTION]** Терміни та TI-01–TI-10 мають значення з ADR-049.
 Для attempt `i` fresh interval `[L_i, U_i]` має обмежувати authoritative decision
-`a_i`; для commit-winning attempt `k`: `a = a_k`, `c` — actual commit,
+на linearization point `d_i` законної durable admission transition у погодженій
+authority; для commit-winning attempt `k`: `d = d_k`, `c` — actual business commit,
 `Eg` — grant expiry, `Es` — session expiry, `C` — effective upstream cap.
 
 ```text
-L_i <= a_i <= U_i < Eg
-L_i >= grant.issuedAt
+grant.issuedAt <= L_i <= d_i <= U_i
+U_i < Eg
 U_i < C
-sessionIssuedAt = t0
-Es = min(sessionIssuedAt + 900000, authenticationExpiresAt), authenticationExpiresAt = C
+j = first valid durable transition in the linearizable order for original O
+t0 = L_j
+session.issuedAt = t0
+Es = min(t0 + 900000, C)
 ```
 
 Немає expiry grace. Equality на expiry означає deny. Кожен retry має новий
-admission decision; незмінний `t0` не є перенесеним admission permission.
+durable admission decision та current dependency checks; незмінний `t0` не є
+перенесеним admission permission. Interval має доведено охоплювати саме transition,
+а не попередній time check; недостовірні bounds означають deny. Transition на або
+після Eg недопустима. Clock authority/proof OPEN; database timestamp чи CAS самі
+не доводять validity. Decision незмінно зв'язує operation, attempt, policy, anchor,
+dependency state та prepared write-set. Фізичний порядок volatile prechecks не
+визначає first admission. Durable-first anchor може почати lifetime пізніше за
+найраніший volatile check; це погоджена зміна семантики без зміни TTL чи pinned C.
 Late `c >= Eg` може завершувати лише ту саму допущену ISSUE_SESSION operation.
 Доказ CreationOK не заміняє current UseOK, а UseOK не легалізує незаконне issuance.
 Admission не є HTTP/transaction start, browser readiness, issuance, dispatch,
 historical receipt або commit response.
+Локальний timestamp, backend response та CAS без validity proof також не є admission.
+Admission record сам по собі не є session, business receipt або credential.
 
 **[DESIGN ASSUMPTION]** `CreationOK_B` охоплює provenance/bindings, valid final
-attempt admission, immutable anchor, atomic one-time grant consumption, session
+attempt durable admission із decision/attempt/write-set binding, immutable anchor,
+atomic one-time grant consumption, session
 та receipt і погоджене revocation/directory ordering. `UseOK` додатково вимагає
 чинного bearer/digest binding, authoritative current session, session/upstream
 time validity, no revocation, current active user/version/key provenance і
@@ -91,6 +114,7 @@ server DI або зовнішнє сховище; вони не є distributed f
 | [Lifecycle](../src/admin/web/identity-contracts/lifecycle.ts) / [validation](../src/admin/web/identity-contracts/validation.ts) | Session lifetime formula, context/lifetime/current-user checks |
 | [Session store](../src/admin/web/identity-contracts/session-store-contracts.ts) | StoredSession, revocation/revision, authoritative session capability requirement |
 | [Operation contracts](../src/admin/web/operation-contracts.ts) | Exact ID/digest/context bindings, RecoveryDescriptor, save-before-dispatch coordinator requirement |
+| [Temporal attempt contracts](../src/admin/web/identity-contracts/temporal-attempt-contracts.ts) / [anchored planner](../src/admin/web/identity-contracts/anchored-session-planner.ts) | LOCAL DATA ONLY: claimed clock/anchor/attempt/dependency/write-set data та arithmetic candidate; жодної trusted durable admission authority |
 | [Wire contracts](../src/admin/web/channel-contracts/contracts.ts) / [recovery](../src/admin/web/channel-contracts/recovery.ts) | Wire v1, time facts, lookup-only, receipt binding; unavailable commit time не вигадується |
 | [Session resolver](../src/admin/web/authentication/session-resolver.ts) / [authorization adapter](../src/admin/web/authentication/authorization-adapter.ts) | Current session/user/key checks, повторний PermissionService decision; не lock для ERP mutation |
 | [PermissionService](../src/security/permission-service.ts) / [UserRepository implementation](../src/security/property-user-repository.ts) | Поточна permission authority; Script Properties не мають спільної transaction з Firestore |
@@ -114,6 +138,18 @@ Firestore durability, cross-authority consistency або STRICT_COMMIT_TIME.
 немає evidence рівня `DEMONSTRATED BY INTEGRATION TEST`; acceptance scenarios нижче
 не оголошуються виконаними.
 
+**[DOCUMENTED]** Contract gaps залишаються OPEN: `LifetimeAnchorData` допускає
+`t0Ms <= originClock.earliestMs`, а amendment вимагає `t0 = L_j` першої valid
+durable transition (PO-04/PO-12). Planner приймає тільки `PREPARED` data та відхиляє
+`clock.latestMs >= Es`; це не proof authoritative admission чи late historical
+commit (PO-02/PO-10/PO-14). `VALID_DATA`, `ADMITTED`, `COMMITTED`, `PLAN_CANDIDATE`,
+claimed owner/generation і digest не автентифікують джерело або linearization order.
+Runtime `expiryAtCommit: STRICT` зберігається; цільовий durable-first protocol не
+впроваджений і не отримує approval через data validators.
+Чинний `lifecycle.planGrantRedemption` задає `issuedAt`/`consumedAt` через `now`;
+це не `L_j` або admission proof. Mapping до нового anchor без reinterpretation
+чинних fields також OPEN у PO-04/PO-12.
+
 ## Proof obligations
 
 **[DESIGN ASSUMPTION]** Кожна таблиця є повною карткою PO. Authoritative source
@@ -125,30 +161,40 @@ Firestore durability, cross-authority consistency або STRICT_COMMIT_TIME.
 | Field | Obligation |
 | --- | --- |
 | ProofID | PO-01 |
-| Security property | Provenance, freshness, conservative uncertainty, rollback/skew та restart safety часу саме на admission/use boundary |
-| Threat або failure scenario | Cached time до awaited reads, повільний callback, clock rollback, skew іншого worker, restart скидає high-water |
-| Required mechanism | Reviewed clock profile з authenticated source, доведеними bounds, health/failure behavior та binding observation-to-decision; джерело ще не вибрано |
+| Security property | Provenance, freshness, conservative uncertainty, rollback/skew та restart safety; interval доведено охоплює durable admission linearization point d_i, окремо use boundary |
+| Threat або failure scenario | Cached time до awaited reads; precheck до Eg, durable transition на/після Eg; повільний callback, rollback/skew, restart скидає high-water |
+| Required mechanism | Reviewed clock profile з authenticated source, bounds та health/failure behavior; доказ grant.issuedAt <= L_i <= d_i <= U_i, U_i < Eg і U_i < C саме для durable transition; authority/proof ще не вибрані |
 | Authoritative source | Потрібна trusted server/backend time authority — NOT IMPLEMENTED. DOCUMENTED requirements: DurableAdmissionRequirements, TrustedClockInterval; scalar/interval DTO не є authority |
-| Evidence required | Source/clock provenance; error/freshness model; worker/restart behavior; fail-closed implementation review; integration fault traces |
+| Evidence required | Source/clock provenance; error/freshness model і coverage linearization point; worker/restart behavior; fail-closed review; integration fault traces; timestamp/CAS самі не evidence validity |
 | Negative tests | SC-03, SC-04, SC-10; boundary equality, wide uncertainty, stale observation, затримка після sample, unavailable clock |
 | Current status | OPEN; local interval/high-water behavior DEMONSTRATED BY LOCAL TEST; remote authority NOT IMPLEMENTED; integration BLOCKED |
 | Blocking dependency | Clock source/profile approval; observation-to-boundary freshness; PO-08 restoration |
-| Acceptance criterion | Незалежний review підтвердив valid bounds на всіх потрібних boundaries; непевність/rollback/unavailability не дозволяють admission/use; локальний high-water не використано як distributed proof |
+| Acceptance criterion | Незалежний review підтвердив coverage d_i, а не лише application check; equality expiry, недостовірні bounds, rollback/unavailability deny; локальний high-water не використано як distributed proof |
 
 ### PO-02 — Transaction Attempt Freshness
 
 | Field | Obligation |
 | --- | --- |
 | ProofID | PO-02 |
-| Security property | Новий authoritative admission decision на кожній transaction attempt |
+| Security property | Власна fresh authoritative durable admission кожної attempt; committed attempt незмінно зв'язана з відповідним durable decision та prepared write-set |
 | Threat або failure scenario | SDK reruns callback після expiry; old policy/time/READY з попередньої attempt використано повторно |
-| Required mechanism | Reviewed transaction retry protocol: усі необхідні authoritative reads, immutable write-set preparation та final clock/decision повторюються; external side effects не виконуються в retried callback |
+| Required mechanism | Reviewed retry protocol: authoritative reads, current dependency checks та immutable write-set preparation повторюються для кожної нової attempt; кожна attempt має власну valid durable admission transition з attempt-specific clock proof; callback replay не переносить старий decision. No external side effects may execute inside a transaction callback that can be retried. Callback replay must not duplicate external effects. |
 | Authoritative source | Потрібні actual transaction attempt lifecycle і record authority. DOCUMENTED candidate behavior: [Firestore transactions](https://firebase.google.com/docs/firestore/manage-data/transactions); adapter відсутній |
-| Evidence required | Retry/control-flow review, attempt-specific observations, conflict injection, trace останньої committed attempt та rejected attempts |
+| Evidence required | Retry/control-flow review, attempt-specific observations і immutable operation/policy/anchor/dependency/write-set bindings; conflict injection; trace durable decision саме committed attempt та rejected attempts |
 | Negative tests | SC-02–SC-04; expiry під час policy read; key/user/fence change перед retry; stale cached interval |
 | Current status | OPEN; remote retry mechanism NOT IMPLEMENTED; integration BLOCKED |
 | Blocking dependency | PO-01, PO-03; reviewed SDK/backend/version and retry behavior |
-| Acceptance criterion | Жодна retry attempt без нового valid decision не може commit; attempt на/після expiry deny; старий t0 не є дозволом повторного admission |
+| Acceptance criterion | Жодна retry attempt без власної valid durable transition не може commit; transition на/після expiry deny; committed write-set відповідає decision; старий t0 та precheck не є admission permission |
+
+**[DESIGN ASSUMPTION]** Business transaction callback, який може повторно запускатися,
+та окрема authoritative durable admission/anchor transition мають різні boundaries.
+Admission/anchor transition має власну linearization boundary, independent authoritative
+ordering, explicit operation/attempt binding, single-assignment original anchor,
+durable recovery, UNKNOWN lookup-only та ownership/generation fencing; credential
+release відсутній. Ці вимоги залишаються OPEN у PO-02, PO-04, PO-07. Admission/anchor
+writes не мають винятку із заборони external side effects і не дозволені всередині
+retried business callback. Якщо майбутній backend не забезпечує доведено безпечного
+відокремлення цих операцій, питання залишається OPEN, виконання — fail-closed.
 
 ### PO-03 — Atomic One-Time Grant Consumption
 
@@ -163,22 +209,22 @@ Firestore durability, cross-authority consistency або STRICT_COMMIT_TIME.
 | Negative tests | SC-06, SC-11, SC-20; rollback між writes; one grant із двома operation IDs; invalid revision/context |
 | Current status | OPEN; fixture atomicity/one-time behavior DEMONSTRATED BY LOCAL TEST; remote implementation NOT IMPLEMENTED; integration BLOCKED |
 | Blocking dependency | Reviewed store/ownership PO-08, retry PO-02, revocation participation PO-05, compatibility PO-12 |
-| Acceptance criterion | У всіх перевірених conflict/failure schedules немає partial success або більше однієї session; receipt точно відповідає єдиному committed transition; vendor atomicity сама не закриває proof |
+| Acceptance criterion | У всіх перевірених conflict/failure schedules немає partial success або більше однієї session; receipt точно відповідає єдиному committed business transition; durable admission не замінює atomic consumption і не створює session/receipt/credential; vendor atomicity сама не закриває proof |
 
 ### PO-04 — Immutable Lifetime Anchor
 
 | Field | Obligation |
 | --- | --- |
 | ProofID | PO-04 |
-| Security property | Незмінний conservative t0 першого valid admission O; Es=min(t0+900000,C), no re-anchoring |
+| Security property | Single-assignment t0=L_j першої valid durable transition original O; session.issuedAt=t0, Es=min(t0+900000,C), no re-anchoring |
 | Threat або failure scenario | Retry/reset/restart пересуває issuedAt; два workers вибирають різні first anchors; втрачений anchor замінено response/lookup time |
-| Required mechanism | Reviewed first-valid-admission ordering і immutable fixation, binding до ID/digest/context/identity/grant, persistence при abort та authoritative restoration; конкретний механізм OPEN |
+| Required mechanism | Linearizable ordering законних durable transitions; атомарний незмінний decision-anchor linkage і рівно одна original assignment; binding operation/attempt/policy/dependencies/write-set; persistence після business abort та authoritative restoration original t0; конкретний механізм OPEN |
 | Authoritative source | Потрібна trusted time authority PO-01 і owner-bound operation/anchor authority PO-08. DOCUMENTED current formula: lifecycle.ts; чинний descriptor не доводить збереження t0 |
-| Evidence required | Точне правило obtaining/ordering t0; conservative uncertainty argument; durability/abort/restart protocol; binding/tamper review; integration traces |
-| Negative tests | SC-02, SC-04, SC-05, SC-09, SC-15; concurrent first admissions, forged/missing/later anchor, arithmetic overflow |
-| Current status | OPEN PROOF OBLIGATION; candidate t0=L0 is DESIGN ASSUMPTION; fixation/restoration NOT IMPLEMENTED; integration BLOCKED |
-| Blocking dependency | PO-01, PO-08, PO-12; погоджена authority першого admission при concurrency |
-| Acceptance criterion | Серед concurrent actors first anchor має доведене authoritative ordering; retries/recovery не збільшують t0/Es/C; якщо anchor втрачений або непевний, немає new mutation чи positive release |
+| Evidence required | Proof першої valid durable transition j і coverage d_j; t0=L_j, single assignment при concurrency; durability/abort/crash/failover/restart/UNKNOWN protocol; mapping data-only t0Ms<=originClock.earliestMs до цільової equality; binding/tamper review та integration traces |
+| Negative tests | SC-02, SC-04, SC-05, SC-06, SC-09, SC-15; first precheck без transition; concurrent durable transitions; business abort після assignment; UNKNOWN response; forged/missing/later anchor; arithmetic overflow |
+| Current status | OPEN; t0=L_j є DOCUMENTED owner-selected direction; durable fixation/restoration NOT IMPLEMENTED; integration BLOCKED |
+| Blocking dependency | PO-01, PO-08, PO-12; reviewed authority/order та atomic decision-anchor linkage |
+| Acceptance criterion | Дві concurrent attempts мають одну original assignment за linearizable order; precheck без durable transition не визначає t0; abort не скасовує anchor; retries/recovery не збільшують t0/Es/pinned C; missing/uncertain anchor fail closed без new mutation чи positive release |
 
 ### PO-05 — Revocation Fencing
 
@@ -186,10 +232,10 @@ Firestore durability, cross-authority consistency або STRICT_COMMIT_TIME.
 | --- | --- |
 | ProofID | PO-05 |
 | Security property | Late commit не відновлює відкликаний доступ, включно з pending issuance та logout-all |
-| Threat або failure scenario | Revoke стався між a і c; session ще відсутня, тому logout пропускає її; stale writer затирає tombstone/epoch |
+| Threat або failure scenario | Revoke стався між d і c; session ще відсутня, тому logout пропускає її; stale writer затирає tombstone/epoch; admission помилково резервує authorization |
 | Required mechanism | Approved revision/epoch/tombstone/fencing або еквівалент із доведеним ordering; pending issuance входить у scope; grant revocation лише за окремо погодженим lifecycle |
 | Authoritative source | Потрібні authoritative session/subject/key revocation records. DOCUMENTED current session revocation/signing policy; єдину cross-authority revocation model не реалізовано |
-| Evidence required | Revocation effectiveness boundary; in-flight policy; data participation/CAS proof; tombstone persistence/GC argument; two-worker race traces |
+| Evidence required | OPEN: точна revocation effectiveness boundary, dependency revision check ordering, pending-issuance fencing, revocation/business commit race, current release/use checks та inert-record guarantees; tombstone persistence/GC argument і two-worker race traces |
 | Negative tests | SC-07, SC-18, SC-19; logout-all перед видимістю session; epoch/version ABA/reset; revoke під час retry; planned retirement окремо від compromise |
 | Current status | OPEN; local revoked/compromised rejection DEMONSTRATED BY LOCAL TEST; durable fencing NOT IMPLEMENTED; integration BLOCKED |
 | Blocking dependency | Вибір authorities/ordering; PO-03, PO-06, PO-08, PO-13 |
@@ -202,7 +248,7 @@ Firestore durability, cross-authority consistency або STRICT_COMMIT_TIME.
 | ProofID | PO-06 |
 | Security property | Current active user, matching authorizationVersion і current permission діють на погодженій protected-operation execution boundary |
 | Threat або failure scenario | User disable/version/permission change між reads, issuance і фактичним ERP mutation; stale roles або reused version |
-| Required mechanism | Окремо approved consistency/authority та version ordering; execution CAS/epoch/fence або еквівалент; current PermissionService checks зберігаються |
+| Required mechanism | Окремо approved consistency/authority та dependency/directory version ordering на durable admission і execution boundaries; CAS/epoch/fence або еквівалент; current PermissionService checks зберігаються; admission не резервує authorization |
 | Authoritative source | DOCUMENTED current authority: UserRepository/PropertyUserRepository/PermissionService. Спільної atomic transaction Script Properties + Firestore немає; майбутній bridge NOT IMPLEMENTED |
 | Evidence required | Визначення admission/execution/effective-change boundaries; cross-authority protocol; policy для in-flight operations; review permission selection і current version binding |
 | Negative tests | SC-08, SC-17; disable між awaits; role change після останнього reread; async decision не await; version rollback/ABA |
@@ -215,15 +261,15 @@ Firestore durability, cross-authority consistency або STRICT_COMMIT_TIME.
 | Field | Obligation |
 | --- | --- |
 | ProofID | PO-07 |
-| Security property | Після possible dispatch outcome з'ясовується lookup-only; жодних replacement mutation/session або TTL extension |
+| Security property | UNKNOWN durable admission або business outcome з'ясовується authoritative lookup-only; жодних recreate/replacement mutation/session, re-anchor або TTL extension |
 | Threat або failure scenario | Commit succeeded/response lost; timeout чи missing receipt сприйнято як rollback; orphan session спричиняє нове issuance |
-| Required mechanism | Durable immutable descriptor до dispatch; atomic receipt; authenticated read-only authoritative lookup; conservative terminal/UNKNOWN state machine |
+| Required mechanism | Durable immutable descriptor до dispatch; atomic business receipt; authenticated read-only lookup original admission/anchor та business outcome; distinct definitive-abort/UNKNOWN recovery; невідома generation fail closed |
 | Authoritative source | Потрібні paired operation outcome/receipt authority і coordinator. DOCUMENTED requirements: RecoveryCoordinatorPort, AtomicLoginStorePort, recoveryAction, LoginOrchestrator |
 | Evidence required | Save-before-dispatch durability; binding/ownership proof; crash/lost-response traces; no mutation/credential-generation dependency у recovery |
 | Negative tests | SC-11, SC-12, SC-15, SC-20; rejected/unavailable lookup, stale completion, timeout з пізнім COMMITTED |
 | Current status | OPEN; local lookup-only/no replacement DEMONSTRATED BY LOCAL TEST; remote coordinator/lookup NOT IMPLEMENTED; integration BLOCKED |
 | Blocking dependency | PO-03, PO-04, PO-08, PO-13; response/reader provenance PO-12 |
-| Acceptance criterion | UNKNOWN ніколи не перетворюється на unsent/retry permission; original ID/digest/bindings/anchors незмінні; COMMITTED metadata не видає bearer; timeout не оголошує cancellation |
+| Acceptance criterion | UNKNOWN ніколи не стає unsent/retry permission; missing receipt не rollback; definitive business abort зберігає anchor, лише окремо законна fresh attempt можлива; generation не вгадується/скидається; original bindings незмінні; COMMITTED metadata не видає bearer; timeout не cancellation; повторна mutation не універсальний fallback |
 
 ### PO-08 — Durable Restoration & Ownership
 
@@ -232,7 +278,7 @@ Firestore durability, cross-authority consistency або STRICT_COMMIT_TIME.
 | ProofID | PO-08 |
 | Security property | Restart не втрачає ownership, original operation metadata, grant/session provenance або revocation/family fencing |
 | Threat або failure scenario | DTO з іншого project/path/context відновлює capability; fabricated snapshot або stale revision; restart скидає owner/clock/anchor history |
-| Required mechanism | Reviewed authenticated store/project/database/path ownership; independent expected bindings; paired closed readers; durable coordinator/fence restoration; malformed/missing evidence fail closed |
+| Required mechanism | Reviewed authenticated store/project/database/path ownership; independent expected bindings; paired closed readers; durable coordinator/anchor/fence та original generation restoration; malformed/missing/unknown generation fail closed без reset/recreate |
 | Authoritative source | Потрібна незалежно встановлена deployment/store authority, не browser expectation. DOCUMENTED interfaces: GrantRestorationPort, RestoredGrantReaderPort, TrustedSessionReaderPort, RecoveryCoordinatorPort |
 | Evidence required | Deployment/source ownership review; restore protocol/version; freshness/current record rechecks; independent binding provenance; multi-worker/restart integration traces |
 | Negative tests | SC-09, SC-15; JSON/casts/foreign owner, wrong database/path/origin, stale revision, descriptor/anchor tamper |
@@ -253,14 +299,14 @@ Firestore durability, cross-authority consistency або STRICT_COMMIT_TIME.
 | Negative tests | SC-13, SC-14; четвертий grant, третя silent attempt, foreign/stale capability, concurrent abandon/dispatch, nested callback |
 | Current status | OPEN; local budgets/reentrancy/final sampling DEMONSTRATED BY LOCAL TEST; distributed family fencing NOT IMPLEMENTED; integration BLOCKED |
 | Blocking dependency | PO-03, PO-05, PO-07, PO-08; production minimum reserve approval |
-| Acceptance criterion | Budgets не обходяться concurrency/restart; possible dispatch ніколи не стає unsent; original upstream cap не збільшується; reserve/5000 ms/local guard не оголошено commit-time або distributed proof |
+| Acceptance criterion | Budgets не обходяться concurrency/restart; possible dispatch ніколи не стає unsent; unresolved operation/невідома generation не звільняє budget і не дозволяє renewal/replacement; original upstream cap не збільшується; reserve/5000 ms/local guard не оголошено commit-time або distributed proof |
 
 ### PO-10 — Credential Release & Protected RPC
 
 | Field | Obligation |
 | --- | --- |
 | ProofID | PO-10 |
-| Security property | Positive release/use потребують CreationOK + current UseOK; historical receipt недостатньо |
+| Security property | Credential creation, release та use — окремі boundaries; positive release/use потребують CreationOK + current UseOK; admission record/historical receipt недостатні |
 | Threat або failure scenario | Expired session до first use; live DTO із незаконним issuance; old receipt відновлює bearer; дозвіл перевірено до зміни permission |
 | Required mechanism | Reviewed creation provenance і current authoritative session reader; bearer/digest binding; time/user/version/key/revocation checks; PermissionService на погодженій execution boundary |
 | Authoritative source | Потрібні current session, directory, key і execution authorities. DOCUMENTED local SessionResolver, SessionAuthorizationAdapter, validateSessionUse, SessionRestorationRequirements |
@@ -292,13 +338,13 @@ Firestore durability, cross-authority consistency або STRICT_COMMIT_TIME.
 | ProofID | PO-12 |
 | Security property | Нова policy/evidence semantics явна, authenticated та version-compatible; старі DTO/booleans не активують B |
 | Threat або failure scenario | Admission названо commit; consumedAt мовчки змінює значення; JSON/cast відкриває gate; нові fields змінюють digest або обходять old readers |
-| Required mechanism | Gate B contract/version review; exact command framing; closed evidence issuer/reader; явні admission/anchor/commit semantics; compatibility або погоджена нова version без fallback |
+| Required mechanism | Gate B compatibility/security review; для дозволеного authoritative sidecar-напрямку — явні version/profile, authenticated ownership і immutable operation/attempt/policy/anchor/dependency/write-set bindings; exact command framing та closed issuer/reader; Wire v1 лише з окремим compatibility proof; новий evidence protocol surface потребує окремого owner decision |
 | Authoritative source | DOCUMENTED: Wire v1/OperationBinding/RemoteOperationTimes, OPERATION_PROFILE, durable/session schema та paired readers. Майбутня policy evidence schema NOT IMPLEMENTED |
-| Evidence required | Field/semantic diff, digest vectors, reader/version rejection tests; ownership binding нового metadata; no boolean/enum-cast trust path |
+| Evidence required | Field/semantic diff, digest vectors, reader/version rejection tests; authenticated sidecar ownership/binding proof, бо чинний command digest автоматично не охоплює нові fields; старі receipts не стають admission evidence; no boolean/enum-cast trust path |
 | Negative tests | SC-20; unknown version, altered body/bindings/anchors, old reader accepting B, fabricated actual commit time, extra DTO fields |
 | Current status | OPEN; current Wire v1/contracts DOCUMENTED; B contract evolution NOT IMPLEMENTED; approval/integration BLOCKED |
-| Blocking dependency | Gate B; PO-04, PO-08, PO-14; рішення internal metadata проти versioned wire change |
-| Acceptance criterion | Чинний v1 у цьому slice незмінний; future readers відкидають непогоджені semantics/versions; unavailable c не вигадується; data-only flags не стають durable capability |
+| Blocking dependency | Gate B — BLOCKED BY MISSING DECISION; PO-04, PO-08, PO-14; sidecar authority/schema, compatibility/security та можливий evidence protocol decision |
+| Acceptance criterion | Wire v1 і значення backendDecisionAt/consumedAt/databaseCommittedAt незмінні; old receipts не reinterpret як admission; future readers відкидають непогоджені semantics/versions; unavailable c не вигадується; data-only sidecar/flags не стають durable capability |
 
 ### PO-13 — Retention, Tombstones & Safe Cleanup
 
@@ -313,7 +359,7 @@ Firestore durability, cross-authority consistency або STRICT_COMMIT_TIME.
 | Negative tests | SC-19, SC-11, SC-15; cleanup під час delayed commit/lookup; ABA/reused ID; expired receipt при unresolved operation |
 | Current status | OPEN; safe distributed retention NOT IMPLEMENTED; numeric production period не вибрано; integration BLOCKED |
 | Blocking dependency | PO-03, PO-05, PO-07, PO-08; terminality/cancellation evidence або equivalent safe fence |
-| Acceptance criterion | Немає resurrection/replay/false rollback після GC; час останнього request не є єдиною підставою deletion; якщо bound не доведений, небезпечний time-based GC заборонений і capacity failure fail closed |
+| Acceptance criterion | Cleanup/tombstone не знищує proof/fencing unresolved operation; немає resurrection/replay/false rollback після GC; час останнього request не є єдиною підставою deletion; без safe cleanup proof система залишається fail-closed навіть ціною capacity/availability |
 
 ### PO-14 — Late Completion, Inert Records & Time Facts
 
@@ -322,13 +368,13 @@ Firestore durability, cross-authority consistency або STRICT_COMMIT_TIME.
 | ProofID | PO-14 |
 | Security property | Late commit не подовжує доступ; session після Es/C непридатна; admission і actual commit facts не підміняються |
 | Threat або failure scenario | c>=Eg названо grace; c>=Es/C повертає чинний bearer; admission timestamp видано за actual commit; arbitrary deadline нібито cancel work |
-| Required mechanism | Явне owner approval late-record semantics; unchanged anchors; current release/use enforcement; separate honest time metadata; commit deadline тільки з independent enforceability proof |
-| Authoritative source | Потрібні owner temporal-policy decision, actual backend metadata коли доступні, current session/time authorities. DOCUMENTED current receipt дозволяє c=UNAVAILABLE; B late-record policy лише DESIGN ASSUMPTION |
-| Evidence required | Legal-origin/late-outcome model; no-extension argument; post-commit/first-use integration tests; honest handling known/unavailable c; explicit residual-risk approval |
+| Required mechanism | Proof умовно погодженої inert late-record semantics: record, створений/завершений після Es або C, неактивний і невикористовуваний, без credential release/use authority чи обходу revocation; unchanged anchors; допустимий commit protocol OPEN; honest time metadata; deadline лише з independent proof |
+| Authoritative source | DOCUMENTED owner conditional approval у Slice 2C.3B.10a та current receipt із c=UNAVAILABLE. Потрібні actual backend metadata коли доступні й current session/time/revocation authorities; runtime mechanism NOT IMPLEMENTED |
+| Evidence required | Legal-origin/late-outcome model; no-extension та no-authority argument для inert records; revocation ordering proof; post-commit/release/first-use integration tests; honest known/unavailable c; compatibility/security review |
 | Negative tests | SC-02, SC-05, SC-12; c рівно Eg/Es/C, delayed response, fabricated commit timestamp, release після expiry |
-| Current status | OPEN; late-record allowance is DESIGN ASSUMPTION, not runtime approval; mechanism NOT IMPLEMENTED; integration BLOCKED |
-| Blocking dependency | PO-01, PO-04, PO-07, PO-10, PO-12, PO-13; Gate A/B owner risk decision |
-| Acceptance criterion | Затримка не збільшує lifetime; c>=Es/C record не дає access/replacement; якщо сам late record неприйнятний, B недостатня без окремого commit-time proof; жодного вигаданого latency bound |
+| Current status | OPEN; conditional inert-record direction DOCUMENTED, runtime approval відсутній; допустимий commit protocol/proof OPEN; mechanism NOT IMPLEMENTED; integration BLOCKED |
+| Blocking dependency | PO-01, PO-04, PO-05, PO-07, PO-10, PO-12, PO-13; Gate A/B protocol та review decisions |
+| Acceptance criterion | Затримка не збільшує lifetime; c>=Es або c>=C record допустимий лише з доведеною інертністю без release/use authority і обходу revocation; usable expired sessions, late credential release/use та replacement заборонені; timestamp facts не підмінені; жодного вигаданого latency bound |
 
 **[DESIGN ASSUMPTION]** PO-13 виділено додатково, бо retention/GC можуть зруйнувати
 одноразовість і revocation після завершення звичайних request timeouts. PO-14
@@ -350,13 +396,13 @@ Firestore durability, cross-authority consistency або STRICT_COMMIT_TIME.
 | SC-02 | Admission до Eg, commit після Eg | B: continuation тієї самої O можливий без re-anchor; A: late success не дозволений | PO-01, PO-02, PO-03, PO-04, PO-14 |
 | SC-03 | Admission після Eg або точно Eg | A/B: deny; старий READY/request timestamp не допомагає | PO-01, PO-02 |
 | SC-04 | Retry після Eg | Нова attempt deny; попередній valid decision не переноситься; старий t0 не змінюється | PO-01, PO-02, PO-04 |
-| SC-05 | Commit після Es/upstream C | B: лише inert historical record, якщо це окремо погоджено; no positive release/use/replacement. A: застосовна strict expiry не послаблюється | PO-01, PO-04, PO-10, PO-14 |
-| SC-06 | Concurrent redemption двома workers | Максимум одна session і відповідний atomic receipt; інший actor отримує bound prior outcome або conflict/replay без нового issuance | PO-03, PO-08, PO-12 |
+| SC-05 | Commit після Es/upstream C | B: owner умовно погодив лише доведено inert historical record, без credential authority чи обходу revocation; no positive release/use/replacement, commit protocol OPEN. A: strict expiry не послаблюється | PO-01, PO-04, PO-05, PO-10, PO-14 |
+| SC-06 | Concurrent redemption двома workers | Одна original anchor assignment за першою valid durable transition; first precheck без transition не визначає t0; максимум одна session та atomic receipt; інший actor отримує bound prior outcome або conflict/replay | PO-01, PO-03, PO-04, PO-08, PO-12 |
 | SC-07 | Revocation під час in-flight issuance | Late writer не відновлює доступ; transaction retry/deny або доведений fence робить record непридатним; pending/logout-all входять у scope | PO-03, PO-05, PO-13 |
 | SC-08 | AuthorizationVersion change | Старій session deny; version не переписується в старому record; current permissions перевіряються окремо | PO-05, PO-06, PO-10 |
-| SC-09 | Backend restart | Відновлення original bindings/anchor/fences лише authoritative reader; за відсутності evidence немає re-anchor чи mutation, тільки safe recovery | PO-01, PO-04, PO-07, PO-08 |
+| SC-09 | Backend restart | Authoritative restoration original bindings/anchor/fences/generation; невідома generation не вгадується чи скидається; за відсутності evidence немає recreate/re-anchor чи mutation | PO-01, PO-04, PO-07, PO-08 |
 | SC-10 | Clock rollback/skew | Недоведені bounds/freshness deny; restart не обнуляє часову довіру; uncertainty не додає grace | PO-01, PO-02, PO-08 |
-| SC-11 | UNKNOWN commit outcome | Read-only lookup original O; timeout/missing receipt не rollback і не replacement permission | PO-03, PO-07, PO-08, PO-13 |
+| SC-11 | UNKNOWN durable admission або business commit outcome | Authoritative read-only lookup original admission/anchor та business outcome; missing business receipt не спростовує durable admission; timeout не rollback/replacement; definitive business abort не скасовує anchor | PO-03, PO-04, PO-07, PO-08, PO-13 |
 | SC-12 | Orphan session | Historical outcome не видає bearer; без current UseOK доступу немає; автоматичне replacement issuance заборонене | PO-07, PO-10, PO-14 |
 | SC-13 | Safe Grant Renewal до dispatch | Лише current unsent generation, authoritative abandonment та бюджети 3/2/2; нові bindings/IDs, той самий verified issuer/subject/cap | PO-03, PO-08, PO-09 |
 | SC-14 | Renewal після possible dispatch | Заборонено; RECOVERY_REQUIRED не перетворюється на BEFORE_DISPATCH; stale permits/capabilities reject | PO-07, PO-09 |
@@ -375,15 +421,16 @@ backend потребує окремо дозволеного isolated environmen
 
 ## Decision gates
 
-**[DOCUMENTED]** Gates незалежні; цей slice готує тільки Gate A.
+**[DOCUMENTED]** Gates незалежні; amendment готує Documentation Acceptance Review
+для Gate A. Owner-selected direction не завершує Gate B; C–E не відкриті.
 
 | Gate | Approval / evidence required | Current status |
 | --- | --- | --- |
 | Gate A — ADR/Proof Model Review | Незалежний review ADR-049, PO-01–PO-14, SC-01–SC-20, scope та owner open decisions | PROPOSED; review pending |
-| Gate B — Contract Evolution Approval | Окреме погодження normative change/versioning, t0/time facts і late-record/revocation semantics | BLOCKED; approval відсутній |
-| Gate C — Backend Adapter Evidence | Reviewed clock, atomic store, durable coordinator, ownership/restoration, revocation та recovery; evidence за PO | BLOCKED; remote mechanisms/evidence відсутні |
-| Gate D — Integration Acceptance | Негативні scenarios, runtime evidence provenance, production/readiness та ADMIN bundle guards, deployment readiness | BLOCKED; integration acceptance відсутній |
-| Gate E — Production Authorization | Окремий дозвіл власника після необхідних proofs/approvals | BLOCKED; authorization відсутній |
+| Gate B — Contract Evolution Approval | Окремі evidence protocol/versioning, sidecar compatibility/security та revocation/commit decisions понад погоджений direction | BLOCKED BY MISSING DECISION |
+| Gate C — Backend Adapter Evidence | Reviewed clock, atomic store, durable coordinator, ownership/restoration, revocation та recovery; evidence за PO | NOT OPENED; BLOCKED, remote mechanisms/evidence відсутні |
+| Gate D — Integration Acceptance | Негативні scenarios, runtime evidence provenance, production/readiness та ADMIN bundle guards, deployment readiness | NOT OPENED; BLOCKED, integration acceptance відсутній |
+| Gate E — Production Authorization | Окремий дозвіл власника після необхідних proofs/approvals | NOT OPENED; BLOCKED, authorization відсутній |
 
 **[BLOCKED]** Проходження Gate A не відкриває B–E. Проходження ISSUE_SESSION gates
 не вирішує PO-11 для ACCEPT_ASSERTION. Owner authorization не є технічним доказом
@@ -396,9 +443,11 @@ backend потребує окремо дозволеного isolated environmen
 (PO-04), revocation та directory/execution authority (PO-05/PO-06), durable recovery
 (PO-07), family ownership і production minimum reserve (PO-09), release/use proof
 (PO-10), незалежний strict ACCEPT_ASSERTION proof (PO-11), contract/versioning
-(PO-12), safe retention (PO-13), допустимість late inert records (PO-14).
+(PO-12), safe retention (PO-13), proof інертності умовно погоджених late records та
+допустимий commit protocol (PO-14). Вибір моделі B, t0=L_j та умовний inert-record
+direction уже погоджені; конкретні mechanisms, contract mapping та proofs OPEN.
 
-**[DOCUMENTED]** Documentation-only scope: новий ADR і цей proof document.
+**[DOCUMENTED]** Documentation-only scope amendment: лише ADR-049 і цей proof document.
 Незмінні: runtime STRICT_COMMIT_TIME для обох operations до окремого approval,
 remote BLOCKED gate, TTL, Wire v1, LoginOrchestrator, PermissionService, ADMIN
 entrypoints/RPC allowlist, production authorization, Safe Grant Renewal contracts,
@@ -417,6 +466,7 @@ TypeScript/tests, build configuration, manifests та dependencies. Жодне �
 **[DESIGN ASSUMPTION]** Gate A reviewer має перевірити scope/status inheritance,
 відсутність runtime approval, completeness і несуперечливість PO fields, traceability
 SC-to-PO, окремий ACCEPT_ASSERTION blocker, чесне маркування evidence levels,
-open t0/revocation/retention decisions та посилання на актуальні contracts.
+owner-selected durable-first semantics, open clock/anchor mechanism,
+revocation/retention/sidecar/late-record proofs та посилання на актуальні contracts.
 Результат такого review не дозволяє staging/commit, code changes, integration,
 deployment або activation без окремого завдання/approval.
