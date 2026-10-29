@@ -159,7 +159,9 @@ function temporalDataSnapshot(value: unknown) {
 export function validateTemporalMetadataDescriptor(value: unknown, expectedValue: unknown,
   targetValue: ChannelExpectation, digest: BodyDigestPort): TemporalContractValidation<TemporalMetadataDescriptor> {
   try {
-    const candidate = temporalDataSnapshot(value), expected = temporalDataSnapshot(expectedValue), target = expectation(targetValue);
+    const expected = temporalDataSnapshot(expectedValue);
+    const target = expectation(targetValue);
+    const candidate = temporalDataSnapshot(value);
     const recovery = inspectRecoveryDescriptor(candidate.recovery, target, digest);
     const original = inspectRecoveryDescriptor(expected.recovery, target, digest);
     const binding = candidate.binding, pinned = expected.binding;

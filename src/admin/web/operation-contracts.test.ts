@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { operationDescriptor, encodeBusinessBody, canonicalSemanticBytes, recoveryDescriptor,
   inspectRecoveryDescriptor, type SemanticMetadata } from './operation-contracts';
 import { canonicalCommandBytes, canonicalRequestBytes } from './channel-contracts/validation';
@@ -146,6 +146,39 @@ const checkTemporal = (value: unknown, pinned: unknown) => validateTemporalMetad
 const invalidTemporal = { status: 'INVALID_DATA', reason: 'INVALID_INPUT' };
 
 describe('operation-scoped temporal metadata (data only, no runtime approval)', () => {
+  it('captures nested pinned metadata and target before inspecting the candidate', () => {
+    const candidate = temporalFixture(), pinned = temporalFixture(), pinnedTarget = { ...target };
+    const descriptors = vi.spyOn(Object, 'getOwnPropertyDescriptors');
+    let result: TemporalContractValidation<TemporalMetadataDescriptor>, inspected: unknown[];
+    try {
+      result = validateTemporalMetadataDescriptor(candidate, pinned, pinnedTarget, digest);
+      inspected = descriptors.mock.calls.map(([value]) => value);
+    } finally { descriptors.mockRestore(); }
+    expect(result.status).toBe('VALID_DATA');
+    const candidateIndex = inspected.indexOf(candidate);
+    expect(candidateIndex).toBeGreaterThanOrEqual(0);
+    const targetIndex = inspected.indexOf(pinnedTarget);
+    expect(targetIndex).toBeGreaterThanOrEqual(0);
+    expect(targetIndex).toBeLessThan(candidateIndex);
+    for (const expected of [pinned, pinned.recovery, pinned.binding, pinned.binding.policy]) {
+      expect(inspected.indexOf(expected)).toBeGreaterThanOrEqual(0);
+      expect(inspected.indexOf(expected)).toBeLessThan(targetIndex);
+    }
+  });
+  it('rejects invalid pinned metadata without inspecting the candidate', () => {
+    const candidate = temporalFixture(), original = temporalFixture();
+    const pinned = { ...original, binding: { ...original.binding, version: 2 } };
+    const descriptors = vi.spyOn(Object, 'getOwnPropertyDescriptors');
+    let result: TemporalContractValidation<TemporalMetadataDescriptor>, inspected: unknown[];
+    try {
+      result = checkTemporal(candidate, pinned);
+      inspected = descriptors.mock.calls.map(([value]) => value);
+    } finally { descriptors.mockRestore(); }
+    expect(result).toEqual(invalidTemporal);
+    expect(inspected).toContain(pinned);
+    for (const value of [candidate, candidate.recovery, candidate.binding, candidate.binding.policy])
+      expect(inspected).not.toContain(value);
+  });
   it.each(temporalPolicies)('validates the allowed pair $operation / $mode as data only', policy => {
     const candidate = temporalFixture(policy), pinned = temporalFixture(policy);
     expect(validateTemporalAdmissionPolicy(policy)).toEqual({ status: 'VALID_DATA', value: policy });
