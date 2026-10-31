@@ -4,6 +4,13 @@ Status: **LOCAL CONTRACTS, REFERENCE MODEL & TESTS ONLY**. No real login, crypto
 session persistence, OAuth configuration or GAS RPC integration. PRODUCTION, TEST_RESET execution
 and ADMIN deployment remain **NO-GO**. This document records slice decisions, not a new ADR.
 
+Profile boundary (Slice 2C.3C.5):
+[ADR-050 — Backend Sessions and Check-Time Continuation](<adr/ADR-050 — Backend Sessions and Check-Time Continuation.md>)
+records owner-approved design for the separate KUB_ERP_SESSION_BD2_V1 profile.
+It is ACCEPTED; its configurable idle/hard-cap design does not change the legacy
+TTL, assertion/grant contracts, browser credential transport or runtime described here.
+No contract integration, strict-gate activation or PO closure follows from that design.
+
 ## Architecture and trust boundaries
 
 Target: two independent ADMIN GAS projects, shared code, Execute as user deploying.

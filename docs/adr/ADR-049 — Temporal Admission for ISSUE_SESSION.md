@@ -4,6 +4,12 @@
 
 **PROPOSED / (Запропоновано).** Дата: 2026-10-27. Slice: 2C.3B.7.
 
+**[DOCUMENTED]** Cross-reference Slice 2C.3C.5 (2026-10-31):
+[ADR-050 — Backend Sessions and Check-Time Continuation](<ADR-050 — Backend Sessions and Check-Time Continuation.md>)
+фіксує owner-approved B/D2 design для окремого нового profile. B/D2 не є Policy B / Model B
+цього ADR. ADR-050 має статус ACCEPTED; це не змінює цей нормативний текст, статус,
+runtime STRICT_COMMIT_TIME для обох operations, OPEN proof obligations або BLOCKED gates.
+
 **[DOCUMENTED]** Власник ERP КУБ погодив напрям проєктування
 `STRICT_BACKEND_ADMISSION` виключно для `ISSUE_SESSION`. Це ADR не схвалює
 runtime enforcement, реалізацію адаптера, runtime integration або production activation.

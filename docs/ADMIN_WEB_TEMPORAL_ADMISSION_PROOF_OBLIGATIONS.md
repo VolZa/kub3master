@@ -9,6 +9,12 @@ Baseline: `feature/bom-logic`, HEAD
 `d6256e4f56d14650a51e124813066309ef5691f1`, clean working tree та empty staging
 до документаційних additions. Власник погодив design direction, а не runtime policy.
 
+**[DOCUMENTED]** Cross-reference Slice 2C.3C.5:
+[ADR-050 — Backend Sessions and Check-Time Continuation](<adr/ADR-050 — Backend Sessions and Check-Time Continuation.md>)
+описує окремий owner-approved B/D2 design зі статусом ACCEPTED. Його check-time policy
+не є доказом legacy strict temporal properties. PO-01–PO-14 тут залишаються OPEN,
+не PASS/N/A; runtime STRICT_COMMIT_TIME, Gate B і remote admission BLOCKED незмінні.
+
 **[DOCUMENTED]** Amendment Slice 2C.3B.10a, дата 2026-10-29. Baseline amendment:
 `feature/bom-logic`, HEAD `930c19fc558f41de0cbab3c6474427955dc87f43`, clean working
 tree та empty staging. Попередній baseline є історією створення документів.

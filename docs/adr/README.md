@@ -1,3 +1,18 @@
+# Architecture Decision Records
+
+## Security architecture decisions
+
+| ADR | Design | Status |
+| --- | --- | --- |
+| [ADR-049](<ADR-049 — Temporal Admission for ISSUE_SESSION.md>) | Legacy temporal admission / durable-first design | PROPOSED |
+| [ADR-050](<ADR-050 — Backend Sessions and Check-Time Continuation.md>) | B/D2 backend sessions; owner-approved design, no runtime approval | ACCEPTED |
+
+ADR-050 does not open Gate B, close PO-01–PO-14 or change current STRICT_COMMIT_TIME.
+PRODUCTION, ADMIN deployment and TEST_RESET remain NO-GO.
+The historical directory overview below is retained; it is not a complete current ADR listing.
+
+---
+
 docs\adr\README.md
 
 docs/
