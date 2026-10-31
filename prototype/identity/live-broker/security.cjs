@@ -10,6 +10,10 @@ function equal(a, b) {
   return typeof a === 'string' && typeof b === 'string' && a.length === b.length &&
     timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
+/** Shared browser-secret binding. Call inside the store's conditional transition for one-time use. */
+function requireBrowserProof(record, proof) {
+  if (!record || !hex(proof) || !hex(record.proofHash) || !equal(record.proofHash, hash(proof))) deny();
+}
 function createGoogleVerifier({ clientId, client = new OAuth2Client(clientId), now = Date.now }) {
   if (typeof clientId !== 'string' || !clientId.endsWith('.apps.googleusercontent.com')) deny();
   return { async verify(token, nonce) {
@@ -63,4 +67,5 @@ function createChannelGuard({ secret, replay, now = Date.now }) {
     if (!equal(expected, mac) || !await replay.consume(requestId, now() + 60_000)) deny();
   };
 }
-module.exports = { createGoogleVerifier, createAssertionSigner, assertionSignatureVerifier, createChannelGuard, hash, random, hex, deny };
+module.exports = { createGoogleVerifier, createAssertionSigner, assertionSignatureVerifier, createChannelGuard,
+  requireBrowserProof, hash, random, hex, deny };

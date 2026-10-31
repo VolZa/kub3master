@@ -1,5 +1,5 @@
 'use strict';
-const { createGoogleVerifier, hash, random, hex, deny } = require('./security.cjs');
+const { createGoogleVerifier, requireBrowserProof, hash, random, hex, deny } = require('./security.cjs');
 /** Store is a durable atomic port. transition(id, phase, fn) invokes synchronous fn once per committed
  * update (or retries only pure calculation) and commits fn's returned record. No in-memory fallback.
  * Store must encrypt PKCE verifier at rest, apply TTL/admission bounds, and never log record values.
@@ -17,7 +17,7 @@ function createBroker({ store, oauth, clientId, redirectUri, users, signAssertio
       if (![id, proof].every(hex)) deny();
       const cookie = random(), state = id + '.' + random(), verifier = random();
       await store.transition(id, 'NEW', record => {
-        live(record); if (record.proofHash !== hash(proof)) deny();
+        live(record); requireBrowserProof(record, proof);
         return { ...record, phase: 'BOUND', cookieHash: hash(cookie), stateHash: hash(state), pkce: verifier };
       });
       const url = oauth.generateAuthUrl({ scope: ['openid', 'email', 'profile'], access_type: 'online',
@@ -51,10 +51,10 @@ function createBroker({ store, oauth, clientId, redirectUri, users, signAssertio
     async redeem({ id, proof }) {
       if (![id, proof].every(hex)) deny();
       const current = await store.read(id); live(current);
-      if (current.proofHash !== hash(proof)) deny();
+      requireBrowserProof(current, proof);
       if (['NEW', 'BOUND', 'PROCESSING'].includes(current.phase)) return { status: 'PENDING' };
       const record = await store.transition(id, 'VERIFIED', row => {
-        live(row); if (row.proofHash !== hash(proof)) deny(); return { ...row, phase: 'REDEEMED' };
+        live(row); requireBrowserProof(row, proof); return { ...row, phase: 'REDEEMED' };
       });
       const { identity } = record;
       if (!await users.isActive(identity.issuer, identity.subject)) deny();
