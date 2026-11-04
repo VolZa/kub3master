@@ -21,15 +21,18 @@ legacy broker and session-issuance composition are not the new backend profile.
 - `createLoginProofValidator` accepts an explicit trusted verification port for isolated
   composition; it must never be selected or supplied through a browser request.
 - The attempt store uses the existing broker `createOnce`/conditional `transition`
-  pattern. A shared durable adapter is required before integration; none is supplied.
-  Test-only Map stores and certificate substitutions exist exclusively under `test/`.
+  pattern. Slice 2C.4.2 adds the isolated Firestore SDK adapter; no production composition.
+  See [durable attempt contract and evidence](DURABLE_LOGIN_ATTEMPTS.md).
+  Map stores and certificate substitutions are test-only; emulator integration uses the real SDK.
 
 ## Local flow and failure boundary
 
 1. `begin({browserProofHash})` binds the SHA-256 of a browser-owned 256-bit secret to
    server-generated attempt ID/nonce, captured context and a short deadline.
-2. `verify({attemptId, browserProof, idToken})` checks the bound context/deadline/proof
+2. `verify({attemptId, browserProof, nonce, idToken})` checks the bound context/deadline/proof
    inside an atomic `NEW -> CONSUMED` transition. Unknown/conflict/unavailable denies.
+   The public nonce from begin is echoed, hashed against `nonceHash`, then checked by
+   the unchanged Google verifier. Raw nonce/proof/token are never persisted by the adapter.
 3. Google verification runs outside any retried store callback. Signature, pinned
    audience, Google issuer, token expiry, subject and the attempt nonce must pass.
    The existing verifier also checks issued-at and authorized-party consistency.
@@ -40,7 +43,8 @@ legacy broker and session-issuance composition are not the new backend profile.
 `CONSUMED` does not mean successful Google authentication. Failed/UNKNOWN verification
 or a crash leaves an unusable attempt; no reset, replay or automatic retry is provided.
 No result is returned on uncertainty. A later independent login needs a new attempt
-and matching Google nonce. Durable result/recovery/session binding is future work.
+and matching Google nonce. Read-only storage outcome lookup is now available;
+resuming verification or issuing a session from lookup metadata remains forbidden.
 The returned object is local verification data, not a serialized authorization capability
 or evidence sufficient to open a gate. Manual enrollment/current permissions remain required.
 

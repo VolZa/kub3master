@@ -57,7 +57,7 @@ async function login(f, proof = randomBytes(32).toString('hex')) {
   const attempt = await f.validator.begin({ browserProofHash: hash(proof) });
   return { ...attempt, browserProof: proof, idToken: token(attempt.nonce) };
 }
-const request = a => ({ attemptId: a.attemptId, browserProof: a.browserProof, idToken: a.idToken });
+const request = a => ({ attemptId: a.attemptId, browserProof: a.browserProof, nonce: a.nonce, idToken: a.idToken });
 const denied = action => assert.rejects(action, { message: 'ACCESS_DENIED' });
 
 test('Google-backed factory uses actual library RSA verification with test-only certificate retrieval', async t => {
@@ -66,7 +66,7 @@ test('Google-backed factory uses actual library RSA verification with test-only 
   const validator = createGoogleLoginProofValidator({ configuration: config(), attempts: f.attempts, now: () => START });
   const proof = randomBytes(32).toString('hex');
   const a = await validator.begin({ browserProofHash: hash(proof) });
-  const result = await validator.verify({ attemptId: a.attemptId, browserProof: proof, idToken: token(a.nonce) });
+  const result = await validator.verify({ attemptId: a.attemptId, browserProof: proof, nonce: a.nonce, idToken: token(a.nonce) });
   assert.deepEqual(result.principal, { issuer: 'https://accounts.google.com', sub: 'verified-google-subject' });
   assert.equal(result.profile, 'KUB_ERP_SESSION_BD2_V1');
   assert.deepEqual(Object.keys(result).sort(), ['attemptId', 'context', 'googleTokenExpiresAtMs', 'principal', 'profile', 'verifiedAtMs']);
