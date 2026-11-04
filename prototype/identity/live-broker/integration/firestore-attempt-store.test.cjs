@@ -55,11 +55,58 @@ test('real SDK/emulator create and claim: digest-only persisted record, replay a
   const outcome = await lookup(f, a); assert.equal(outcome.status, 'COMMITTED'); assert.equal(outcome.revision, 1);
   assert.equal((await lookup(f, a, 'CREATE')).status, 'COMMITTED');
 });
-test('two concurrent requests through two independent SDK clients have exactly one successful claim', async () => {
+test('two concurrent requests through two independent SDK clients have at most one successful claim', async t => {
   const a = fixture(), b = fixture(), attempt = await login(a);
+  const ref = a.db.collection(collectionId).doc(attempt.attemptId), before = (await ref.get()).data();
+  assert.equal(before.attempt.phase, 'NEW'); assert.equal(before.revision, 0); assert.equal(before.claim, null);
+  const instances = [a, b], outerTransactions = [0, 0];
+  for (const [i, f] of instances.entries()) {
+    const run = f.db.runTransaction.bind(f.db);
+    f.db.runTransaction = (...args) => { outerTransactions[i]++; return run(...args); };
+  }
   const results = await Promise.allSettled([a.validator.verify(request(attempt)), b.validator.verify(request(attempt))]);
-  assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
-  assert.equal(a.calls() + b.calls(), 1);
+  const successes = results.filter(r => r.status === 'fulfilled'), failures = results.filter(r => r.status === 'rejected');
+  assert.ok(successes.length <= 1); assert.equal(a.calls() + b.calls(), successes.length);
+  assert.deepEqual(outerTransactions, [1, 1], 'one original invocation per caller; no outer retry after UNKNOWN');
+  for (const result of successes) assert.equal(result.value.principal.sub, 'durable-fixture-subject');
+  for (const { reason } of failures) {
+    assert.equal(reason instanceof AttemptStoreError, true);
+    assert.ok(['REJECTED', 'UNKNOWN'].includes(reason.outcome));
+    assert.equal(reason.descriptor.kind, 'CLAIM'); assert.equal(reason.descriptor.attemptId, attempt.attemptId);
+    assert.equal(reason.descriptor.operationId, operationId('CLAIM', attempt.attemptId));
+    if (reason.descriptor.bindingDigest !== null) assert.equal(reason.descriptor.bindingDigest, before.bindingDigest);
+  }
+  if (successes.length === 0) {
+    assert.ok(failures.some(r => r.reason.outcome === 'UNKNOWN'), 'zero progress requires fail-closed ambiguity, not silent denial');
+    assert.equal(a.calls() + b.calls(), 0);
+  }
+  // UNKNOWN may leave NEW or persist CONSUMED. Inspect storage independently; neither
+  // a numeric SDK error nor lack of successful responses proves the original outcome.
+  const after = (await ref.get()).data();
+  assert.deepEqual({ ...after.attempt, phase: 'NEW' }, before.attempt);
+  assert.equal(after.bindingDigest, before.bindingDigest); assert.equal(after.createOperationId, before.createOperationId);
+  assert.ok(['NEW', 'CONSUMED'].includes(after.attempt.phase));
+  if (after.attempt.phase === 'NEW') {
+    assert.equal(after.revision, 0); assert.equal(after.claim, null); assert.equal(successes.length, 0);
+  } else {
+    assert.equal(after.revision, 1); assert.equal(after.claim.operationId, operationId('CLAIM', attempt.attemptId));
+  }
+  if (successes.length === 1) assert.equal(after.attempt.phase, 'CONSUMED');
+  const callsBeforeRecovery = a.calls() + b.calls();
+  for (const [i, result] of results.entries()) {
+    const descriptor = result.status === 'rejected' ? result.reason.descriptor : {
+      kind: 'CLAIM', attemptId: attempt.attemptId, operationId: operationId('CLAIM', attempt.attemptId), bindingDigest: before.bindingDigest };
+    for (let read = 0; read < 2; read++) {
+      const outcome = await instances[i].store.lookup(descriptor);
+      assert.equal(outcome.status, after.attempt.phase === 'CONSUMED' ? 'COMMITTED' : 'UNKNOWN');
+      if (outcome.status === 'COMMITTED') { assert.equal(outcome.phase, 'CONSUMED'); assert.equal(outcome.revision, 1); }
+    }
+  }
+  assert.deepEqual(outerTransactions, [1, 1], 'original-operation recovery must be read-only');
+  assert.equal(a.calls() + b.calls(), callsBeforeRecovery, 'lookup must not resume Google verification');
+  assert.deepEqual((await ref.get()).data(), after);
+  t.diagnostic(JSON.stringify({ successes: successes.length, unknown: failures.filter(r => r.reason.outcome === 'UNKNOWN').length,
+    outerTransactions, google: a.calls() + b.calls(), persistedPhase: after.attempt.phase, revision: after.revision }));
 });
 test('consumed state survives a genuine backend process restart; child lookup cannot authorize replay', async () => {
   const f = fixture(), a = await login(f);

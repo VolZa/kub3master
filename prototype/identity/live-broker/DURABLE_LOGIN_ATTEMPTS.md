@@ -71,22 +71,22 @@ fresh attempt. The methods do not orchestrate retries of UNKNOWN; callers must p
 the descriptor/recovery mode across restart. No durable HTTP request coordinator is claimed.
 After unknown creation, lost transient nonce cannot be recovered from the store.
 
-### OPEN caller-side enforcement
+### Raw-port risk and isolated caller-side enforcement
 
-The current API is not an end-to-end lookup-only gate. After UNKNOWN before commit,
+The raw attempt/login-proof API is not an end-to-end lookup-only gate. After UNKNOWN before commit,
 the stored attempt may still be NEW. An explicit second verify call with the same request
 can then claim it and invoke Google verification. The integration suite records this as
 an OPEN risk; passing that test is not proof that caller recovery is enforced.
 
-Minimal proposed mechanism, not implemented in this corrective slice: a shared durable
-caller dispatch journal keyed by original operation ID, attempt ID and pinned context,
-with immutable request/binding digests and no raw credentials. Persist dispatch intent
-before invoking verify/claim, using conditional single-dispatch ownership. A pending
-intent after crash or any UNKNOWN must route duplicate requests to read-only lookup,
-never back to verify/claim, even if lookup has no receipt. Uncertain journal persistence
-must prevent dispatch. COMMITTED lookup still does not resume Google verification.
-This is proposed caller bookkeeping, not a change to NEW -> CONSUMED or a new grant/
-session/admission lifecycle. Cross-worker/restart enforcement requires separate acceptance.
+Slice 2C.4.3 adds an isolated shared durable dispatch journal and coordinator around this
+raw port; see [DISPATCH_JOURNAL.md](DISPATCH_JOURNAL.md) for schema, API, crash semantics
+and acceptance evidence. Durable intent and irreversible conditional reservation precede
+the outer claim. Duplicate/recovery paths cannot obtain a new permit, even with NEW or
+no claim receipt. COMMITTED lookup never resumes Google verification. This is caller
+bookkeeping, not a change to NEW -> CONSUMED or a new grant/session/admission lifecycle.
+The raw-port risk test remains valid: bypassing the wrapper is unsafe. Public HTTP/browser
+integration, durable request routing, production authority and operational proofs remain
+OPEN; the isolated composition is not automatically enabled by this documentation.
 
 ## Clock, ordering and delayed commit
 

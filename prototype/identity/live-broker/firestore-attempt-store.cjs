@@ -122,7 +122,8 @@ function createFirestoreAttemptStore({ firestore, configuration: config, collect
       if (q.kind === 'CLAIM' && e.claim === null) return Object.freeze({ status: 'UNKNOWN' });
       return Object.freeze({ status: 'COMMITTED', kind: q.kind, attemptId: q.attemptId,
         operationId: q.operationId, bindingDigest: e.bindingDigest, phase: e.attempt.phase, revision: e.revision,
-        checkedAtMs: q.kind === 'CLAIM' ? e.claim.checkedAtMs : null });
+        checkedAtMs: q.kind === 'CLAIM' ? e.claim.checkedAtMs : null,
+        createdAtMs: e.attempt.createdAtMs, expiresAtMs: e.attempt.expiresAtMs });
     },
   });
 }
