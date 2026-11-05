@@ -3,7 +3,9 @@ const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { randomBytes } = require('node:crypto');
 const { createLocalFirestoreClient } = require('../firestore-attempt-store.cjs');
-const { createFirestoreUserStore } = require('../firestore-user-store.cjs');
+const { createFirestoreUserStore, readUserInTransaction } = require('../firestore-user-store.cjs');
+const { createFirestoreSessionPolicyStore, readCurrentPolicyInTransaction } = require('../firestore-session-policy-store.cjs');
+const pc = require('../bd2-session-policy-contract.cjs');
 const c = require('../bd2-user-contract.cjs');
 const host = process.env.FIRESTORE_EMULATOR_HOST;
 if (!host) throw Error('INTEGRATION_BLOCKED: loopback Firestore Emulator required; no mock/production fallback');
@@ -28,6 +30,136 @@ function fixture(ctx = context()) {
 }
 after(async () => { await Promise.all(clients.map(db => db.terminate())); });
 const reject = (p, outcome) => assert.rejects(p, e => e instanceof c.UserStoreError && e.outcome === outcome);
+
+// Test-only coordinator; results are inspected locally, never reused as authority in another transaction.
+async function readPair(f, afterUser = () => {}) {
+  const reads = [];
+  const result = await f.db.runTransaction(async tx => {
+    for (const method of ['create', 'update', 'set', 'delete']) tx[method] = () => assert.fail('read-only coordinator wrote');
+    const port = { firestore: { collection: f.db.collection.bind(f.db) }, context: f.ctx,
+      get: ref => { reads.push(ref.path); return tx.get(ref); } };
+    const user = await readUserInTransaction(port, principal('target'));
+    afterUser(); // May START a competing writer, but must never await it under read locks.
+    const policy = await readCurrentPolicyInTransaction(port);
+    if (!user || !policy) throw Error('REQUIRED_STATE_MISSING');
+    assert.ok(Object.isFrozen(user)); assert.ok(Object.isFrozen(policy));
+    return { user, policy };
+  }, { maxAttempts: 1 });
+  return { ...result, reads };
+}
+const policyCommand = (f, idle, version = 1) => pc.createCommand(f.ctx, {
+  commandId: randomBytes(32).toString('hex'), actor: principal('fixture-actor'),
+  kind: idle === undefined ? 'INITIALIZE_SESSION_POLICY' : 'UPDATE_SESSION_POLICY',
+  expectedPolicyVersion: idle === undefined ? null : version, payload: idle === undefined ? {} : { idleTimeoutMinutes: idle },
+});
+function policyStore(f) {
+  return createFirestoreSessionPolicyStore({ firestore: f.db, context: f.ctx, authorize: () => true });
+}
+async function pairFixture() {
+  const a = fixture(), b = fixture(a.ctx), policies = policyStore(a);
+  await a.store.enrollUser(a.command()); await policies.initializeSessionPolicy(policyCommand(a));
+  return { a, b, policies };
+}
+async function durableRows(f) {
+  const names = ['users', 'operations', 'session_policy', 'session_policy_history', 'session_policy_operations'];
+  return Promise.all(names.map(async name => [name,
+    (await f.root.collection(name).orderBy('__name__').get()).docs.map(d => [d.id, d.data()])]));
+}
+
+test('external readers share exactly one SDK transaction across independent clients without authorization or writes', async () => {
+  const { a, b } = await pairFixture(), before = await durableRows(a);
+  for (const f of [a, b]) {
+    const calls = f.state.transactions, auth = f.state.authorizations, pair = await readPair(f);
+    assert.equal(pair.user.active, false); assert.deepEqual(pair.user.roles, []); assert.equal(pair.policy.policyVersion, 1);
+    assert.equal(pair.reads.length, 4); assert.equal(new Set(pair.reads).size, 4);
+    assert.equal(f.state.transactions, calls + 1); assert.equal(f.state.authorizations, auth);
+    assert.deepEqual(pair.user, await f.store.getUser(principal('target')));
+    assert.deepEqual(pair.policy, await policyStore(f).getCurrentPolicy());
+  }
+  assert.deepEqual(await durableRows(a), before);
+});
+
+test('test-only coordinator refuses missing User/Policy and corrupt persisted evidence with zero writes', async () => {
+  for (const damage of ['missing user', 'missing policy', 'corrupt user', 'corrupt policy', 'missing anchor']) {
+    const { a, b } = await pairFixture();
+    if (damage === 'missing user') await a.userRef('target').delete();
+    if (damage === 'missing policy') {
+      for (const name of ['session_policy', 'session_policy_history', 'session_policy_operations'])
+        for (const doc of (await a.root.collection(name).get()).docs) await doc.ref.delete();
+    }
+    if (damage === 'corrupt user') await a.userRef('target').update({ 'user.roles': ['OWNER'] });
+    if (damage === 'corrupt policy') await a.root.collection('session_policy').doc('current').update({ storageSchemaVersion: 2 });
+    if (damage === 'missing anchor') {
+      const ps = policyStore(a); await ps.updateSessionPolicy(policyCommand(a, 30));
+      await ps.updateSessionPolicy(policyCommand(a, 360, 2)); await a.root.collection('session_policy_history').doc('1').delete();
+    }
+    const before = await durableRows(a), calls = b.state.transactions, auth = b.state.authorizations;
+    await assert.rejects(readPair(b), e => damage.startsWith('missing ') && damage !== 'missing anchor' ?
+      e.message === 'REQUIRED_STATE_MISSING' : e.outcome === 'INVALID');
+    assert.equal(b.state.transactions, calls + 1); assert.equal(b.state.authorizations, auth);
+    assert.deepEqual(await durableRows(a), before);
+  }
+});
+
+// Deliberate test-only coupled update: both normal store schemas/receipts/history stay valid.
+// It is not exported or composed into runtime issuance/authorization.
+async function coupledUpdate(f) {
+  const userCommand = f.command('SET_USER_ACTIVE', 0, { active: true }), command = policyCommand(f, 30);
+  return f.db.runTransaction(async tx => {
+    const userRef = f.userRef('target'), currentRef = f.root.collection('session_policy').doc('current');
+    const envelope = (await tx.get(userRef)).data(), record = (await tx.get(currentRef)).data();
+    const before = c.validateEnvelope(f.ctx, envelope, c.userKey(principal('target'))).user;
+    const policy = pc.validateRecord(f.ctx, record).policy, at = Math.max(Date.now(), envelope.updatedAtMs, policy.updatedAtMs);
+    const plan = c.transition(f.ctx, userCommand, before), receipt = pc.createReceipt(f.ctx, command, policy, at);
+    assert.equal(plan.outcome, 'UPDATED'); assert.equal(receipt.outcome, 'UPDATED');
+    tx.update(userRef, c.validateEnvelope(f.ctx, { ...envelope, user: plan.user, updatedAtMs: at,
+      updatedBy: userCommand.actor, lastOperationId: userCommand.operationId }, c.userKey(principal('target'))));
+    tx.create(f.operationRef(userCommand), c.createReceipt(f.ctx, userCommand, before, plan.user, plan.outcome, at));
+    tx.update(currentRef, pc.createRecord(f.ctx, receipt.afterPolicy, command.operationId));
+    tx.create(f.root.collection('session_policy_history').doc('2'), pc.createHistory(f.ctx, receipt.afterPolicy, command.operationId));
+    tx.create(f.root.collection('session_policy_operations').doc(command.operationId), receipt);
+  }, { maxAttempts: 1 });
+}
+
+for (const mode of ['User version', 'Policy update', 'atomic coupled User/Policy']) {
+  test('external snapshot remains consistent during concurrent ' + mode, { timeout: 45000 }, async t => {
+    const { a, b, policies } = await pairFixture(); let writer;
+    const userCmd = a.command('SET_USER_ACTIVE', 0, { active: true }), policyCmd = policyCommand(a, 30);
+    const write = () => mode === 'User version' ? a.store.setUserActive(userCmd) :
+      mode === 'Policy update' ? policies.updateSessionPolicy(policyCmd) : coupledUpdate(a);
+    const start = a.state.transactions, readerStart = b.state.transactions;
+    const observed = await Promise.allSettled([readPair(b, () => {
+      // Handle rejection immediately; settle it only AFTER the reader releases its locks.
+      writer = Promise.allSettled([write()]);
+    })]);
+    const [written] = await writer;
+    assert.equal(a.state.transactions, start + 1); assert.equal(b.state.transactions, readerStart + 1);
+    const check = pair => {
+      const u = pair.user.authorizationVersion, p = pair.policy.policyVersion;
+      if (mode === 'User version') { assert.ok([0, 1].includes(u)); assert.equal(p, 1); }
+      else if (mode === 'Policy update') { assert.equal(u, 0); assert.ok([1, 2].includes(p)); }
+      else assert.ok((u === 0 && p === 1) || (u === 1 && p === 2), 'no mixed snapshot across an atomic write');
+      assert.equal(pair.user.revision, u); assert.equal(pair.user.active, u === 1);
+      assert.equal(pair.policy.idleTimeoutMinutes, p === 1 ? 180 : 30);
+    };
+    if (observed[0].status === 'fulfilled') check(observed[0].value);
+    else assert.ok([4, 10].includes(observed[0].reason.code), 'only SDK contention may abort the reader');
+    if (written.status === 'rejected') assert.ok(written.reason.outcome === 'UNKNOWN' || [4, 10].includes(written.reason.code));
+    const settled = await readPair(b); check(settled);
+    if (written.status === 'fulfilled') {
+      assert.equal(settled.user.authorizationVersion, mode === 'Policy update' ? 0 : 1);
+      assert.equal(settled.policy.policyVersion, mode === 'User version' ? 1 : 2);
+    }
+    // A separate explicit test action ensures positive post-change evidence even if contention made no progress.
+    if ((mode === 'User version' && settled.user.authorizationVersion === 0) ||
+      (mode !== 'User version' && settled.policy.policyVersion === 1)) await write();
+    const final = await readPair(b); check(final);
+    assert.equal(final.user.authorizationVersion, mode === 'Policy update' ? 0 : 1);
+    assert.equal(final.policy.policyVersion, mode === 'User version' ? 1 : 2);
+    t.diagnostic(JSON.stringify({ mode, reader: observed[0].status, writer: written.status,
+      finalUserVersion: final.user.authorizationVersion, finalPolicyVersion: final.policy.policyVersion }));
+  });
+}
 
 test('local client rejects production hosts/projects, ADC options and endpoint substitution', () => {
   for (const options of [{ host: 'firestore.googleapis.com:443', projectId }, { host, projectId: 'real-project' },

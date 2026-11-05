@@ -2,7 +2,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const api = require('../../../../build/permission-node/index.cjs');
-const { createFirestoreSessionPolicyStore } = require('../firestore-session-policy-store.cjs');
+const { createFirestoreSessionPolicyStore, readCurrentPolicyInTransaction } = require('../firestore-session-policy-store.cjs');
+const { createFirestoreUserStore, readUserInTransaction } = require('../firestore-user-store.cjs');
+const uc = require('../bd2-user-contract.cjs');
 const c = require('../bd2-session-policy-contract.cjs');
 const ctx = { environment: 'TEST', applicationAudience: 'policy-store-unit', expectedScriptId: 'isolated' };
 const actor = { issuer: 'https://accounts.google.com', sub: 'actor' };
@@ -260,6 +262,7 @@ test('F-01: current v3 requires intact initialization evidence before reads, UPD
     await f.store.updateSessionPolicy(f.command(360, 2));
     corrupt(f, init, update);
     const before = structuredClone([...f.rows]), writes = f.counts.writes, calls = f.counts.transactions;
+    await rejects(readCurrentPolicyInTransaction(externalPolicyPort(f).options), 'INVALID');
     await rejects(f.store.getCurrentPolicy(), 'INVALID');
     await rejects(f.store.updateSessionPolicy(f.command(180, 3)), 'INVALID');
     await rejects(f.store.updateSessionPolicy(f.command(360, 3)), 'INVALID');
@@ -293,4 +296,107 @@ test('F-01: intact v1 evidence permits current v3, v4, NOOP, replay and read-onl
   assert.deepEqual(await f.store.lookupOperationOutcome(c.descriptor(ctx, noop)), savedNoop);
   assert.equal(f.counts.transactions, calls); assert.equal(f.counts.authorizations, auth);
   assert.equal(f.counts.writes, writes); assert.deepEqual([...f.rows], before);
+});
+
+function externalPolicyPort(f) {
+  const reads = [];
+  const forbidden = () => assert.fail('reader-owned transaction/independent get');
+  const ref = path => ({ path, collection: name => collection(path + '/' + name), get: forbidden });
+  const collection = path => ({ doc: id => ref(path + '/' + id), limit: n => ({ path, query: true, limit: n, get: forbidden }) });
+  return { reads, options: { context: ctx, firestore: { collection, runTransaction: forbidden }, async get(r) {
+    reads.push(r);
+    if (r.query) { assert.equal(r.limit, 1); return { empty: ![...f.rows.keys()].some(p => p.startsWith(r.path + '/')) }; }
+    return { exists: f.rows.has(r.path), data: () => f.rows.get(r.path) };
+  } } };
+}
+test('external Policy port preserves empty-authority queries and rejects either orphan collection', async () => {
+  const f = fixture(), p = externalPolicyPort(f);
+  assert.equal(await readCurrentPolicyInTransaction(p.options), undefined);
+  assert.equal(p.reads.length, 3); assert.equal(p.reads.filter(r => r.query).length, 2);
+  for (const path of [f.paths.history(1), f.paths.operation({ operationId: 'a'.repeat(64) })]) {
+    f.rows.set(path, {}); await rejects(readCurrentPolicyInTransaction(p.options), 'INVALID'); f.rows.delete(path);
+  }
+  assert.deepEqual(f.counts, { transactions: 0, reads: 0, writes: 0, authorizations: 0 });
+});
+test('external Policy port uses complete bounded graph, frozen detached results and no cross-invocation cache', async () => {
+  const f = fixture(), init = f.command(); await f.store.initializeSessionPolicy(init);
+  await f.store.updateSessionPolicy(f.command(30)); const update = f.command(360, 2); await f.store.updateSessionPolicy(update);
+  const p = externalPolicyPort(f), before = { ...f.counts }, result = await readCurrentPolicyInTransaction(p.options);
+  assert.equal(result.policyVersion, 3);
+  assert.deepEqual(p.reads.map(r => r.path).sort(), [f.paths.current, f.paths.history(3), f.paths.operation(update),
+    f.paths.history(2), f.paths.history(1), f.paths.operation(init)].sort());
+  for (const value of [result, result.context, result.updatedBy]) assert.ok(Object.isFrozen(value));
+  assert.deepEqual(f.counts, before); assert.deepEqual(result, await f.store.getCurrentPolicy());
+  const v4 = f.command(180, 3); await f.store.updateSessionPolicy(v4);
+  p.reads.length = 0; assert.equal((await readCurrentPolicyInTransaction(p.options)).policyVersion, 4);
+  assert.equal(p.reads.length, 6); assert.equal(result.policyVersion, 3);
+  f.rows.delete(f.paths.operation(v4)); await rejects(readCurrentPolicyInTransaction(p.options), 'INVALID');
+});
+test('external Policy port rejects corrupt current, adjacent history/receipt and accessors without writes', async () => {
+  for (const corrupt of [
+    f => { f.rows.get(f.paths.current).storageProfile = 'wrong'; },
+    f => { f.rows.get(f.paths.current).storageSchemaVersion = 2; },
+    f => { f.rows.get(f.paths.current).policy.context.applicationAudience = 'other'; },
+    f => { f.rows.get(f.paths.current).policy.idleTimeoutMinutes = 0; },
+    f => { f.rows.delete(f.paths.history(3)); },
+    f => { f.rows.delete(f.paths.history(2)); },
+    f => { f.rows.get(f.paths.history(3)).operationId = '0'.repeat(64); },
+    (f, update) => { f.rows.get(f.paths.operation(update)).requestDigest = '0'.repeat(64); },
+  ]) {
+    const f = fixture(); await f.store.initializeSessionPolicy(f.command());
+    await f.store.updateSessionPolicy(f.command(30)); const update = f.command(360, 2); await f.store.updateSessionPolicy(update);
+    corrupt(f, update); const before = { ...f.counts }, rows = structuredClone([...f.rows]);
+    await rejects(readCurrentPolicyInTransaction(externalPolicyPort(f).options), 'INVALID');
+    assert.deepEqual(f.counts, before); assert.deepEqual([...f.rows], rows);
+  }
+  for (const at of ['current', 'history', 'receipt']) {
+    const f = fixture(), init = f.command(); await f.store.initializeSessionPolicy(init);
+    const row = f.rows.get(at === 'current' ? f.paths.current : at === 'history' ? f.paths.history(1) : f.paths.operation(init));
+    const target = at === 'receipt' ? row.canonicalCommand.actor : row.policy.updatedBy;
+    let calls = 0; Object.defineProperty(target, 'sub', { enumerable: true, get() { calls++; return actor.sub; } });
+    await rejects(readCurrentPolicyInTransaction(externalPolicyPort(f).options), 'INVALID'); assert.equal(calls, 0);
+  }
+});
+test('external Policy port rejects malformed configuration and preserves SDK error identity at every dependency', async () => {
+  const f = fixture(); await f.store.initializeSessionPolicy(f.command()); await f.store.updateSessionPolicy(f.command(30));
+  await f.store.updateSessionPolicy(f.command(360, 2)); const p = externalPolicyPort(f);
+  for (const get of [undefined, null, 1]) await assert.rejects(readCurrentPolicyInTransaction({ ...p.options, get }), /ACCESS_DENIED/);
+  let calls = 0; const options = { ...p.options }; Object.defineProperty(options, 'get', { enumerable: true, get() { calls++; return p.options.get; } });
+  await assert.rejects(readCurrentPolicyInTransaction(options), /ACCESS_DENIED/); assert.equal(calls, 0); assert.equal(p.reads.length, 0);
+  for (let failAt = 1; failAt <= 6; failAt++) {
+    const error = Object.assign(Error('SDK failure'), { code: 10 }); let read = 0;
+    await assert.rejects(readCurrentPolicyInTransaction({ ...p.options, get: r => {
+      if (++read === failAt) throw error; return p.options.get(r);
+    } }), e => e === error);
+  }
+});
+
+test('test-only coordinator owns one transaction, shares its port, and finishes all reads before test writes', async () => {
+  const f = fixture(), userStore = createFirestoreUserStore({ firestore: f.options.firestore, context: ctx, authorize: () => true });
+  const enroll = uc.createCommand(ctx, { commandId: 'a'.repeat(64), actor, target: actor,
+    kind: 'ENROLL_USER', expectedRevision: null, payload: {} });
+  // This coordinator is a test fixture, never a runtime combined reader or grant.
+  const coordinate = () => f.options.firestore.runTransaction(async tx => {
+    const port = { firestore: f.options.firestore, context: ctx, get: ref => tx.get(ref) };
+    const user = await readUserInTransaction(port, actor);
+    const policy = await readCurrentPolicyInTransaction(port);
+    if (!user || !policy) throw Error('REQUIRED_STATE_MISSING');
+    assert.ok(Object.isFrozen(user)); assert.ok(Object.isFrozen(policy));
+    // Synthetic marker only: proves every required read completed before owner writes.
+    tx.create({ path: 'test-only/coordinator' }, { checked: true });
+    return { user, policy };
+  }, { maxAttempts: 1 });
+  await assert.rejects(coordinate(), /REQUIRED_STATE_MISSING/);
+  await userStore.enrollUser(enroll);
+  await assert.rejects(coordinate(), /REQUIRED_STATE_MISSING/);
+  await f.store.initializeSessionPolicy(f.command());
+  const before = { ...f.counts }, result = await coordinate();
+  assert.equal(result.user.active, false); assert.equal(result.policy.policyVersion, 1);
+  assert.equal(f.counts.transactions, before.transactions + 1);
+  assert.equal(f.counts.authorizations, before.authorizations);
+  assert.equal(f.counts.reads, before.reads + 4); assert.equal(f.counts.writes, before.writes + 1);
+  f.rows.delete('test-only/coordinator'); f.rows.delete(f.paths.history(1));
+  const writes = f.counts.writes;
+  await rejects(coordinate(), 'INVALID'); assert.equal(f.counts.writes, writes);
+  assert.equal(f.rows.has('test-only/coordinator'), false);
 });

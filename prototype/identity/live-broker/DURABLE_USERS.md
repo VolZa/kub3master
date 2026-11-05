@@ -130,3 +130,54 @@ fresh-proof policy, production namespace/IAM/migration and retention/erasure dec
 ADR-050 remains ACCEPTED; ADR-049 remains PROPOSED. Legacy operations stay STRICT_COMMIT_TIME.
 Gate B remains BLOCKED BY MISSING DECISION; PO-01–PO-14 OPEN. Remote admission and business mutations
 remain BLOCKED; PRODUCTION deployment, ADMIN deployment and TEST_RESET remain NO-GO.
+
+## Slice 2C.5.4-C — transaction-scoped User read
+
+The existing store module additionally exports the internal API
+`readUserInTransaction({ firestore, context, get }, principal)`. It reads exactly
+`users/{userKey}` in the existing context-bound authority through injected `get`.
+It reuses `userKey`, `validateBd2Context` and the unchanged `validateEnvelope` /
+curated User validator: canonical principal/path binding, storage and User
+profile/schema, context, active/roles, authorizationVersion/revision, timestamps,
+audit principals and accessor safety all remain mandatory. It does not add a
+creating-receipt read through `lastOperationId` or change User integrity semantics.
+
+The trusted owner supplies `get: ref => tx.get(ref)` from its own Firestore
+transaction. Both independent User and Policy readers must receive that same
+transaction-bound function and matching client/context. The reader opens no
+transaction, performs no standalone `.get()` fallback, writes nothing, calls no
+authorizer and retains no cache. It returns only a detached, deeply frozen User
+projection, never an SDK snapshot or reference. A missing User returns undefined;
+inactive Users and empty roles remain valid data, never positive authorization.
+Malformed principal throws UserStoreError(REJECTED); corrupt persisted data
+throws UserStoreError(INVALID), with ACCESS_DENIED and no operation descriptor.
+Malformed port/context configuration rejects before reads. An injected SDK error
+propagates unchanged to the transaction owner; it is not absence or rollback proof.
+Existing public getUser UNAVAILABLE, mutation UNKNOWN and read-only recovery
+UNKNOWN/INVALID/UNAVAILABLE classifications are unchanged.
+
+The owner must await every required User/Policy read and complete validation
+before staging any write. A DTO's authoritative lifetime is limited to that
+transaction attempt: do not carry it into another transaction as current state,
+or retain the read port after its owner closes. The reader cannot authenticate
+the injected port, enforce its lifetime, grant issuance authority or verify a
+future caller's authorization. Those are trusted composition obligations.
+No runtime combined reader, Session Store/Issuer/Checker or production boundary
+is introduced. Existing OPEN provenance, entitlement, clock, IAM, retention and
+Gate B obligations above remain unchanged; ADR statuses are unchanged.
+
+Verification on 2026-11-05 used existing Node 24.19.0 (no installation) and local
+Firestore Emulator 1.22.0 / Java 21 at 127.0.0.1:8685. User store units: 30 PASS /
+0 FAIL; combined User/Policy store units: 69 PASS / 0 FAIL; backend unit regression,
+including the unchanged Session Contract suite: 195 PASS / 0 FAIL. User Emulator:
+20 PASS / 0 FAIL; combined User/Policy Emulator: 48 PASS / 0 FAIL. Counts include
+negative subtests. Metadata-only unit ports reject independent gets and nested
+transactions; synthetic owner writes verify reads-before-writes. The read-only
+SDK coordinator uses one outer transaction, checks both required results, refuses
+missing/corrupt state without writes and runs through two independent clients.
+Concurrent User, Policy and test-only atomic coupled updates preserve consistent
+snapshots. Competing writers start under the read but are awaited only after it
+settles; no winner is assumed. Coupled writes exist only in the test file and use
+valid User/Policy envelopes, receipts and history. Emulator evidence does not
+establish production durability or protection against privileged coordinated
+tampering. See DURABLE_SESSION_POLICY.md for Policy dependencies and isolation checks.

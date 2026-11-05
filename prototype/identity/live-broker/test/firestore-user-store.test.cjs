@@ -1,7 +1,7 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { createFirestoreUserStore } = require('../firestore-user-store.cjs');
+const { createFirestoreUserStore, readUserInTransaction } = require('../firestore-user-store.cjs');
 const c = require('../bd2-user-contract.cjs');
 const context = () => ({ environment: 'TEST', applicationAudience: 'store-unit', expectedScriptId: 'isolated' });
 const principal = sub => ({ issuer: 'https://accounts.google.com', sub });
@@ -186,4 +186,66 @@ test('configuration and command inputs detach before any injected callback can m
   f.options.authorize = () => false;
   await f.store.enrollUser(f.command()); assert.equal(f.rows.size, 2);
   assert.throws(() => createFirestoreUserStore({ ...f.options, isAdmin: true }), /ACCESS_DENIED/);
+});
+
+// Metadata-only SDK surface: every accidental independent read/transaction fails.
+function externalUserPort(f) {
+  const paths = [];
+  const ref = path => ({ path, collection: name => collection(path + '/' + name),
+    get() { assert.fail('independent get'); } });
+  const collection = path => ({ doc: id => ref(path + '/' + id) });
+  return { paths, options: { context: context(), firestore: { collection,
+    runTransaction() { assert.fail('nested transaction'); } },
+    async get(r) { paths.push(r.path); return { exists: f.rows.has(r.path), data: () => f.rows.get(r.path) }; } } };
+}
+test('external User port reads only the User, returns detached frozen inactive state and never caches', async () => {
+  const f = fixture(), p = externalUserPort(f), read = () => readUserInTransaction(p.options, principal('target'));
+  assert.equal(await read(), undefined);
+  const cmd = f.command(); await f.store.enrollUser(cmd);
+  // User integrity intentionally does not depend on its creating receipt.
+  for (const path of f.rows.keys()) if (path.includes('/operations/')) f.rows.delete(path);
+  const before = { ...f.counts }, user = await read();
+  assert.equal(user.active, false); assert.deepEqual(user.roles, []);
+  for (const value of [user, user.roles, user.context, user.principal]) assert.ok(Object.isFrozen(value));
+  f.rows.get(f.path('target')).user.active = true;
+  assert.equal(user.active, false); assert.equal((await read()).active, true);
+  assert.deepEqual(f.counts, before); assert.deepEqual(p.paths, Array(3).fill(f.path('target')));
+});
+test('external User port preserves every envelope/User check and rejects accessors without invoking them', async t => {
+  const cases = [
+    ['storage profile', r => { r.storageProfile = 'wrong'; }],
+    ['storage schema', r => { r.storageSchemaVersion = 2; }],
+    ['User profile', r => { r.user.profile = 'wrong'; }],
+    ['User schema', r => { r.user.schemaVersion = 2; }],
+    ['context', r => { r.user.context.applicationAudience = 'other'; }],
+    ['principal/key', r => { r.user.principal.sub = 'other'; }],
+    ['active', r => { r.user.active = 1; }],
+    ['roles', r => { r.user.roles = ['OWNER']; }],
+    ['authorization version', r => { r.user.authorizationVersion = -1; }],
+    ['revision', r => { r.user.revision = 0.5; }],
+    ['timestamps', r => { r.updatedAtMs = r.createdAtMs - 1; }],
+    ['audit principal', r => { r.createdBy.issuer = 'other'; }],
+    ['operation syntax', r => { r.lastOperationId = 'bad'; }],
+  ];
+  for (const [name, corrupt] of cases) await t.test(name, async () => {
+    const f = fixture(); await f.store.enrollUser(f.command()); corrupt(f.rows.get(f.path('target')));
+    const before = { ...f.counts }; await rejects(readUserInTransaction(externalUserPort(f).options, principal('target')), 'INVALID');
+    assert.deepEqual(f.counts, before);
+  });
+  for (const location of ['envelope', 'principal', 'roles']) {
+    const f = fixture(); await f.store.enrollUser(f.command()); const row = f.rows.get(f.path('target'));
+    let calls = 0;
+    const [target, key, value] = location === 'envelope' ? [row, 'updatedAtMs', 1000] :
+      location === 'principal' ? [row.user.principal, 'sub', 'target'] : [row.user.roles, '0', 'ADMIN'];
+    Object.defineProperty(target, key, { enumerable: true, configurable: true, get() { calls++; return value; } });
+    await rejects(readUserInTransaction(externalUserPort(f).options, principal('target')), 'INVALID'); assert.equal(calls, 0);
+  }
+});
+test('external User port validates configuration/principal before I/O and leaves SDK failure to owner', async () => {
+  const f = fixture(), { options, paths } = externalUserPort(f);
+  for (const get of [undefined, null, 1]) await assert.rejects(readUserInTransaction({ ...options, get }, principal('target')), /ACCESS_DENIED/);
+  let calls = 0; const bad = { issuer: principal('x').issuer, get sub() { calls++; return 'x'; } };
+  await rejects(readUserInTransaction(options, bad), 'REJECTED'); assert.equal(calls, 0); assert.equal(paths.length, 0);
+  const error = Object.assign(Error('SDK failure'), { code: 10 });
+  await assert.rejects(readUserInTransaction({ ...options, get: async () => { throw error; } }, principal('target')), e => e === error);
 });

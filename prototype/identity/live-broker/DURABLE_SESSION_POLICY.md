@@ -315,3 +315,74 @@ Changes are limited to the store, its unit/integration tests, the contract test
 and this document. No new files or contract/build/production integration changes.
 The original six files remain untracked and staging remains empty. This correction
 is intended for repeat independent review; that review is not run automatically.
+
+## Slice 2C.5.4-C — transaction-scoped Policy read
+
+The existing store module additionally exports
+`readCurrentPolicyInTransaction({ firestore, context, get })`. The trusted owner
+opens the outer transaction and supplies `get: ref => tx.get(ref)` from that
+attempt. `get` must support both DocumentReference and Query; a missing current
+requires two `limit(1)` probes of history and operations through the same port.
+Only a genuinely empty authority returns undefined. Orphan history or operations
+without current are INVALID. No implicit initialization or idle-180 fallback exists.
+
+The exact existing bounded validation graph was extracted into module-private
+`policyReader(context, root, get, descriptor?)` and is shared by the new reader,
+public getter, mutations and historical recovery. Current-policy reads still
+validate current, its matching version history and creating receipt, the receipt's
+required previous history, initialization history H(1) and its matching INITIALIZED
+receipt. At v3 and v4 that is six distinct point reads, without recursive history
+audit. The shared NOOP/recovery path retains its creating-receipt and adjacent
+history dependencies; recovery remains independent of current. Full F-01
+initialization binding and F-02 nested accessor safety remain in force.
+
+The reader opens no transaction, performs no independent `.get()` fallback,
+stages no write and invokes no authorizer. Deduplication is confined to one
+invocation; later calls reread every dependency. Only the validated detached,
+deeply frozen Policy projection is returned, never snapshots or lazy references.
+Corrupt persisted evidence throws SessionPolicyStoreError(INVALID) with
+ACCESS_DENIED and no operation descriptor. Invalid port/context rejects before
+I/O. SDK failures propagate unchanged to the outer owner. The public standalone
+getter still maps SDK failure to UNAVAILABLE; mutation uncertainty remains UNKNOWN;
+recovery with missing original receipt remains UNKNOWN, missing required history
+for a present receipt remains INVALID, and recovery transport failure remains
+UNAVAILABLE. Existing fresh mutation authorization behavior is unchanged.
+
+Both independent readers must receive the same transaction-bound get and matching
+Firestore client/context. The trusted owner awaits all required reads, rejects
+missing required state and completes validation before staging any writes. Read
+ports and authoritative DTO use must stay within the originating attempt; retry
+or a new transaction requires fresh reads. DTO validation cannot prove that a
+caller supplied the correct port or closed it. No runtime combined module,
+issuance capability, production authorizer or Session implementation is added.
+Owner bootstrap, Security Manager entitlement, actor provenance, sensitive proof,
+IAM, clock and durability/retention obligations remain OPEN. Gate B remains
+BLOCKED BY MISSING DECISION; production remains NO-GO. ADR-050 stays ACCEPTED and
+ADR-049 stays PROPOSED. Slice D is outside this implementation.
+
+Verification on 2026-11-05: Policy store units 39 PASS / 0 FAIL (including all
+16 F-01 corruption scenarios through the external reader and existing public
+boundaries); Policy Emulator 28 PASS / 0 FAIL (the same 16 persisted corruption
+scenarios plus bounded dependency, adjacent-evidence and empty-authority checks).
+Combined User/Policy store units: 69 PASS / 0 FAIL. Full backend unit regression:
+195 PASS / 0 FAIL, including unchanged Session Contracts and mutation/recovery
+tests. Combined User/Policy Emulator: 48 PASS / 0 FAIL, including two independent
+clients, one outer transaction, zero nested transactions, missing/corrupt-state
+refusal without writes, concurrent User/Policy changes and a valid test-only
+atomic coupled update. No writer is awaited while the reader holds locks and no
+particular race winner is required. Node 24.19.0, local Emulator 1.22.0 and Java 21
+were already available; no dependencies or system settings were installed/changed.
+
+Repository regression: 73 Vitest files / 2516 tests PASS, 0 FAIL. This includes
+the actual curated Node facade build/export checks, in-memory GAS Rollup graph
+and exported-entrypoint checks, portable permission/session regressions and
+production default-deny execution. The Node export test invokes bundle.write
+for the ignored Node facade artifact; GAS uses bundle.generate without writing
+production output. Separate before/after SHA-256 comparison of all 21 files in
+dist/ and build/ found no content changes, including the rebuilt Node artifact.
+No production build command was run. All six changed JavaScript files pass
+node --check; git diff --check passes. Changes are confined to the eight allowed
+Slice C files; no contract, ADR, build configuration or production entrypoint
+changed. Staging remains empty; branch and HEAD remain feature/bom-logic at
+394b088a989e670b539af048861904340ca8f69a. Implementation is ready for independent
+review within this isolated scope, without commit/push/deployment or Slice D.

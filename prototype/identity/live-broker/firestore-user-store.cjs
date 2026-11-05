@@ -4,6 +4,23 @@ const { ROOT, USER_PROFILE, data, integer, authorityKey, userKey, validateComman
   validateDescriptor, validateEnvelope, transition, createReceipt, validateReceipt, UserStoreError,
   sameUser } = require('./bd2-user-contract.cjs');
 
+/** Internal trusted port. The owner supplies a transaction-bound get and owns its
+ * lifetime and error boundary. No transaction, standalone fallback, writes or grant.
+ */
+async function readUserInTransaction(options, principal) {
+  const o = data(options, ['firestore', 'context', 'get']);
+  const context = api.validateBd2Context(o.context);
+  if (!o.firestore || typeof o.firestore.collection !== 'function' || typeof o.get !== 'function')
+    throw Error('ACCESS_DENIED');
+  let key;
+  try { key = userKey(principal); } catch { throw new UserStoreError('REJECTED'); }
+  const ref = o.firestore.collection(ROOT).doc(authorityKey(context)).collection('users').doc(key);
+  const snapshot = await o.get(ref); // Preserve SDK failures for the transaction owner.
+  if (!snapshot.exists) return undefined;
+  try { return validateEnvelope(context, snapshot.data(), key).user; }
+  catch { throw new UserStoreError('INVALID'); }
+}
+
 /** Internal trusted SDK port. No default client, HTTP registration, positive authorizer or cache.
  * authorize(command, reads) is trusted server injection, NEVER an actor/isAdmin DTO. Only test
  * fixtures currently allow. A future production authorizer/provenance boundary needs approval.
@@ -104,4 +121,4 @@ function createFirestoreUserStore(options) {
     },
   });
 }
-module.exports = { createFirestoreUserStore };
+module.exports = { createFirestoreUserStore, readUserInTransaction };

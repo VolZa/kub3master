@@ -3,7 +3,7 @@ const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { randomBytes } = require('node:crypto');
 const { createLocalFirestoreClient } = require('../firestore-attempt-store.cjs');
-const { createFirestoreSessionPolicyStore } = require('../firestore-session-policy-store.cjs');
+const { createFirestoreSessionPolicyStore, readCurrentPolicyInTransaction } = require('../firestore-session-policy-store.cjs');
 const c = require('../bd2-session-policy-contract.cjs');
 const host = process.env.FIRESTORE_EMULATOR_HOST;
 if (!host) throw Error('INTEGRATION_BLOCKED: loopback Firestore Emulator required; no production/mock fallback');
@@ -40,6 +40,11 @@ const reject = (p, outcome) => assert.rejects(p, e => e instanceof c.SessionPoli
 const rows = async f => ({ current: (await f.current.get()).data(),
   histories: (await f.histories.orderBy('__name__').get()).docs.map(d => [d.id, d.data()]),
   operations: (await f.operations.orderBy('__name__').get()).docs.map(d => [d.id, d.data()]) });
+
+// Only this test owner opens a transaction. The reader sees no transaction method.
+const readExternal = f => f.db.runTransaction(tx => readCurrentPolicyInTransaction({
+  firestore: { collection: f.db.collection.bind(f.db) }, context: f.ctx, get: ref => tx.get(ref),
+}), { maxAttempts: 1 });
 
 test('local factory refuses non-loopback/non-demo/credential overrides', () => {
   for (const options of [{ host: 'firestore.googleapis.com:443', projectId }, { host, projectId: 'production-project' },
@@ -206,13 +211,14 @@ test('F-01: damaged initialization evidence at current v3 blocks reads, UPDATE, 
     await f.store.updateSessionPolicy(f.command(360, 2));
     await corrupt(f, init, update);
     const before = await rows(f), writes = f.state.writes, calls = f.state.transactions;
+    await reject(readExternal(f), 'INVALID');
     await reject(f.store.getCurrentPolicy(), 'INVALID');
     await reject(f.store.updateSessionPolicy(f.command(180, 3)), 'INVALID');
     await reject(f.store.updateSessionPolicy(f.command(360, 3)), 'INVALID');
     await reject(f.store.updateSessionPolicy(update), 'INVALID');
     await reject(f.store.initializeSessionPolicy(init), 'INVALID');
     assert.equal(f.state.writes, writes, 'zero staged writes after corruption');
-    assert.equal(f.state.transactions, calls + 5, 'no automatic retry');
+    assert.equal(f.state.transactions, calls + 6, 'one external transaction plus five public calls; no nested transaction');
     assert.equal((await f.histories.doc('4').get()).exists, false);
     assert.deepEqual(await rows(f), before, 'all persisted documents unchanged, no repair');
   });
@@ -236,4 +242,39 @@ test('F-01: intact initialization anchor preserves v3/v4, NOOP, replay and read-
   assert.deepEqual(await f.store.lookupOperationOutcome(c.descriptor(f.ctx, noop)), savedNoop);
   assert.equal(f.state.transactions, calls); assert.equal(f.state.authorizations, auth);
   assert.equal(f.state.writes, writes); assert.deepEqual(await rows(f), before);
+});
+
+test('external Policy reader uses bounded SDK dependencies, empty-authority queries and fresh evidence across clients', async () => {
+  const a = fixture(), b = fixture(a.ctx);
+  const emptyCalls = b.state.transactions, emptyReads = b.state.reads;
+  assert.equal(await readExternal(b), undefined);
+  assert.equal(b.state.transactions, emptyCalls + 1); assert.equal(b.state.reads, emptyReads + 3);
+  const init = a.command(); await a.store.initializeSessionPolicy(init);
+  await a.store.updateSessionPolicy(a.command(30)); const update = a.command(360, 2); await a.store.updateSessionPolicy(update);
+  const before = { ...b.state }, graph = [];
+  const result = await b.db.runTransaction(tx => readCurrentPolicyInTransaction({
+    firestore: { collection: b.db.collection.bind(b.db) }, context: b.ctx,
+    get: ref => { graph.push(ref.path); return tx.get(ref); },
+  }), { maxAttempts: 1 });
+  assert.deepEqual(graph.sort(), [b.current.path, b.histories.doc('3').path, b.operations.doc(update.operationId).path,
+    b.histories.doc('2').path, b.histories.doc('1').path, b.operations.doc(init.operationId).path].sort());
+  assert.equal(b.state.transactions, before.transactions + 1); assert.equal(b.state.reads, before.reads + 6);
+  assert.equal(b.state.writes, before.writes); assert.equal(b.state.authorizations, before.authorizations);
+  for (const value of [result, result.context, result.updatedBy]) assert.ok(Object.isFrozen(value));
+  await a.store.updateSessionPolicy(a.command(180, 3)); assert.equal((await readExternal(b)).policyVersion, 4);
+  assert.equal(result.policyVersion, 3);
+  // Persisted adjacent evidence, separate from the initialization corruption matrix.
+  for (const ref of [a.histories.doc('4'), a.histories.doc('3'), a.operations.doc((await a.current.get()).data().lastOperationId)]) {
+    const saved = (await ref.get()).data(); await ref.delete();
+    const durable = await rows(a), writes = b.state.writes;
+    await reject(readExternal(b), 'INVALID'); assert.equal(b.state.writes, writes); assert.deepEqual(await rows(a), durable);
+    await ref.create(saved);
+  }
+  await a.current.delete(); await reject(readExternal(b), 'INVALID');
+  // Missing current with only either kind of orphan still fails closed.
+  for (const keep of ['history', 'operation']) {
+    const f = fixture(), cmd = f.command(); await f.store.initializeSessionPolicy(cmd); await f.current.delete();
+    await (keep === 'history' ? f.operations.doc(cmd.operationId) : f.histories.doc('1')).delete();
+    await reject(readExternal(f), 'INVALID');
+  }
 });
