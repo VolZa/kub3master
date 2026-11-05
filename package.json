@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "build": "rollup -c && cpy appsscript.json dist && cpy html/**/*.html dist",
+    "build:permission-node": "rollup -c rollup.permission-node.config.mjs",
     "build:test-admin": "rollup -c rollup.test-admin.config.mjs",
     "build:test-runtime": "rollup -c rollup.test-runtime.config.mjs",
     "build:admin": "rollup -c rollup.admin.config.mjs",

@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [],
+    "sourceMap": false,
+    "incremental": false,
+    "noEmitOnError": true,
+    "outDir": "./build/permission-node"
+  },
+  "include": ["src/security/permission-service.ts", "src/security/bd2/**/*.ts"],
+  "exclude": ["src/security/bd2/**/*.test.ts", "node_modules", "dist", "build"]
+}

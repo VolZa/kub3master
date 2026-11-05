@@ -6,6 +6,7 @@ dist/
 build/test-admin/
 build/test-readiness/
 build/test-runtime/
+build/permission-node/
 
 # Logs
 npm-debug.log*
