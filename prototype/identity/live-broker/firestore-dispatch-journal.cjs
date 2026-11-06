@@ -34,6 +34,20 @@ function sameBinding(a, b) {
 function outcomeReference(b) {
   return Object.freeze({ kind: 'CLAIM', attemptId: b.attemptId, operationId: b.operationId, bindingDigest: b.bindingDigest });
 }
+// Internal pure validator; config is the caller's captured, validated configuration.
+function validateDispatchJournalRecord(value, config) {
+  const r = data(value, ['schemaVersion', 'binding', 'createdAtMs', 'state', 'revision', 'reservedAtMs', 'outcomeRef']);
+  const b = readBinding(r.binding, config), ref = data(r.outcomeRef, ['kind', 'attemptId', 'operationId', 'bindingDigest']);
+  if (r.schemaVersion !== 1 || !Number.isSafeInteger(r.createdAtMs) || r.createdAtMs < b.attemptCreatedAtMs ||
+    r.createdAtMs >= b.attemptExpiresAtMs || Object.keys(ref).some(k => ref[k] !== outcomeReference(b)[k])) deny();
+  if (r.state === 'INTENT') {
+    if (r.revision !== 0 || r.reservedAtMs !== null) deny();
+  } else if (r.state === 'RESERVED') {
+    if (r.revision !== 1 || !Number.isSafeInteger(r.reservedAtMs) ||
+      r.reservedAtMs < r.createdAtMs || r.reservedAtMs >= b.attemptExpiresAtMs) deny();
+  } else deny();
+  return { ...r, binding: b };
+}
 class DispatchJournalError extends Error {
   constructor(outcome, descriptor) {
     super('ACCESS_DENIED'); this.name = 'DispatchJournalError'; this.outcome = outcome;
@@ -61,19 +75,6 @@ function createFirestoreDispatchJournal({ firestore, configuration: config,
   function live(binding, at) {
     if (binding.attemptCreatedAtMs > at || binding.attemptExpiresAtMs <= at) deny();
   }
-  function stored(value) {
-    const r = data(value, ['schemaVersion', 'binding', 'createdAtMs', 'state', 'revision', 'reservedAtMs', 'outcomeRef']);
-    const b = readBinding(r.binding, c), ref = data(r.outcomeRef, ['kind', 'attemptId', 'operationId', 'bindingDigest']);
-    if (r.schemaVersion !== 1 || !Number.isSafeInteger(r.createdAtMs) || r.createdAtMs < b.attemptCreatedAtMs ||
-      r.createdAtMs >= b.attemptExpiresAtMs || Object.keys(ref).some(k => ref[k] !== outcomeReference(b)[k])) deny();
-    if (r.state === 'INTENT') {
-      if (r.revision !== 0 || r.reservedAtMs !== null) deny();
-    } else if (r.state === 'RESERVED') {
-      if (r.revision !== 1 || !Number.isSafeInteger(r.reservedAtMs) ||
-        r.reservedAtMs < r.createdAtMs || r.reservedAtMs >= b.attemptExpiresAtMs) deny();
-    } else deny();
-    return { ...r, binding: b };
-  }
   async function transaction(ref, callback) {
     // F-01: never turn any numeric SDK code into another outer transaction.
     // maxAttempts=1 does not disable all lower-level RPC retries.
@@ -90,7 +91,7 @@ function createFirestoreDispatchJournal({ firestore, configuration: config,
       const created = await transaction(ref, async tx => {
         const snapshot = await tx.get(doc);
         if (snapshot.exists) {
-          try { if (!sameBinding(stored(snapshot.data()).binding, b)) deny(); }
+          try { if (!sameBinding(validateDispatchJournalRecord(snapshot.data(), c).binding, b)) deny(); }
           catch { return reject(ref); }
           return false; // Existing INTENT is never adopted, even if no reservation occurred.
         }
@@ -112,7 +113,7 @@ function createFirestoreDispatchJournal({ firestore, configuration: config,
         const doc = collection.doc(b.intentId), snapshot = await tx.get(doc);
         if (!snapshot.exists) return reject(ref);
         let r, at;
-        try { r = stored(snapshot.data()); if (!sameBinding(r.binding, b)) deny(); }
+        try { r = validateDispatchJournalRecord(snapshot.data(), c); if (!sameBinding(r.binding, b)) deny(); }
         catch { return reject(ref); }
         if (r.state !== 'INTENT') return false;
         try { at = time(); live(b, at); if (at < r.createdAtMs) deny(); } catch { return reject(ref); }
@@ -136,7 +137,7 @@ function createFirestoreDispatchJournal({ firestore, configuration: config,
       catch { return Object.freeze({ status: 'UNAVAILABLE' }); }
       if (!snapshot.exists) return Object.freeze({ status: 'UNKNOWN' });
       try {
-        const r = stored(snapshot.data()), actual = reference(r.binding);
+        const r = validateDispatchJournalRecord(snapshot.data(), c), actual = reference(r.binding);
         if (r.binding.intentId !== ref.intentId || actual.requestDigest !== ref.requestDigest ||
           (ref.bindingDigest !== null && actual.bindingDigest !== ref.bindingDigest)) deny();
         return Object.freeze({ status: 'FOUND', descriptor: actual, state: r.state, revision: r.revision,
@@ -145,4 +146,5 @@ function createFirestoreDispatchJournal({ firestore, configuration: config,
     },
   });
 }
-module.exports = { createFirestoreDispatchJournal, DispatchJournalError, intentId, reference, readReference, readBinding };
+module.exports = { createFirestoreDispatchJournal, DispatchJournalError, intentId, reference, readReference, readBinding,
+  validateDispatchJournalRecord };

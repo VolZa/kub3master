@@ -3,6 +3,22 @@ const { Firestore } = require('@google-cloud/firestore');
 const { hex, deny } = require('./security.cjs');
 const { data, configuration, record, bindingDigest, operationId, AttemptStoreError } = require('./bd2-attempt-contract.cjs');
 
+// Internal pure validator; config is the caller's captured, validated configuration.
+function validateAttemptEnvelope(value, config, id) {
+  const e = data(value, ['schemaVersion', 'attempt', 'bindingDigest', 'createOperationId', 'revision', 'claim']);
+  const row = record(e.attempt, config, id);
+  if (e.schemaVersion !== 1 || e.bindingDigest !== bindingDigest(row) || e.createOperationId !== operationId('CREATE', id)) deny();
+  if (row.phase === 'NEW') {
+    if (e.revision !== 0 || e.claim !== null) deny();
+  } else {
+    const claim = data(e.claim, ['operationId', 'checkedAtMs']);
+    if (e.revision !== 1 || claim.operationId !== operationId('CLAIM', id) ||
+      !Number.isSafeInteger(claim.checkedAtMs) || claim.checkedAtMs < row.createdAtMs ||
+      claim.checkedAtMs >= row.expiresAtMs) deny();
+  }
+  return { ...e, attempt: row };
+}
+
 /** Isolated local factory: loopback + demo project only, insecure emulator transport, no ADC.
  * A future production client/composition requires separate approval. No environment fallback.
  */
@@ -37,20 +53,6 @@ function createFirestoreAttemptStore({ firestore, configuration: config, collect
   }
   function live(row, at) {
     if (row.createdAtMs > at || row.expiresAtMs <= at) deny();
-  }
-  function envelope(value, id) {
-    const e = data(value, ['schemaVersion', 'attempt', 'bindingDigest', 'createOperationId', 'revision', 'claim']);
-    const row = record(e.attempt, c, id);
-    if (e.schemaVersion !== 1 || e.bindingDigest !== bindingDigest(row) || e.createOperationId !== operationId('CREATE', id)) deny();
-    if (row.phase === 'NEW') {
-      if (e.revision !== 0 || e.claim !== null) deny();
-    } else {
-      const claim = data(e.claim, ['operationId', 'checkedAtMs']);
-      if (e.revision !== 1 || claim.operationId !== operationId('CLAIM', id) ||
-        !Number.isSafeInteger(claim.checkedAtMs) || claim.checkedAtMs < row.createdAtMs ||
-        claim.checkedAtMs >= row.expiresAtMs) deny();
-    }
-    return { ...e, attempt: row };
   }
   async function transaction(d, update) {
     // One outer attempt only. maxAttempts disables SDK callback retries, not all RPC retries.
@@ -87,7 +89,7 @@ function createFirestoreAttemptStore({ firestore, configuration: config, collect
           if (!snapshot.exists) rejected(d());
           let e, next, at;
           try {
-            e = envelope(snapshot.data(), id); digest = e.bindingDigest;
+            e = validateAttemptEnvelope(snapshot.data(), c, id); digest = e.bindingDigest;
             at = time(); live(e.attempt, at);
             if (e.attempt.phase !== 'NEW') rejected(d());
             next = record(update(e.attempt), c, id);
@@ -116,7 +118,7 @@ function createFirestoreAttemptStore({ firestore, configuration: config, collect
       if (!snapshot.exists) return Object.freeze({ status: 'UNKNOWN' });
       let e;
       try {
-        e = envelope(snapshot.data(), q.attemptId);
+        e = validateAttemptEnvelope(snapshot.data(), c, q.attemptId);
         if (q.bindingDigest !== null && q.bindingDigest !== e.bindingDigest) deny();
       } catch { return Object.freeze({ status: 'INVALID' }); }
       if (q.kind === 'CLAIM' && e.claim === null) return Object.freeze({ status: 'UNKNOWN' });
@@ -127,4 +129,4 @@ function createFirestoreAttemptStore({ firestore, configuration: config, collect
     },
   });
 }
-module.exports = { createLocalFirestoreClient, createFirestoreAttemptStore };
+module.exports = { createLocalFirestoreClient, createFirestoreAttemptStore, validateAttemptEnvelope };
