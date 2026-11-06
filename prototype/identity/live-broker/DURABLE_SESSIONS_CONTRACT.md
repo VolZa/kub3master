@@ -24,6 +24,24 @@ remains PROPOSED. Gate B remains **BLOCKED BY MISSING DECISION**; production is
 **NO-GO**. Legacy STRICT_COMMIT_TIME, production authorization/holds and existing
 security foundations are unchanged. Local DTO consistency cannot open a gate.
 
+## ACCEPTED Slice C decisions
+
+C-01–C-05 are agreed architectural decisions, implemented in Slice 2C.5.4-C
+and accepted in commit `d1340666fdc6293dd47419db32de2cc3655824d3`:
+
+| Decision | Agreed architecture implemented in Slice C |
+| --- | --- |
+| C-01 | Internal transaction-scoped readers reside in the existing User and SessionPolicy stores. |
+| C-02 | Two independent APIs: `readUserInTransaction()` and `readCurrentPolicyInTransaction()`. |
+| C-03 | One outer transaction is controlled by the trusted owner; both readers use the same transaction-bound read port. |
+| C-04 | Existing `undefined` results for missing state and existing error semantics are preserved. |
+| C-05 | Existing bounded integrity checks are preserved, including the SessionPolicy F-01/F-02 regressions. |
+
+Implementation details and evidence remain in
+[Durable Users — Slice C](DURABLE_USERS.md#slice-2c54-c--transaction-scoped-user-read)
+and [Durable SessionPolicy — Slice C](DURABLE_SESSION_POLICY.md#slice-2c54-c--transaction-scoped-policy-read).
+This records completed reader work, not a Session creation transaction or production readiness.
+
 ## IMPLEMENTED contracts
 
 `bd2-session-contract.cjs` requires the existing curated
@@ -148,7 +166,9 @@ Capture policy/version exactly once with that committed creation. A changed
 operation for an occupied original attempt must fail closed. Retain original
 S/digest/snapshot across UNKNOWN; do not infer abort from missing evidence.
 There is no implementation or concurrency/durability evidence for this protocol
-in Slice B. Transaction-scoped readers and proof provenance require review first.
+in Slice B. Transaction-scoped User/Policy readers are now implemented and accepted
+in [Slice C](#accepted-slice-c-decisions); their use in the future creation transaction
+remains part of the future store work.
 
 ## SID boundary, OPEN decisions and production limitations
 
@@ -166,13 +186,15 @@ descriptor is only an immutable locator: it grants neither mutation nor recovery
 permission. Authenticated HTTP recovery and fresh release/use checks remain OPEN.
 
 OPEN: trusted proof-to-issuer provenance; freshness/creation-time rules; reviewed
-clock guarantees; transaction-scoped User/Policy readers; browser delivery/CSRF;
+clock guarantees; browser delivery/CSRF;
 authenticated HTTP recovery; Owner/Security Manager security operations;
 production namespace/IAM; P-14 AuditLog; activity continuation/revoke authorization.
 No OPEN decision blocks the isolated data minimum implemented here. Actual
 issuance/recovery/authorization and store integration remain BLOCKED until these
 decisions and their evidence are accepted. No arbitrary production defaults are
-substituted for them. Slice C is not started.
+substituted for them. Slice C is implemented and accepted in commit
+`d1340666fdc6293dd47419db32de2cc3655824d3`; its agreed decisions are defined
+[above](#accepted-slice-c-decisions).
 
 ## Verification (2026-11-05)
 

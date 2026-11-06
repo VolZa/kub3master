@@ -14,8 +14,12 @@ Gate B is BLOCKED BY MISSING DECISION; production is NO-GO.
 | D-04 | One original Attempt has at most one creation slot within its authority; durable enforcement belongs to later slices |
 | D-05 | Trusted Handoff Foundation only |
 
-Existing S-01–S-06 and C-01–C-05 remain obligations, without changes to their
-contracts or implementations. D1 does not prove distributed at-most-one Session.
+Existing S-01–S-06 remain obligations. The agreed C-01–C-05 decisions, already
+implemented and accepted in Slice C, are defined in
+[Durable Sessions — ACCEPTED Slice C decisions](DURABLE_SESSIONS_CONTRACT.md#accepted-slice-c-decisions).
+This canonical reference addresses documentation traceability finding F-01 from
+the independent D1 review, without changing contracts or implementations.
+D1 does not prove distributed at-most-one Session.
 
 ## Trusted origin and actual call graph
 
