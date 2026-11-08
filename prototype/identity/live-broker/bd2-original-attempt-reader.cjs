@@ -1,10 +1,13 @@
 'use strict';
-const { deny } = require('./security.cjs');
+const { deny, hex } = require('./security.cjs');
 const { data, configuration, bindingDigest, operationId } = require('./bd2-attempt-contract.cjs');
 const { authorityKey } = require('./bd2-user-contract.cjs');
 const { createTrustedSessionHandoff } = require('./bd2-trusted-session-handoff.cjs');
 const { validateAttemptEnvelope } = require('./firestore-attempt-store.cjs');
 const { validateDispatchJournalRecord, intentId } = require('./firestore-dispatch-journal.cjs');
+const { createCreationClockGuard, isPreFixationTimeValid, isPostFixationTimeValid } = require('./bd2-creation-clock.cjs');
+const { createSessionCreationCoordinator } = require('./bd2-session-creation-coordinator.cjs');
+const session = require('./bd2-session-contract.cjs');
 const CONTEXT = ['environment', 'applicationAudience', 'expectedScriptId'];
 const sameContext = (a, b) => CONTEXT.every(key => a[key] === b[key]);
 
@@ -24,14 +27,9 @@ function documentReader(firestore, collectionId) {
   };
 }
 
-/** Trusted Node construction ONLY: no owner/reader/verifier/continuation injection.
- * Captures original configuration before constructing its genuine D1 owner. Existing
- * D1 internals still revalidate immutable copies; no later configuration is consulted.
- * readOriginal consumes D1 and terminates at DATA. It grants no creation authority.
- * Future B must extend this closure's same private operation, never adopt its output.
- */
-function createOriginalAttemptMetadataReader(options) {
-  const o = data(options, ['firestore', 'configuration'], ['now', 'attemptCollectionId', 'journalCollectionId']);
+// Module-private construction shared by the two distinct facades. Never exported:
+// neither a raw owner nor a reader/continuation supplied by callers is accepted.
+function originalOperation(o) {
   const c = configuration(o.configuration), firestore = o.firestore, now = o.now ?? Date.now;
   const attemptCollectionId = o.attemptCollectionId ?? 'bd2_login_attempts_v1';
   const journalCollectionId = o.journalCollectionId ?? 'bd2_dispatch_intents_v1';
@@ -74,6 +72,13 @@ function createOriginalAttemptMetadataReader(options) {
       createdAtMs: row.createdAtMs, expiresAtMs: row.expiresAtMs });
   }
 
+  return { owner, readMetadata, configuration: c, firestore, now };
+}
+
+/** Compatible A2 data-only facade. Reading metadata spends D1 and ends progression. */
+function createOriginalAttemptMetadataReader(options) {
+  const o = data(options, ['firestore', 'configuration'], ['now', 'attemptCollectionId', 'journalCollectionId']);
+  const { owner, readMetadata } = originalOperation(o);
   return Object.freeze({
     begin: owner.begin,
     prepareOriginal: owner.prepareOriginal,
@@ -90,4 +95,86 @@ function createOriginalAttemptMetadataReader(options) {
   });
 }
 
-module.exports = { createOriginalAttemptMetadataReader };
+/** Isolated trusted Node construction, NOT production D3 registration. target and
+ * clocks are trusted infrastructure, never request options. No default target exists.
+ * Only canonical command/descriptor DATA cross target entry; its result is discarded.
+ */
+function createTrustedSessionCreationComposition(options) {
+  const o = data(options, ['firestore', 'configuration', 'target'],
+    ['now', 'monotonicNow', 'attemptCollectionId', 'journalCollectionId']);
+  const target = o.target, monotonicNow = o.monotonicNow ?? (() => process.hrtime.bigint());
+  if (typeof target !== 'function' || typeof monotonicNow !== 'function') deny();
+  const { owner, readMetadata, configuration: c, firestore, now } = originalOperation(o);
+  const intents = createSessionCreationCoordinator({ firestore, context: c.context });
+  const permits = new WeakMap();
+  const report = (status, intentStatus, dispatchStatus, descriptor) => Object.freeze({
+    status, intentStatus, dispatchStatus, ...(descriptor ? { descriptor } : {}),
+  });
+
+  // No await, validation, clock/source callback or target lookup before deletion.
+  function consumePermit(permit, operation) {
+    const owned = permits.get(permit);
+    permits.delete(permit);
+    if (owned !== operation || operation.target !== target) deny();
+    if (!isPostFixationTimeValid({ ...operation.timing, t: operation.guard.observe() })) deny();
+  }
+
+  return Object.freeze({
+    begin: owner.begin,
+    prepareOriginal: owner.prepareOriginal,
+    verify: owner.verify,
+    recover: owner.recover,
+    lookupIntent: descriptor => intents.lookupIntent(descriptor), // Data only; never resumes completion.
+    completeOriginal(capability, expectedBinding, input) {
+      const count = arguments.length;
+      return owner.consume(capability, expectedBinding, async original => {
+        let descriptor, permit, entered = false, intentStatus = 'NOT_SUBMITTED';
+        try {
+          if (count !== 3) deny();
+          const seed = data(input, ['commandId', 'sessionDigest']);
+          if (!hex(seed.commandId) || !hex(seed.sessionDigest)) deny();
+          // Detached scalars before any asynchronous work; no caller command/S/principal.
+          Object.freeze(seed);
+          const guard = createCreationClockGuard({ wallNow: now, monotonicNow });
+          guard.observe(); // Anchor after D1 deletion, before first metadata I/O. Not S.
+          const metadata = await readMetadata(original);
+          const pre = Object.freeze({ C: metadata.createdAtMs, D: metadata.expiresAtMs,
+            V: original.verifiedAtMs, G: original.googleTokenExpiresAtMs });
+          if (!isPreFixationTimeValid({ ...pre, t: guard.observe() })) deny();
+          const S = guard.observe(); // Distinct fixation observation, outside any transaction.
+          const timing = Object.freeze({ ...pre, S });
+          if (!isPostFixationTimeValid({ ...timing, t: S })) deny();
+          const command = session.createCommand(c.context, { ...seed, kind: 'CREATE_SESSION',
+            attempt: original.attempt, principal: original.principal, createdAtMs: S });
+          descriptor = session.descriptor(c.context, command);
+          const operation = Object.freeze({ original, metadata, timing, command, descriptor, guard, target });
+          if (!isPostFixationTimeValid({ ...timing, t: guard.observe() })) deny();
+          intentStatus = 'UNKNOWN'; // Any exception after submission cannot establish rollback.
+          const outcome = data(await intents.createOriginal(command), ['status', 'descriptor']);
+          if (!['NEW', 'EXISTING', 'CONFLICT', 'INVALID', 'UNKNOWN'].includes(outcome.status)) deny();
+          const returned = session.validateDescriptor(c.context, outcome.descriptor);
+          if (Object.keys(descriptor).some(key => returned[key] !== descriptor[key])) deny();
+          intentStatus = outcome.status;
+          if (!isPostFixationTimeValid({ ...timing, t: guard.observe() })) deny();
+          if (intentStatus !== 'NEW') return report(intentStatus === 'UNKNOWN' ? 'UNKNOWN' : 'DENIED',
+            intentStatus, 'NOT_INVOKED', descriptor);
+
+          permit = Object.freeze({});
+          permits.set(permit, operation); // Only this original NEW continuation can mint.
+          consumePermit(permit, operation);
+          entered = true; // Before calling: throw/rejection/thenable failure is potentially UNKNOWN.
+          await target(command, descriptor);
+          return report('TARGET_RETURNED', intentStatus, 'RETURNED', descriptor);
+        } catch {
+          if (!descriptor) return deny(); // D1 also sanitizes; no original snapshot escapes.
+          return report(entered || intentStatus === 'UNKNOWN' ? 'UNKNOWN' : 'DENIED', intentStatus,
+            entered ? 'UNKNOWN' : 'NOT_INVOKED', descriptor);
+        } finally {
+          if (permit) permits.delete(permit); // Also covers failure between mint and consume.
+        }
+      });
+    },
+  });
+}
+
+module.exports = { createOriginalAttemptMetadataReader, createTrustedSessionCreationComposition };

@@ -145,7 +145,8 @@ test('genuine original flow returns only detached frozen metadata, exact C/D and
 
 test('restricted facade/export exposes no owner, raw reader, continuation, Intent or permit API', t => {
   const f = fixture(t);
-  assert.deepEqual(Object.keys(require('../bd2-original-attempt-reader.cjs')), ['createOriginalAttemptMetadataReader']);
+  assert.deepEqual(Object.keys(require('../bd2-original-attempt-reader.cjs')),
+    ['createOriginalAttemptMetadataReader', 'createTrustedSessionCreationComposition']);
   assert.deepEqual(Object.keys(f.reader).sort(), ['begin', 'prepareOriginal', 'readOriginal', 'recover', 'verify']);
   assert.ok(Object.isFrozen(f.reader));
   assert.equal(f.firestore.transactions, 0);
