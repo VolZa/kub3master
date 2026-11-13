@@ -9,6 +9,15 @@
 
 ADR-050 does not open Gate B, close PO-01–PO-14 or change current STRICT_COMMIT_TIME.
 PRODUCTION, ADMIN deployment and TEST_RESET remain NO-GO.
+
+## Production data lifecycle decisions
+
+| ADR | Design | Status |
+| --- | --- | --- |
+| [ADR-051](<ADR-051 — Життєвий цикл виробничих даних.md>) | Життєвий цикл комплекту ЗБВ будинку; NONE за ADR-048; погоджене архівування виробничих даних | ACCEPTED |
+
+ADR-051 accepts architecture rules; implementation and alignment of existing ADR/DDS remain separate tasks.
+
 The historical directory overview below is retained; it is not a complete current ADR listing.
 
 ---
